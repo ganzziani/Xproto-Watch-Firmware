@@ -114,7 +114,7 @@ ISR(USARTE0_RXC_vect) {
             p=(uint8_t *)&M; for(; i<44; i++) send(*p++);   // M
             return;
         case 'w':   // Send waveform stored in EE
-            do { send(eeprom_read_byte(EEwave+i)); } while(++i);
+            do { send(eeprom_read_byte((uint8_t *)EEwave+i)); } while(++i);
             return;
         case 'x':   // Read data and store in AWG buffer
             send('G');   // confirmation

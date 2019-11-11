@@ -2746,7 +2746,7 @@ cancelvdc:
             freqv = TCC0.CCA;
             freqv = (freqv<<16) + TCE0.CCA;
         }
-        if(testbit(RTC.INTFLAGS, RTC_COMPIF_bp)) {
+        if(testbit(RTC.INTFLAGS, RTC_COMPIF_bp)) {  // Check RTC interrupt flag (gets set every second)
             if(!testbit(MStatus,vdc)) {
                 last_capture = new_capture;
                 new_capture = TCC0.CCA;

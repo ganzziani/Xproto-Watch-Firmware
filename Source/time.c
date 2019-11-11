@@ -3,14 +3,13 @@
 Oscilloscope Watch
 
 Gabotronics
-December 2018
+March 2019
 
-Copyright 2018 Gabriel Anzziani
+Copyright 2019 Gabriel Anzziani
 
 This program is distributed under the terms of the GNU General Public License
 
 ATXMEGA256A3U
-
 Compiled with GCC, -Os optimizations
 
 www.gabotronics.com
@@ -77,7 +76,6 @@ uint8_t EEMEM EE_WatchSettings = 0; // 24Hr format, Date Format, Hour Beep, Alar
 // f = fo (1-PPM(T-To))^2
 // RTC will lose time if the temperature is increased or decreased from the room temperature value (25°C)
 // Coefficient = ?T^2 x -0.036 ppm
-
 //The firmware repeats the following steps once per minute to calculate and accumulate lost time.
 // 1. The ADC is used to measure the die temperature from the on-chip temperature sensor.
 // 2. The value measured by the ADC is then used to calculate the deviation in ppm, and the result is stored in memory.
@@ -86,19 +84,21 @@ uint8_t EEMEM EE_WatchSettings = 0; // 24Hr format, Date Format, Hour Beep, Alar
 // At the end of a 24-hour period, the total accumulated error is added to the RTC time to complete the compensation
 // process. The temperature is assumed to not vary widely within a one-minute period.
 
-// RTC Compare, occurs every 1s, phase 180
-ISR(RTC_COMP_vect, ISR_NAKED) { // Naked ISR (No need to save registers)
-    EXTCOMML();					// LCD polarity inversion
+
+// The three interrupts below are Naked-ISR since there is no need to save any registers
+
+// The two interrupts below generate a 1Hz signal used by the LCD to prevent image burn-in
+// Changing a bit in a VPORT does not change the Status Register
+ISR(RTC_COMP_vect, ISR_NAKED) { // RTC Compare, occurs every 1s, phase 180
+    EXTCOMML();                 // Set LCD polarity inversion low
+    asm("reti");
+}
+ISR(RTC_OVF_vect, ISR_NAKED) {  // RTC Overflow, occurs every 1s, phase 0
+    EXTCOMMH();                 // Set LCD polarity inversion high
     asm("reti");
 }
 
-// RTC Overflow, occurs every 1s, phase 0
-ISR(RTC_OVF_vect, ISR_NAKED) {	// Naked ISR (No need to save registers)
-    EXTCOMMH();                 // Changing a bit in a VPORT does not change the the Status Register either
-    asm("reti");
-}
-
-// 12 Hour interrupt - Toggle the T flag
+// 12 Hour interrupt - Toggle the T flag (used as AM/PM bit)
 ISR(TCF0_OVF_vect, ISR_NAKED) {
 	__asm__ volatile (
         "brts 1f" "\n\t"    // Branch if T is set
@@ -111,16 +111,16 @@ ISR(TCF0_OVF_vect, ISR_NAKED) {
 
 // 1 Minute interrupt, disabled during oscilloscope mode
 ISR(TCF0_CCA_vect) {
-    TCF0.CCA+=60;   // Set interrupt on next minute
+    TCF0.CCA+=60;   // Set next interrupt on next minute
     if(TCF0.CCA>43199) TCF0.CCA=59;
     NowSecond=0;
-    NowMinute++;                // Update minute
+    NowMinute++;                            // Update minute
     if(NowMinute>=60) {
         NowMinute=0;
-        NowHour++;              // One hour
+        NowHour++;                          // Update hour
         if(NowHour>=24) {
             NowHour=0;
-            NowWeekDay++;
+            NowWeekDay++;                   // Update weekday
             if(NowWeekDay>=7) NowWeekDay=0;
             NowDay++;                       // Update day
             if(NowDay>DaysInMonth(NOW)) {
@@ -503,13 +503,13 @@ typedef struct {
 
 // Hand picked constants and locations for the Julia fractal
 const fractal_struct MyFractals[7] PROGMEM = {
-    {  199,  -38, 2, 64, -230, 52 },
-    {  210,  -26, 3, 56, -205, 33 },
-    {  153,   36, 2, 76, -179, 78 },
-    {   -5,    7, 4, 72, -179, 70 },
-    { -253,   19, 2, 47, -179, 70 },
-    {   -4, -165, 1, 38, -179, 70 },
-    {  270,  -35, 1, 94, -179, 70 },
+    {  199,  -38, 2, 64, -230, 52 },    // Saturday:
+    {  210,  -26, 3, 56, -205, 33 },    // Sunday:
+    {  153,   36, 2, 76, -179, 78 },    // Monday:
+    {   -5,    7, 4, 72, -179, 70 },    // Tuesday:   2 ellipses
+    { -253,   19, 2, 47, -179, 70 },    // Wednesday:
+    {   -4, -165, 1, 38, -179, 70 },    // Thursday:
+    {  270,  -35, 1, 94, -179, 70 },    // Friday:
 };
     
 // Fractals Watch Face

@@ -262,6 +262,7 @@ int main(void) {
                 break;
                 case 2:     // Oscilloscope Menu
                     if(testbit(Buttons,K3)) {
+						eeprom_write_block(NOW, &saved_time, sizeof(time_var));
                         AnalogOn();
                         RTC.INTCTRL = 0x00;                     // Disable RTC interrupts
                         TCF0.INTCTRLB = 0x00;                   // Disable 1 minute interrupt

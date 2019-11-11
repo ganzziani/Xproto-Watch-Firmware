@@ -100,7 +100,7 @@ void BuildWave(void) {
     do {
         j=hibyte(step);
         T.DATA.AWGTemp2[j] = *p;
-        int8_t k=*p++;
+//        int8_t k=*p++;
 //        if(j<1023) Temp.DATA.AWGTemp2[j+1] = (k+(*p))/2;    // With interpolation
         if(j<255) T.DATA.AWGTemp2[j+1] = *p;            // Without interpolation
         step+=inc;

@@ -198,7 +198,7 @@ ISR(USB_TRNCOMPL_vect) {
 static inline void EVENT_USB_Device_ControlRequest(struct USB_Request_Header* req) {
 	uint8_t *p;
 	uint8_t i=0;
-    RTC.CNT=0;  // Clear screen saver timer
+    //RTC.CNT=0;  // Clear screen saver timer
 	if ((req->bmRequestType & CONTROL_REQTYPE_TYPE) == REQTYPE_VENDOR) {
 		switch(req->bRequest) {
 			case 'a': // Firmware version
