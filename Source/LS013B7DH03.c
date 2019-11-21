@@ -5,7 +5,35 @@
     www.gabotronics.com
 
 -----------------------------------------------------------------------------*/
- 
+
+// LCD Display is 128x128 pixels and is physically oriented at 90 degrees with
+// respect to the orientation shown on the data sheet.
+// Each bytes controls eight pixels
+// At the end of each 16 byte, there are 2 trailer bytes
+
+// Text
+// Line  - -  -  -  -  -  -  -  -  ...  -  -  -  -  -  -  -
+//  0    | 2286 2268                      .  .  .  36 18 0 |
+//  1    | 2287                                       19 1 |
+//  2    |                                               2 |
+//  3    |                                               . |
+//  4    |                                               . |
+//  5    |                                               . |
+//  6 ===+                                                 |
+//  7 ===+                                                 |
+//  9 ===+                                                 |
+// 10 ===+                                                 |
+// 11    |                                               . |
+// 12    |                                               . |
+// 13    |                                               . |
+// 14    |                                              13 |
+// 15    | 2300                                      32 14 |
+// 16    | 2301 2283                     .  .  .  51 33 15 |
+         -  -  -  -  -  -  -  -  -  ...  -  -  -  -  -  -  -
+
+// To optimize memory access, Disp_send.buffer will be set to point at byte 2286
+// which corresponds on the Xproto Watch to the upper left corner
+
 /******************************************************************************
 /                       DECLARATIONS / DEFINITIONS                            /
 / ****************************************************************************/
@@ -148,4 +176,3 @@ ISR(DMA_CH2_vect) {
     clrbit(LCD_CTRL, LCD_CS);			    // DeSelect
     setbit(DMA.INTFLAGS, 0);
 }
-

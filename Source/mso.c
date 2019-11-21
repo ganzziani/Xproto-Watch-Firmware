@@ -3212,10 +3212,10 @@ ISR(TCE1_OVF_vect) {
                 uint8_t vline;
                 uint16_t address;
                 if((Index&0x01)==0) {      // erase when index is even
-                    vline=127-(Index>>1);      // clear next vertical line
-                    u8CursorY=0;
-                    address = vline*18;
-                    for(uint8_t i=0; i<16; i++) Disp_send.buffer[address++] = 0;
+					u8CursorY=0;
+					uint8_t *p=Disp_send.buffer;
+					p -= (uint16_t)(Index>>1)*18;     // Calculate pointer
+					for(uint8_t i=0; i<16; i++) *p++=0; // clear next vertical line
                 }
             }
         }
