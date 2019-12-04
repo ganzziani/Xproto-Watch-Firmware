@@ -6,10 +6,10 @@
 
 -----------------------------------------------------------------------------*/
 
-// LCD Display is 128x128 pixels and is physically oriented at 90 degrees with
-// respect to the orientation shown on the data sheet.
+// LCD Display is 128x128 pixels and is physically oriented on the watch at 90
+// degrees with respect to the orientation shown on the data sheet.
 // Each bytes controls eight pixels
-// At the end of each 16 byte, there are 2 trailer bytes
+// At the end of each 16 bytes, there are 2 trailer bytes
 
 // Text
 // Line  - -  -  -  -  -  -  -  -  ...  -  -  -  -  -  -  -
@@ -29,7 +29,7 @@
 // 14    |                                              13 |
 // 15    | 2300                                      32 14 |
 // 16    | 2301 2283                     .  .  .  51 33 15 |
-         -  -  -  -  -  -  -  -  -  ...  -  -  -  -  -  -  -
+//       -  -  -  -  -  -  -  -  -  ...  -  -  -  -  -  -  -
 
 // To optimize memory access, Disp_send.buffer will be set to point at byte 2286
 // which corresponds on the Xproto Watch to the upper left corner

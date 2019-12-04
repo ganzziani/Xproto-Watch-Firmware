@@ -181,8 +181,8 @@ static inline void SendBMP(void) {
 
     // First Block
     send(SOH);
-    send(Packet);       // Send Packet number
-    send(255-Packet);   // Send Packet number 1's complement
+    send(1);		// Send Packet number
+    send(254);		// Send Packet number 1's complement
     // Send BMP Header
     for(i=0; i<62; i++) {
         n++;
@@ -208,8 +208,8 @@ static inline void SendBMP(void) {
                 if(rx!=ACK) return; // Error -> cancel transmission
                 Packet++;
                 send(SOH);
-                send(Packet);
-                send(255-Packet);
+                send(Packet);		// Send Packet number
+                send(255-Packet);	// Send Packet number 1's complement
                 crc=0;
             }
         }

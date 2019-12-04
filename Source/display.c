@@ -261,7 +261,7 @@ void fillTriangle(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2,uint8_t x3,uint8_t
 			}
 			if (changed1) break;
 			else   	   	  t1x += signx1;
-			if(i<dx1) i++;
+			i++;
 		}
 	next3:
         // process second line until y value is about to change
@@ -687,7 +687,7 @@ Send a run length encoded image from program memory to the LCD
 ----------------------------------------------------------------------------*/
 void bitmap(uint8_t x, uint8_t y, const uint8_t *BMP) {
     uint8_t *p;
-  	uint8_t row=0,col=0;
+  	uint8_t row,col=0;
 	uint8_t data=0,count=0;
 	uint8_t width,height;
     uint8_t const *b;

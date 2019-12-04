@@ -58,14 +58,14 @@ const char days_short[][4] PROGMEM = {          // Short Days of the week
     "Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"
 };
 
-time_var EEMEM saved_time = {           // Last known time
-    BUILD_SECOND,           // sec      Seconds      [0-59]
-    BUILD_MINUTE,           // min      Minutes      [0-59]
-    BUILD_HOUR,             // hour     Hours        [0-23]
-    BUILD_DAY,              // mday     Day          [1-31]
-    BUILD_MONTH,            // mon      Month        [1-12]
-    BUILD_YEAR,             // year     Year since 2000
-    0,                      // wday     Day of week  [0-6]   Saturday is 0
+time_var EEMEM saved_time = {   // Last known time
+    BUILD_SECOND,				// sec      Seconds      [0-59]
+    BUILD_MINUTE,				// min      Minutes      [0-59]
+    BUILD_HOUR,					// hour     Hours        [0-23]
+    BUILD_DAY,					// mday     Day          [1-31]
+    BUILD_MONTH,				// mon      Month        [1-12]
+    BUILD_YEAR,					// year     Year since 2000
+    0,							// wday     Day of week  [0-6]   Saturday is 0
 };
 
 uint8_t EEMEM EE_Alarm_Hour = 8;
@@ -131,7 +131,7 @@ ISR(TCF0_CCA_vect) {
                     NowYear++;              // Update year
                 }
             }
-            T.TIME.battery = MeasureBattery(0);
+            T.TIME.battery = MeasureVin(0);
         }            
         if(testbit(WSettings,hourbeep)) {   // On the hour beep
             Sound(NOTE_B7,NOTE_B7);
@@ -201,7 +201,7 @@ void Watch(void) {
     Menu = 0;   // Selected item to change
     AlarmHour = eeprom_read_byte(&EE_Alarm_Hour);
     AlarmMinute = eeprom_read_byte(&EE_Alarm_Minute);
-    T.TIME.battery = MeasureBattery(0);
+    T.TIME.battery = MeasureVin(0);
     do {                    // Cycle time is 0.5 seconds
                                                         // When to refresh screen? ->
         if( Menu ||                                     // When user is changing the time
@@ -417,8 +417,12 @@ void face0(void) {
     bitmap(49,9,DOTS);
     // Date
     bitmap(118,0,BELL);
-    bitmap(2,0,BATTERY);
-    if(T.TIME.battery) fillRectangle(4,2,4+T.TIME.battery-1,5,255);
+    uint8_t temp_battery = T.TIME.battery;
+    if(temp_battery) {
+		bitmap(2,0,BATTERY);
+		fillRectangle(4,2,4+temp_battery-1,5,255);
+	}
+	else bitmap(2,0,BATTERY_POWER);
     lcd_goto(74,0);
     uint8_t hour = AlarmHour;
     if(testbit(WatchBits,blink) || Menu!=ALARM_HOUR) {  // Flash when changing

@@ -631,6 +631,12 @@ const unsigned char BATTERY[] PROGMEM = { 16, 8,
     '\xff','\x81','\x81','\x0d','\xff','\x18',
 };
 
+const unsigned char BATTERY_POWER[] PROGMEM = { 16, 8,
+    '\xff','\x81','\x81','\x02','\x80','\x81','\x93','\xb6', // 0x0008
+    '\x3c','\x6d','\xc9','\x81','\x01','\x81','\x81','\x02', // 0x0010
+    '\xff','\x18',
+};
+
 // Gabotronics text
 const unsigned char LOGO[] PROGMEM = {
     0x7E, 0xFF, 0x81, 0x89, 0x89, 0x8F, 0x06, 0x00,

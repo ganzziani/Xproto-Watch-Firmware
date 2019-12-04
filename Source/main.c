@@ -238,7 +238,7 @@ int main(void) {
     Randomize();                    // Randomize random number generator
     About();                        // Go to About on startup
     RST.STATUS = 0x3F;              // Clear Reset flags
-    Watch();                        // Go to watch mode after reset
+    Diagnose();                     // Go to Diagnose after reset
     clrbit(Misc, userinput);
     
     Buttons=K1;
@@ -852,9 +852,9 @@ void SoundOff(void) {
 } 
 
 // Measure battery under load
-// scale = 0, return value between 0 and 10
+// scale == 0, return value between 0 and 11
 // scale != 0, return ADC result
-int16_t MeasureBattery(uint8_t scale) {
+int16_t MeasureVin(uint8_t scale) {
     ANALOG_ON();
     PR.PRPA  &= 0b11111101;         // Enable ADCA module
     BATT_TEST_ON();
@@ -862,24 +862,27 @@ int16_t MeasureBattery(uint8_t scale) {
     ADCA.CTRLA   = 0x01;            // Enable ADC
     ADCA.CTRLB   = 0x70;            // Limit ADC current, signed mode, no free run, 12 bit right
     ADCA.REFCTRL = 0x20;            // REF = AREF (2.048V)
-    if(CLK.CTRL==0) {               // CPU is running a t 2MHz
+    if(CLK.CTRL==0) {               // CPU is running at 2MHz
         ADCA.PRESCALER = 0x00;      // DIV4
     }
     else {                          // CPU is running at 32MHz
-        ADCA.PRESCALER = 0x05;      // DIV128
+        ADCA.PRESCALER = 0x04;      // DIV64
     }
-    ADCA.CH0.MUXCTRL    = 0x3A;     // Channel 0 input: ADC7 pin - ADC6 pin
-    ADCA.CH0.CTRL       = 0x83;     // Start conversion, Differential with gain
+	ADCA.CH0.MUXCTRL    = 0x02;     // Channel 0 input: ADC0 pin - ADC6 pin
+    ADCA.CH0.CTRL       = 0x83;     // Start conversion, Differential with gain (1x)
     while(ADCA.INTFLAGS==0);
     ADCA.INTFLAGS = 0x01;           // Clear interrupt flag
-    // Volt (mv) = 2048 - (RESL * 1000*VREF/2048) = 2048 - 2*RES
-    int16_t volt=2048-2*ADCA.CH0RES;
+	// Vin = 2*V(ADC6)
+	// RES*Vref/2048 = V(AD7) - V(AD6) = 2048mV - V(ADC6) = 2048mV - Vin/2
+	// RES*2*2048/2048 = 4096mV - Vin
+	// Vin = 4096 - 2*RES
+	int16_t volt=4096-2*(int16_t)ADCA.CH0RES;
     ANALOG_OFF();
     BATT_TEST_OFF();
     ADCA.REFCTRL = 0x00;            // Bandgap off    
     PR.PRPA  |= 0b00000010;         // Disable ADCA
     if(scale) return volt;
-    //if(volt>=4500) return 12;     // Charging
+    if(volt>=4300) return 0;		// Charging
     if(volt>=4100) return 11;       // Estimated charge
     if(volt>=4000) return 10;
     if(volt>=3900) return 9;
@@ -894,9 +897,64 @@ int16_t MeasureBattery(uint8_t scale) {
     return 0;
 }
 
+// Measure External Reference voltage (2.048V)
+int16_t MeasureVRef(void) {
+	ANALOG_ON();
+	PR.PRPA  &= 0b11111101;         // Enable ADCA module
+	delay_ms(25);
+	ADCA.CTRLA   = 0x01;            // Enable ADC
+	ADCA.CTRLB   = 0x70;            // Limit ADC current, signed mode, no free run, 12 bit right
+	ADCA.REFCTRL = 0x40;            // REF = VCC/2 (1.5V)
+	if(CLK.CTRL==0) {               // CPU is running at 2MHz
+		ADCA.PRESCALER = 0x00;      // DIV4
+	}
+	else {                          // CPU is running at 32MHz
+		ADCA.PRESCALER = 0x04;      // DIV64
+	}
+	ADCA.CH0.MUXCTRL    = 0x38;     // Channel 0 input: ADC7 pin
+	ADCA.CH0.CTRL       = 0x81;     // Start conversion, Single-ended positive input signal
+	while(ADCA.INTFLAGS==0);
+	ADCA.INTFLAGS = 0x01;           // Clear interrupt flag
+	// VRef = 2*V(ADC7)
+	// RES*Vref/2048 = V(AD7) = VRef/2
+	// RES*2*1500/2048 = VRef
+	// Vin = (375 * RES) / 256
+	int16_t volt=(int32_t)(ADCA.CH0RES)*375/256;
+	ANALOG_OFF();
+	ADCA.REFCTRL = 0x00;            // Bandgap off
+	PR.PRPA  |= 0b00000010;         // Disable ADCA
+	return volt;
+}
+
+// Measure VCC (3V)
+int16_t MeasureVCC(void) {
+	PR.PRPA  &= 0b11111101;         // Enable ADCA module
+	ADCA.CTRLA   = 0x01;            // Enable ADC
+	ADCA.CTRLB   = 0x10;            // No limit ADC current, signed mode, no free run, 12 bit right
+	ADCA.REFCTRL = 0x02;            // REF = Bandgap (1V)
+	ADCA.CH0.MUXCTRL    = 0x10;     // 1/10 scaled VCC
+	delay_ms(1);
+	if(CLK.CTRL==0) {               // CPU is running at 2MHz
+		ADCA.PRESCALER = 0x02;      // DIV16
+	}
+	else {                          // CPU is running at 32MHz
+		ADCA.PRESCALER = 0x07;      // DIV512
+	}
+	ADCA.CH0.CTRL       = 0x80;     // Start conversion, Internal positive input signal
+	while(ADCA.INTFLAGS==0);
+	ADCA.INTFLAGS = 0x01;           // Clear interrupt flag
+	// VCC = 10*V(ADC)
+	// RES*Vref/2048 = V(ADC) = VCC/10
+	// RES*10*1000/2048 = VCC
+	// Vin = (625 * RES) / 128
+	int16_t volt=(int32_t)(ADCA.CH0RES)*625/128;
+	ADCA.REFCTRL = 0x00;            // Bandgap off
+	PR.PRPA  |= 0b00000010;         // Disable ADCA
+	return volt;
+}
+
 void Diagnose(void) {
     uint8_t bar=0;
-    int16_t batt=0;
     setbit(MStatus, update);
     setbit(Misc,bigfont);
     clrbit(WatchBits,goback);
@@ -910,34 +968,29 @@ void Diagnose(void) {
     TCC1.CTRLA = 0b00001000;        // Source is Event CH0
     do {
         uint8_t temp = TCF0.CNTL;
-        batt = MeasureBattery(1);
         if((temp&0x03) == 0) ONWHITE();
         else if((temp&0x03) == 1) ONGRN();
         else if((temp&0x03) == 2) ONRED();
-        else Sound(NOTE_B7,NOTE_B7);
+        else Sound(NOTE_G7,NOTE_C8);
         clr_display();
         lcd_goto(0,0);
         lcd_put5x8(VERSION); lcd_put5x8(PSTR(" Build: "));
         printHEX5x8(BUILD_NUMBER>>8); printHEX5x8(BUILD_NUMBER&0x00FF);
-        lcd_goto(0,1); lcd_put5x8(PSTR("TimerC: "));
-        lcd_goto(0,2); lcd_put5x8(PSTR("TimerF: "));
-        lcd_goto(0,3); lcd_put5x8(PSTR("XMEGA rev")); putchar5x8('A'+MCU.REVID);
-        lcd_goto(0,4); lcd_put5x8(PSTR("Logic: "));
-        lcd_goto(0,5); lcd_put5x8(PSTR("Reset: "));
-        lcd_goto(0,6); lcd_put5x8(PSTR("Battery: "));
-        lcd_goto(0,7); lcd_put5x8(PSTR("Clock: "));
+        lcd_goto(0,1); lcd_put5x8(PSTR("TimerC: ")); printHEX5x8(TCC1.CNTH); printHEX5x8(TCC1.CNTL);
+        lcd_goto(0,2); lcd_put5x8(PSTR("TimerF: ")); printHEX5x8(TCF0.CNTH); printHEX5x8(TCF0.CNTL);
+        lcd_goto(0,3); lcd_put5x8(PSTR("XMEGA:  rev")); putchar5x8('A'+MCU.REVID);
+        lcd_goto(0,4); lcd_put5x8(PSTR("Logic:  ")); printHEX5x8(VPORT2.IN);   // Shows the logic input data
+        lcd_goto(0,5); lcd_put5x8(PSTR("Reset:  ")); printHEX5x8(RST.STATUS);    // Show reset cause
+		lcd_goto(0,6); lcd_put5x8(PSTR("Vin:    ")); print16_5x8(MeasureVin(1));
+		lcd_goto(0,7); lcd_put5x8(PSTR("VCC:    ")); print16_5x8(MeasureVCC());
+		lcd_goto(0,8); lcd_put5x8(PSTR("VRef:   ")); print16_5x8(MeasureVRef());		
+        lcd_goto(0,9); lcd_put5x8(PSTR("Clock:  ")); printHEX5x8(CLK.CTRL); printHEX5x8(OSC.CTRL); printHEX5x8(OSC.STATUS); printHEX5x8(OSC.XOSCFAIL);
         lcd_goto(0,15); lcd_put5x8(PSTR("OFFSET   FAST    SLOW"));
         SoundOff();
         VPORT1.OUT = 0; // Turn off LEDs
-        lcd_goto(64,1); printHEX5x8(TCC1.CNTH); printHEX5x8(TCC1.CNTL);
-        lcd_goto(64,2); printHEX5x8(TCF0.CNTH); printHEX5x8(TCF0.CNTL);
-        lcd_goto(64,4); printHEX5x8(VPORT2.IN);   // Shows the logic input data
-        lcd_goto(64,5); printHEX5x8(RST.STATUS);    // Show reset cause
-        lcd_goto(64,6); print16_5x8(batt);
-        lcd_goto(64,7); printHEX5x8(CLK.CTRL); printHEX5x8(OSC.CTRL); printHEX5x8(OSC.STATUS); printHEX5x8(OSC.XOSCFAIL);
         for(uint8_t i=0; i<16; i++) {           // Print GPIO registers
-            if(i<8) lcd_goto(i*16,8);
-            else lcd_goto((i-8)*16,9);
+            if(i<8) lcd_goto(i*16,10);
+            else lcd_goto((i-8)*16,11);
             printHEX5x8(*((uint8_t *)i));
         }
         if(testbit(Misc,userinput)) {

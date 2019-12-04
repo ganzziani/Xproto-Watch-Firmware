@@ -61,6 +61,7 @@ extern const uint8_t    PM[];
 extern const uint8_t    AM[];
 extern const uint8_t    BELL[];
 extern const uint8_t    BATTERY[];
+extern const uint8_t    BATTERY_POWER[];
 extern const uint8_t    SCOPE_ICON[];
 extern const uint8_t    WATCH_ICON[];
 extern const uint8_t    GAMES_ICON[];

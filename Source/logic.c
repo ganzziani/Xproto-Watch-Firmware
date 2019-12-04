@@ -48,7 +48,7 @@ void HEXSerial(void) {
         increment*=2;
         start=start<<1;
     }
-    uint8_t result;							// Does not need to be initialized
+    uint8_t result;							// Does not need to be initialized (all bits shifted in)
     uint8_t data,bit=0,yPos,mask;
     yPos = M.CHDpos>>3;
     for(mask=0x80; mask; mask=mask>>1) {	// Loop 8 digital channels
@@ -109,14 +109,13 @@ const uint16_t TCC1val[8] PROGMEM = {
 };
 
 void LogicDMA(void) {
-    uint8_t dummy;
     setbit(DMA.CH0.CTRLA,6);    // reset DMA CH0
     setbit(DMA.CH1.CTRLA,6);    // reset DMA CH1
     // Flush receive buffers
     while(testbit(USARTC0.STATUS,7)) {
-         dummy=USARTC0.DATA;
+         (void)USARTC0.DATA;	// dummy read
     }
-    if(SPIC.STATUS) dummy=SPIC.DATA;
+    if(SPIC.STATUS) (void)SPIC.DATA;	// dummy read
     DMA.CH0.ADDRCTRL  = 0b10000101;     // reload source addr after each burst, incr dest, reload dest end block
     DMA.CH0.TRFCNT    = BUFFER_SERIAL;            // buffer size
     DMA.CH0.DESTADDR0 = (((uint16_t) T.LOGIC.data.Serial.RX)>>0*8) & 0xFF;
@@ -154,9 +153,8 @@ void Sniff(void) {
     uint8_t page=0; // 16 pages to display 1024 bytes of data
                     // one page has 8 lines, each line will display
                     // 8 bytes in this format: "FF+ "
-    uint8_t *p=T.LOGIC.data.All.decoded;
     clr_display_1();
-    for(i=0; i<BUFFER_SERIAL*2+2; i++) *p++=0;   // Erase buffers and index
+    for(uint8_t *p=T.LOGIC.data.All.decoded, i=0; i<BUFFER_SERIAL*2+2; i++) *p++=0;   // Erase buffers and index
     T.LOGIC.indrx=0; T.LOGIC.indtx=0;
     if(testbit(Trigger, round)) page=0x0F;  // Go to last page
     // Setup

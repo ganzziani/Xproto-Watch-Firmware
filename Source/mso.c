@@ -3209,8 +3209,6 @@ ISR(TCE1_OVF_vect) {
                 }
             }
             if(testbit(MFFT, scopemode) && !testbit(Display, persistent)) {
-                uint8_t vline;
-                uint16_t address;
                 if((Index&0x01)==0) {      // erase when index is even
 					u8CursorY=0;
 					uint8_t *p=Disp_send.buffer;

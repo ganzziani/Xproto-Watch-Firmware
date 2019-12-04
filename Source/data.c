@@ -19,7 +19,7 @@ email me at: gabriel@gabotronics.com
 #include "mso.h"
 
 // Commonly used text
-const char VERSION[]    PROGMEM = "FW 2.48";
+const char VERSION[]    PROGMEM = "FW 2.49";
 
 const uint32_t Powersof10[] PROGMEM = { 1,10,100,1000,10000,100000,1000000, 10000000 };
 // index                                0 1  2   3    4     5      6        7
