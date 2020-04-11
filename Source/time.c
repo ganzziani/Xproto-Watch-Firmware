@@ -36,8 +36,6 @@ void face2(void);
 void Stopwatch(void);
 void CountDown(void);
 uint8_t firstdayofmonth(time_var *timeptr);
-void GetTimeTimer(void);
-void SetMinuteInterrupt(void);
 uint8_t DaysInMonth(time_var *timeptr);
 
 const uint8_t monthDays[] PROGMEM = { 31,28,31,30,31,30,31,31,30,31,30,31 };
@@ -209,7 +207,7 @@ void Watch(void) {
             (SECPULSE() && testbit(WSettings,disp_secs))    // Every second when displaying seconds is enabled
             ) {
             clrbit(Misc, redraw);
-            if(AlarmHour==NowHour && AlarmMinute==NowMinute) {
+            if(AlarmHour==NowHour && AlarmMinute==NowMinute && testbit(WSettings,alarm_on)) {
                 setbit(Misc, redraw);
                 Sound(NOTE_B7,NOTE_B7);
             }
@@ -257,21 +255,24 @@ void Watch(void) {
                 }
                 if(testbit(Buttons, KBR)) newface = Faces + 1;
                 if(testbit(Buttons, KUL)) {     // Toggle second display
+					togglebit(WSettings,alarm_on);
                     setbit(Misc, redraw);
-                    togglebit(WSettings, disp_secs);
                 }                    
                 if(testbit(Buttons, KBL)) {
                     if(testbit(WatchBits,longpress)) {   // Check if this is a long press
                         Change_timeout = 120;   // 120 half seconds -> 1 Minute
-                        Menu=SECOND;
+                        Menu=SET_SECOND;
                         clrbit(WatchBits,longpress);     // Prevent repeat key
                         clrbit(WatchBits,prepress);
-                    }
+                    } else {
+						togglebit(WSettings, disp_secs);
+						setbit(Misc, redraw);
+					}
                 }
                 if(testbit(Buttons,KUL)) {
                     if(testbit(WatchBits,longpress)) {   // Check if this is a long press
                         Change_timeout = 120;   // 120 half seconds -> 1 Minute
-                        Menu=ALARM_MINUTE;
+                        Menu=SET_ALARM_MINUTE;
                         clrbit(WatchBits,longpress);     // Prevent repeat key
                         clrbit(WatchBits,prepress);
                     }
@@ -281,7 +282,7 @@ void Watch(void) {
                 if(testbit(Buttons,KBL)) {
                     if(!testbit(WatchBits,longpress)) { // Already changing time -> go to next item
                         Menu++;
-                        if(Menu>YEAR) {
+                        if(Menu>SET_YEAR) {
                             Menu=0;
                         }
                     }
@@ -289,7 +290,7 @@ void Watch(void) {
                 if(testbit(Buttons,KUL)) {
                     if(!testbit(WatchBits,longpress)) { // Already changing time -> go to next item
                         Menu++;
-                        if(Menu>ALARM_HOUR) {
+                        if(Menu>SET_ALARM_HOUR) {
                             Menu=0;
                             eeprom_write_byte(&EE_Alarm_Hour, AlarmHour);
                             eeprom_write_byte(&EE_Alarm_Minute, AlarmMinute);
@@ -298,35 +299,35 @@ void Watch(void) {
                 }
                 cli();  // Prevent the RTC interrupt from changing the time in this block
                 switch(Menu) {
-                    case SECOND:
+                    case SET_SECOND:
                         if(testbit(Buttons,KUR)) NowSecond++;
                         if(testbit(Buttons,KBR)) NowSecond--;
                     break;
-                    case MINUTE:
+                    case SET_MINUTE:
                         if(testbit(Buttons,KUR)) NowMinute++;
                         if(testbit(Buttons,KBR)) if(NowMinute) NowMinute--; else NowMinute=59;
                     break;
-                    case HOUR:
+                    case SET_HOUR:
                         if(testbit(Buttons,KUR)) NowHour++;
                         if(testbit(Buttons,KBR)) if(NowHour) NowHour--; else NowHour=23;
                     break;
-                    case DAY:
+                    case SET_DAY:
                         if(testbit(Buttons,KUR)) NowDay++;
                         if(testbit(Buttons,KBR)) if(NowDay>1) NowDay--; else NowDay=DaysInMonth(NOW);
                     break;
-                    case MONTH:
+                    case SET_MONTH:
                         if(testbit(Buttons,KUR)) NowMonth++;
                         if(testbit(Buttons,KBR)) if(NowMonth>1) NowMonth--; else NowMonth=12;
                     break;
-                    case YEAR:
+                    case SET_YEAR:
                         if(testbit(Buttons,KUR)) if(NowYear<98) NowYear++;
                         if(testbit(Buttons,KBR)) if(NowYear) NowYear--;
                     break;
-                    case ALARM_MINUTE:
+                    case SET_ALARM_MINUTE:
                         if(testbit(Buttons,KUR)) AlarmMinute++;
                         if(testbit(Buttons,KBR)) if(AlarmMinute) AlarmMinute--; else AlarmMinute=59;
                     break;
-                    case ALARM_HOUR:
+                    case SET_ALARM_HOUR:
                         if(testbit(Buttons,KUR)) AlarmHour++;
                         if(testbit(Buttons,KBR)) if(AlarmHour) AlarmHour--; else AlarmHour=23;
                     break;
@@ -389,12 +390,12 @@ void face0(void) {
         setbit(WatchBits,blink);
     } else clrbit(WatchBits,blink);
     if((testbit(WSettings,disp_secs) || Menu) &&         // Displaying seconds or changing time
-       (testbit(WatchBits,blink) || Menu!=SECOND)) {  // Flash when changing
+       (testbit(WatchBits,blink) || Menu!=SET_SECOND)) {  // Flash when changing
         printN_7seg(104, 11, NowSecond, 2);
     } else {    // Not displaying seconds, erase area
         fillRectangle(104,88,127,108,0);
     }
-    if(testbit(WatchBits,blink) || Menu!=MINUTE) {  // Flash when changing
+    if(testbit(WatchBits,blink) || Menu!=SET_MINUTE) {  // Flash when changing
         uint8_t n=NowMinute; d=0;
         while (n>=10) { d++; n-=10; }
         bitmap(55,9,(const uint8_t *)pgm_read_word(DIGITS+d));
@@ -402,7 +403,7 @@ void face0(void) {
     } else {
         fillRectangle(55,72,101,111,0);
     }
-    if(testbit(WatchBits,blink) || Menu!=HOUR) {  // Flash when changing
+    if(testbit(WatchBits,blink) || Menu!=SET_HOUR) {  // Flash when changing
         uint8_t n=NowHour;
         if(testbit(SREG, CPU_T_bp)) bitmap(105,9,PM);
         else bitmap(105,9,AM);
@@ -415,8 +416,8 @@ void face0(void) {
         fillRectangle(0,72,46,111,0);
     }
     bitmap(49,9,DOTS);
-    // Date
-    bitmap(118,0,BELL);
+	if(testbit(WSettings,alarm_on)) bitmap(118,0,BELL);
+	else fillRectangle(118,0,125,7,0);
     uint8_t temp_battery = T.TIME.battery;
     if(temp_battery) {
 		bitmap(2,0,BATTERY);
@@ -425,24 +426,26 @@ void face0(void) {
 	else bitmap(2,0,BATTERY_POWER);
     lcd_goto(74,0);
     uint8_t hour = AlarmHour;
-    if(testbit(WatchBits,blink) || Menu!=ALARM_HOUR) {  // Flash when changing
-        uint8_t n=AlarmHour;
-        if(n>=12) n-=12;
-        if(n==0) n=12;
-        if(!testbit(WSettings, time24)) printN_5x8(n);
-        else printN_5x8(hour);
-    } else { putchar5x8(' '); putchar5x8(' '); }
-    putchar5x8(':');
-    if(testbit(WatchBits,blink) || Menu!=ALARM_MINUTE) {  // Flash when changing
-        printN5x8(AlarmMinute);
-    }  else { putchar5x8(' '); putchar5x8(' '); }
-    if(!testbit(WSettings, time24)) {
-        if(hour>12) lcd_put5x8(PSTR("pm"));
-        else lcd_put5x8(PSTR("am"));
-    }        
+    if(testbit(WSettings,alarm_on) || Menu==SET_ALARM_HOUR || Menu==SET_ALARM_MINUTE) {
+        if(testbit(WatchBits,blink) || Menu!=SET_ALARM_HOUR) {  // Flash when changing
+            uint8_t n=AlarmHour;
+            if(n>=12) n-=12;
+            if(n==0) n=12;
+            if(!testbit(WSettings, time24)) printN_5x8(n);
+            else printN_5x8(hour);
+        } else { putchar5x8(' '); putchar5x8(' '); }
+        putchar5x8(':');
+        if(testbit(WatchBits,blink) || Menu!=SET_ALARM_MINUTE) {  // Flash when changing
+            printN5x8(AlarmMinute);
+        }  else { putchar5x8(' '); putchar5x8(' '); }
+        if(!testbit(WSettings, time24)) {
+            if(hour>12) lcd_put5x8(PSTR("pm"));
+            else lcd_put5x8(PSTR("am"));
+        }
+    } else lcd_put5x8(PSTR("       "));
     lcd_goto(40,2);
     lcd_put5x8(days[NowWeekDay]);
-    if(testbit(WatchBits,blink) || Menu!=DAY) {  // Flash when changing
+    if(testbit(WatchBits,blink) || Menu!=SET_DAY) {  // Flash when changing
         uint8_t n=NowDay; d=0; // Day.         [1-31]
         while (n>=10) { d++; n-=10; }
         bitmap(101,4,(const uint8_t *)pgm_read_word(mDIGITS+d));
@@ -450,14 +453,14 @@ void face0(void) {
         } else {
         fillRectangle(101,32,129,55,0);
     }
-    if(testbit(WatchBits,blink) || Menu!=MONTH) {  // Flash when changing
+    if(testbit(WatchBits,blink) || Menu!=SET_MONTH) {  // Flash when changing
         uint8_t n=NowMonth;    // Month.       [1-12]
         if(n>=10) { n-=10; bitmap(70,4,mDIGI1b); }
         bitmap(75,4,(const uint8_t *)pgm_read_word(mDIGITS+n));
         } else {
         fillRectangle(70,32,89,55,0);
     }
-    if(testbit(WatchBits,blink) || Menu!=YEAR) {
+    if(testbit(WatchBits,blink) || Menu!=SET_YEAR) {
         uint8_t n=NowYear; d=0; // Year
         while (n>=10) { d++; n-=10; }
         bitmap(1,4,mDIGI2);

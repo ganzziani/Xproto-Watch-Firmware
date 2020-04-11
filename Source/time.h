@@ -40,18 +40,20 @@ void Watch(void);
 void Calendar(void);
 void findweekday(time_var *timeptr);
 void SetTimeTimer(void);
+void GetTimeTimer(void);
+void SetMinuteInterrupt(void);
 
 #define MAX_FACES       3   // Number of implemented watch faces
 
 // Change item definitions
-#define SECOND          1
-#define MINUTE          2
-#define HOUR            3
-#define DAY             4
-#define MONTH           5
-#define YEAR            6
-#define ALARM_MINUTE    7
-#define ALARM_HOUR      8
+#define SET_SECOND          1
+#define SET_MINUTE          2
+#define SET_HOUR            3
+#define SET_DAY             4
+#define SET_MONTH           5
+#define SET_YEAR            6
+#define SET_ALARM_MINUTE    7
+#define SET_ALARM_HOUR      8
 
 // Day of the week definitions
 #define SATURDAY        0

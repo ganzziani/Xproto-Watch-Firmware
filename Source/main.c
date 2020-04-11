@@ -277,6 +277,17 @@ int main(void) {
                         WSettings = 0;
                         TCD0.CTRLB = 0;
                         TCD0.CCAH = 0;
+                        ADCA.EVCTRL = 0;
+                        ADCB.EVCTRL = 0;
+                        setbit(DMA.CH0.CTRLA,6);    // reset DMA CH0
+                        setbit(DMA.CH2.CTRLA,6);    // reset DMA CH2
+                        setbit(DMA.CH1.CTRLA,6);    // reset DMA CH1
+                        EVSYS.CH1MUX = 0;
+                        EVSYS.CH2MUX = 0;
+                        EVSYS.CH3MUX = 0;
+                        EVSYS.CH5MUX = 0;
+                        EVSYS.CH6MUX = 0;
+                        EVSYS.CH7MUX = 0;
                         SetMinuteInterrupt();                   // Set minute interrupt
                         RTC.INTCTRL = 0x05;
                         setbit(MStatus, update);
@@ -905,6 +916,7 @@ int16_t MeasureVRef(void) {
 	ADCA.CTRLA   = 0x01;            // Enable ADC
 	ADCA.CTRLB   = 0x70;            // Limit ADC current, signed mode, no free run, 12 bit right
 	ADCA.REFCTRL = 0x40;            // REF = VCC/2 (1.5V)
+    ADCA.INTFLAGS = 0xFF;           // Clear all interrupt flag
 	if(CLK.CTRL==0) {               // CPU is running at 2MHz
 		ADCA.PRESCALER = 0x00;      // DIV4
 	}
@@ -934,6 +946,7 @@ int16_t MeasureVCC(void) {
 	ADCA.REFCTRL = 0x02;            // REF = Bandgap (1V)
 	ADCA.CH0.MUXCTRL    = 0x10;     // 1/10 scaled VCC
 	delay_ms(1);
+    ADCA.INTFLAGS = 0xFF;           // Clear all interrupt flag
 	if(CLK.CTRL==0) {               // CPU is running at 2MHz
 		ADCA.PRESCALER = 0x02;      // DIV16
 	}
