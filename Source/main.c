@@ -451,6 +451,7 @@ void CPU_Slow(void) {
 
 void AnalogOn(void) {
     ANALOG_ON();
+    LOGIC_ON();
     // Power reduction: Stop unused peripherals
     PR.PRGEN = 0x18;        // Stop: AES, EBI
     PR.PRPA  = 0x04;        // Stop: DAC
@@ -467,6 +468,7 @@ void LowPower(void) {
     CCPWrite(&WDT.CTRL, WDT_CEN_bm); // Watchdog off
     SLEEP.CTRL = SLEEP_SMODE_PSAVE_gc | SLEEP_SEN_bm;
     ANALOG_OFF();
+    LOGIC_OFF();
     TCC0.CTRLA = 0;                 // Stop timer prior to reset
     TCC0.CTRLFSET   = 0x0F;         // Reset timer
     TCC1.CTRLA = 0;                 // Stop timer prior to reset
@@ -979,6 +981,7 @@ void Diagnose(void) {
     TCC1.PER = 59999;
     TCC0.CTRLA = 3;                 // CPU clock
     TCC1.CTRLA = 0b00001000;        // Source is Event CH0
+    LOGIC_ON();
     do {
         uint8_t temp = TCF0.CNTL;
         if((temp&0x03) == 0) ONWHITE();
@@ -1021,6 +1024,7 @@ void Diagnose(void) {
         WaitDisplay();
         SLP();          // Sleep
     } while(!testbit(WatchBits,goback));
+    LOGIC_OFF();
     TCC0.CTRLA = 0;
     TCC1.CTRLA = 0;
     PR.PRPC  |= 0b00000011;         // Disable TCC0 TCC1C clocks

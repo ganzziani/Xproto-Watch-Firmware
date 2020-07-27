@@ -45,6 +45,8 @@ email me at: gabriel@gabotronics.com
 #define TOGGLE_RED()    PORTE.OUTTGL = 0x04
 #define ANALOG_ON()     setbit(VPORT0.OUT, ANPOW)
 #define ANALOG_OFF()    clrbit(VPORT0.OUT, ANPOW)
+#define LOGIC_ON()      PORTA.OUTSET = 0x02
+#define LOGIC_OFF()     PORTA.OUTCLR = 0x02
 #define LOGIC_DIROUT()  clrbit(VPORT0.OUT, LOGIC_DIR)
 #define LOGIC_DIRIN()   setbit(VPORT0.OUT, LOGIC_DIR)
 #define EXTCOMMH()      setbit(VPORT3.OUT, EXTCOMM)
