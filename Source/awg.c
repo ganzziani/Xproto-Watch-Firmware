@@ -50,9 +50,10 @@ void BuildWave(void) {
         Flevel >>= 1;
     }
     // Construct 256 bytes waveform
-    uint8_t i=0,j;
+    
     int8_t *p=(int8_t *)T.DATA.AWGTemp1;
     uint16_t Seed;
+    uint8_t i=0;
     switch(M.AWGtype) {
         case 0: // Random
             Seed = TCD1.CNT;
@@ -65,6 +66,7 @@ void BuildWave(void) {
             do { *p++ = Sin(i+64); } while(++i);
         break;
         case 2: // Square
+            setbit(Misc,bigfont);    // No interpolation
             do { *p++ = (i<128)?-127:127; } while(++i);
         break;
         case 3: // Triangle
@@ -86,11 +88,14 @@ void BuildWave(void) {
     i=0; inc=(256-M.AWGduty)<<1;
     p=(int8_t *)T.DATA.AWGTemp1;
     do {
-        j=hibyte(step);
+        uint8_t j=hibyte(step);
         T.DATA.AWGTemp2[j] = *p;
-        int8_t k=*p++;
-		if(j<255) T.DATA.AWGTemp2[j+1] = (k+(*p))/2;	// With interpolation
-//      if(j<255) T.DATA.AWGTemp2[j+1] = *p;            // Without interpolation
+        int8_t awgpoint;
+        if(!testbit(Misc,bigfont)) {  // Interpolation
+            int8_t k=*p++;
+            awgpoint = (k+(*p))/2;
+        } else awgpoint = *p++;         // No Interpolation
+        if(j<255) T.DATA.AWGTemp2[j+1] = awgpoint;
         step+=inc;
         if(i==127) inc=M.AWGduty<<1;
     } while(++i);
@@ -112,10 +117,11 @@ void BuildWave(void) {
     i=0;
     do {
     // ******** Multiply by Gain ********
-        j=FMULS8(M.AWGamp,T.DATA.AWGTemp2[(uint8_t)(i*cycles)]); // Keep index < 256
+        uint8_t j=FMULS8(M.AWGamp,T.DATA.AWGTemp2[(uint8_t)(i*cycles)]); // Keep index < 256
     // ******** Add Offset ********
         AWGBuffer[i]=saddwsat(j,M.AWGoffset);
     } while(++i);
     clrbit(MStatus, updateawg);
+    clrbit(Misc,bigfont);    // default value
     PMIC.CTRL = 0x07; // Enable all interrupts
 }

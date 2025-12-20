@@ -245,6 +245,10 @@
       <SubType>compile</SubType>
       <Link>snake.c</Link>
     </Compile>
+    <Compile Include="Source\strings.c">
+      <SubType>compile</SubType>
+      <Link>strings.c</Link>
+    </Compile>
     <Compile Include="Source\time.c">
       <SubType>compile</SubType>
       <Link>time.c</Link>

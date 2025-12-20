@@ -5,30 +5,33 @@ set /p var= <%1
 set /a var= %var:~21,5%+1
 echo #define BUILD_NUMBER %var% >%1
 echo Build Number: %var%
-REM Get Time and Date using WMIC os GET LocalDateTime
-for /F "usebackq tokens=1,2 delims==" %%i in (`wmic os get LocalDateTime /VALUE 2^>NUL`) do if '.%%i.'=='.LocalDateTime.' set ldt=%%j
 
-echo #define BUILD_YEAR   %ldt:~2,2%>>%1
+REM Get Time and Date using PowerShell instead of WMIC
+for /f "tokens=1-6 delims=/:" %%a in ('powershell -command "Get-Date -Format 'yy/MM/dd/HH/mm/ss'"') do (
+    set year=%%a
+    set month=%%b
+    set day=%%c
+    set hour=%%d
+    set minute=%%e
+    set second=%%f
+)
+
+echo #define BUILD_YEAR   %year%>>%1
 
 REM Remove 0 prefix 
-set n=%ldt:~4,2%
-set /a n=100%n% %% 100
-echo #define BUILD_MONTH  %n% >>%1
+set /a month=100%month% %% 100
+echo #define BUILD_MONTH  %month% >>%1
 
-set n=%ldt:~6,2%
-set /a n=100%n% %% 100
-echo #define BUILD_DAY    %n% >>%1
+set /a day=100%day% %% 100
+echo #define BUILD_DAY    %day% >>%1
 
-set n=%ldt:~8,2%
-set /a n=100%n% %% 100
-echo #define BUILD_HOUR   %n% >>%1
+set /a hour=100%hour% %% 100
+echo #define BUILD_HOUR   %hour% >>%1
 
-set n=%ldt:~10,2%
-set /a n=100%n% %% 100
-echo #define BUILD_MINUTE %n% >>%1
+set /a minute=100%minute% %% 100
+echo #define BUILD_MINUTE %minute% >>%1
 
-set n=%ldt:~12,2%
-set /a n=100%n% %% 100
-echo #define BUILD_SECOND %n% >>%1
+set /a second=100%second% %% 100
+echo #define BUILD_SECOND %second% >>%1
 
 echo // This file is generated from build_inc.bat>>%1
