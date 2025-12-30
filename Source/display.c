@@ -5,35 +5,43 @@
 #include "mygccdef.h"
 #include "main.h"
 #include "mso.h"
+#include "utils.h"
 
 Disp_data Disp_send;
 uint8_t   u8CursorX, u8CursorY;
 
 void SwitchBuffers(void) {
-    if(!testbit(WatchBits, disp_select)) {   // Check display buffer
+    uint8_t *NewDataAddress;
+    uint8_t *NewSPIAddress;
+    if(!testbit(WatchBits, disp_select)) {                  // Which display buffer is active?
         setbit(WatchBits, disp_select);
-        Disp_send.DataAddress=Disp_send.display_data1+127*18; // Locate pointer at upper left byte
-        Disp_send.SPI_Address=Disp_send.display_setup1;
+        NewDataAddress=Disp_send.display_data1+127*18;      // Locate pointer at upper left byte
+        NewSPIAddress=Disp_send.display_setup1;
     }
     else {
         clrbit(WatchBits, disp_select);
-        Disp_send.DataAddress=Disp_send.display_data2+127*18;        // Locate pointer at upper left byte
-        Disp_send.SPI_Address=Disp_send.display_setup2;
+        NewDataAddress=Disp_send.display_data2+127*18;      // Locate pointer at upper left byte
+        NewSPIAddress=Disp_send.display_setup2;
     }
+    Disp_send.DataAddress=NewDataAddress;
+    Disp_send.SPI_Address=NewSPIAddress;
+
 }
 
 // Clear active display buffer
 void clr_display(void) {
-    uint8_t *p;
-    p=Disp_send.SPI_Address+2;
-    for(uint8_t i=0; i<128; i++) {
-        for(uint8_t j=0; j<16; j++) {
-            #ifdef INVERT_DISPLAY
-            *p++=255;
-            #else
-            *p++=0;
-            #endif
-        }
+    uint8_t *p=Disp_send.SPI_Address+2;  // Locate pointer at start of data buffer;
+    #ifdef INVERT_DISPLAY
+    const uint8_t cleared=255;
+    #else
+    const uint8_t cleared=0;
+    #endif
+    for(uint8_t i=128; i; i--) { // Erase all 2048 bytes in the buffer
+        // Unroll inner loop for speed - Clear 16 lines
+        *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
+        *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
+        *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
+        *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
         p+=2;   // Skip line LCD setup
     }
     lcd_goto(0,0);
@@ -41,23 +49,24 @@ void clr_display(void) {
 
 // Clear display buffers 1 and 2
 void clr_display_all(void) {
-    uint8_t *p1, *p2;
-    p1=Disp_send.display_data1;
-    p2=Disp_send.display_data2;
-    for(uint8_t i=0; i<128; i++) {
-        for(uint8_t j=0; j<16; j++) {
-            #ifdef INVERT_DISPLAY
-            *p1++=255;
-            *p2++=255;
-            #else
-            *p1++=0;
-            *p2++=0;
-            #endif
+    uint8_t *p;
+    #ifdef INVERT_DISPLAY
+    const uint8_t cleared=255;
+    #else
+    const uint8_t cleared=0;
+    #endif
+    p=Disp_send.display_data1;
+    for(uint8_t i=0; i<2; i++) {
+        for(uint8_t j=0; j<128; j++) {
+            // Unroll inner loop for speed - Clear 16 lines
+            *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
+            *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
+            *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
+            *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
+            p+=2;   // Skip line LCD setup
         }
-        p1+=2;   // Skip line LCD setup
-        p2+=2;   // Skip line LCD setup
+        p=Disp_send.display_data2;
     }
-    lcd_goto(0,0);
 }
 
 // Sprites, each byte pair represents next pixel relative position
@@ -77,25 +86,23 @@ void putchar3x6(char u8Char) {
 	uint8_t data;
 	pointer = (unsigned int)(Font3x6)+(u8Char-20)*(3);
     if(u8Char!='\n') {
-        uint8_t u8CharColumn=0;
-       	/* Draw a char */
-    	while (u8CharColumn < 3)	{
+        // Draw a char: 3 bytes
+        for(uint8_t i=3; i; i--) {
             data = pgm_read_byte_near(pointer++);
 		    if(testbit(Misc,negative)) data = ~(data|128);
 		    display_or(data);
-		    u8CharColumn++;
 	    }
     }
     // Special characters
     if(u8Char==0x1C) {       // Begin long 'd' character
-        display_or(0x06);
+        display_or(FONT3x6_d1);
     }
     else if(u8Char==0x1D) {  // Complete long 'd' character
-        display_or(0x0E);
+        display_or(FONT3x6_d2);
         u8CursorX++;
     }
     else if(u8Char==0x1A) {  // Complete long 'm' character
-        display_or(0x08);
+        display_or(FONT3x6_m);
     }
     else if(u8CursorX < 128) {  // if not then insert a space before next letter
 		data = 0;
@@ -105,21 +112,6 @@ void putchar3x6(char u8Char) {
     if(u8CursorX>=128 || u8Char=='\n') {    // Next line
         u8CursorX = 0; u8CursorY++;
     }
-}
-
-// Print a char on the display using the 10x15 font
-void putchar10x15(char u8Char) {
-    uint8_t i=0;
-    uint16_t pointer = (unsigned int)(Font10x15)+(u8Char)*20;
-	// Upper side
-	u8CursorY--;
-	while (i < 10) { display_or(pgm_read_byte_near(pointer++)); i++; }
-	i=0;
-	// Lower Side
-	u8CursorY++;
-	u8CursorX-=10;
-	while (i < 10) { display_or(pgm_read_byte_near(pointer++)); i++; }
-    u8CursorX+=2;
 }
 
 // Print a string in program memory to the display
@@ -161,21 +153,26 @@ void printV(int16_t Data, uint8_t gain, uint8_t CHCtrl) {
 // or Print Long integer with 7 digits
 void printF(uint8_t x, uint8_t y, int32_t Data) {
 	uint8_t D[8]={0,0,0,0,0,0,0,0},point=0;
+    uint8_t *DisplayPointer = Disp_send.DataAddress -(x)*18 + (y);
     lcd_goto(x,y);
-    if(Data<0) {    // Negative sign
+    if(Data<0) {    // Negative number: Print minus
         Data=-Data;
         if(testbit(Misc,bigfont)) { // putchar10x15('-');
-            display_or(0xC0);
-            display_or(0xC0);
-            display_or(0xC0);
-            display_or(0xC0);
-            u8CursorX+=2;
+            for(uint8_t i=4; i; i--) {
+                #ifdef INVERT_DISPLAY
+                *DisplayPointer = ~0xC0;
+                #else
+                *DisplayPointer = 0xC0;
+                #endif
+                DisplayPointer -=18;   // Go to next column
+            }
+            DisplayPointer -=36;
         }            
         else putchar3x6('-');
     }
-    else {  // Space
+    else {          // Positive number: Print space
         if(testbit(Misc,bigfont)) { // putchar10x15(' ');
-            u8CursorX+=6;
+            DisplayPointer -=108;   // Move 6 columns
         }            
         else putchar3x6(' ');
     }
@@ -210,11 +207,28 @@ void printF(uint8_t x, uint8_t y, int32_t Data) {
     else i=3;
 	for(; i!=255; i--) {
 		if(testbit(Misc,bigfont)) {
-			putchar10x15(D[i]);
+            // putchar10x15();
+            uint8_t *TempPointer = DisplayPointer;
+            uint16_t FontPointer = (unsigned int)(Font10x15)+(D[i])*20;
+            // Upper side
+            DisplayPointer--;
+            for(uint8_t i=10; i; i--) {
+                *DisplayPointer = pgm_read_byte_near(FontPointer++);
+                DisplayPointer -= 18;
+            }
+            // Lower Side
+            DisplayPointer = TempPointer;
+            for(uint8_t i=10; i; i--) {
+                *DisplayPointer = pgm_read_byte_near(FontPointer++);
+                DisplayPointer -= 18;
+            }
+            DisplayPointer -=36;
 			if(point==i) { // putchar10x15('.'); Small point to Save space
-                display_or(0x06);
-                display_or(0x06);
-                u8CursorX+=2;
+                for(uint8_t j=2; j; j--) {
+                    *DisplayPointer = 0x06;
+                    DisplayPointer -= 18;
+                }
+                DisplayPointer -=36;
             }                
 		}
 		else {
@@ -504,22 +518,25 @@ Print a char on the LCD
 		u8Char = char to display
 -------------------------------------------------------------------------------*/
 void putchar5x8(char u8Char) {
-    uint16_t pointer;
-	uint8_t data,u8CharColumn=0;
-	pointer = (unsigned int)(Font5x8)+(u8Char-0x20)*(5);
-    if(u8Char!='\n') {
-       	/* Draw a char */
-    	while (u8CharColumn < 5)	{
-            data = pgm_read_byte_near(pointer++);
-            #ifdef INVERT_DISPLAY
-            if(!testbit(Misc,negative)) data = ~data;
-            #else
-		    if(testbit(Misc,negative)) data = ~data;
-            #endif
-		    display_set(data);
-		    u8CharColumn++;
-	    }
+    if(u8Char=='\n') {    // Next line
+        u8CursorX = 0; u8CursorY++;
+        return;
     }
+    uint16_t FontPointer = (unsigned int)(Font5x8)+(u8Char-0x20)*(5);
+	uint8_t data;
+    uint8_t *DisplayPointer = Disp_send.DataAddress -(u8CursorX)*18 + (u8CursorY);
+    // Draw a char: 5 bytes
+    for(uint8_t i = 5; i; i--) {
+        data = pgm_read_byte_near(FontPointer++);
+        #ifdef INVERT_DISPLAY
+        if(!testbit(Misc,negative)) data = ~data;
+        #else
+		if(testbit(Misc,negative)) data = ~data;
+        #endif
+		*DisplayPointer = data;
+        DisplayPointer -=18;    // Go to next column
+    }
+    u8CursorX += 5;
     if(u8CursorX < 128) {  // Insert a space before next letter
         #ifdef INVERT_DISPLAY
         data = 0xFF;
@@ -528,10 +545,8 @@ void putchar5x8(char u8Char) {
         data = 0;
 		if(testbit(Misc,negative)) data = 0xFF;
         #endif
-		display_set(data);
-	}
-    if(u8CursorX>=128 || u8Char=='\n') {    // Next line
-        u8CursorX = 0; u8CursorY++;
+		*DisplayPointer = data;
+        u8CursorX++;
     }
 }
 
@@ -540,7 +555,7 @@ Print a string on the LCD from a string in program memory
 	GLCD_Printf (uint8_t *au8Text) 
 		*au8Text = string to display
 -------------------------------------------------------------------------------*/
-void print5x8 (const char *ptr) {
+void print5x8(const char *ptr) {
     char c;
     while ((c=pgm_read_byte(ptr++)) != 0x00) {
         putchar5x8(c);

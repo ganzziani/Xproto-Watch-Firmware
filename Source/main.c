@@ -992,8 +992,11 @@ void Diagnose(void) {
                 else CPU_Slow();
             }                
         }
-        u8CursorX=0; u8CursorY=bar;
-        for(uint8_t i=0; i<128; i++) display_xor(255);
+        uint8_t *DisplayPointer = Disp_send.DataAddress + bar;
+        for(uint8_t i=0; i<128; i++) {
+            *DisplayPointer = ~(*DisplayPointer);
+            DisplayPointer -= 18;   // Next column
+        }
         bar++; if(bar>=16) bar=0;
         dma_display();
         WaitDisplay();

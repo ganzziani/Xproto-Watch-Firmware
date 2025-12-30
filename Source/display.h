@@ -31,7 +31,6 @@ extern uint8_t u8CursorX, u8CursorY;
 /* EXTERN Function Prototype(s) */
 void print3x6(const char *);
 void print5x8(const char *);
-void putchar10x15 (char);
 void putchar3x6 (char);
 void putchar5x8(char u8Char);
 void printN3x6(uint8_t Data);

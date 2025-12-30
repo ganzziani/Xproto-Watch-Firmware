@@ -23,7 +23,7 @@ set_pixel:                          ; Disp_send+2 is Disp_send.DataAddress
     mul     r24, r25                ; r1:r0 = x*18
     sub     r30, r0                 ; z = r31:r30 = addr + 127*18 - x*18
     sbc     r31, r1
-    clr     r1                      ; r1 = 0 gcc needs r1 cleared
+    clr     r1                      ; r1 = 0, gcc needs r1 cleared
     mov     r25, r22                ; r25 = y
     lsr     r25
     lsr     r25                     ; r25 = y>>3
@@ -38,12 +38,12 @@ set_pixel:                          ; Disp_send+2 is Disp_send.DataAddress
     lsr     r24	                    ; r24 >>= 1
     dec     r22                     ; Decrement y
     brpl    0b                      ; repeat while y >= 0
-    lac     z, r24                  ; AND bits in display data
+    lac     z, r24                  ; Clear bits in display data
     ret
 
 ; Disp_send.buffer[((uint16_t)((127-x)*18)) + (u8CursorY)] |= data;
-.global display_or               ; void write_display(uint8_t data);
-display_or:                      ; OR byte on display buffer
+.global display_or                  ; void write_display(uint8_t data);
+display_or:                         ; Clear bits on display buffer
     lds     r30, u8CursorX          ; r30 = u8CursorX
     inc     r30                     ; r30++
     sts     u8CursorX, r30          ; u8CursorX = r30
@@ -59,7 +59,7 @@ display_or:                      ; OR byte on display buffer
     add     r30,r0                  ; r31:r30 += y
     adc     r31,r1
     ; Address is ready, now put data
-    lac     z, r24                  ; OR bits in display data
+    lac     z, r24                  ; Clear bits in display data
     ret
 
 ; void lcd_line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
@@ -96,7 +96,7 @@ lcd_line:
     add     r30, r26                ; Z += (y1 >> 3)
     adc     r31, r1
 
-    ; Calculate initial bit mask: 0x80 >> (y1 & 0x07)
+    ; Calculate initial bit mask: (0x80 >> (y1 & 0x07))
     sub     r18, r22                ; Calculate dy before modyfying y1: r18 = dy = y2 - y1
     andi    r22, 0x07               ; y1 &= 0x07
     ldi     r27, 0x80               ; bit mask = 0x80
@@ -106,8 +106,8 @@ lcd_line:
     dec     r22
     brpl    .L_mask_shift
     mov     r0, r27
-    lac     Z, r0                   ; Set initial pixel at x1,y1
-    
+    lac     Z, r0                   ; Clear initial pixel at x1,y1
+
     ; Initialize x vars
     ; Note: x is REVERSED, so positive dx means NEGATIVE step in buffer
     sub     r20, r24                ; r20 = dx = x2 - x1
@@ -141,7 +141,7 @@ lcd_line:
     ret                             ; if dxabs == 0, exit
     add     r23, r18                ; e += dyabs
     cp      r23, r20                ; if (e >= dxabs)
-    brlo    .HorizontalStepx        ; Branch if lower (no y step needed)
+    brlo    .HorizontalStepx        ; Branch if lower
     sub     r23, r20                ; e -= dxabs
     ; Update bit mask and buffer pointer for y change
     tst     r26                     ; check stepy sign
@@ -164,7 +164,7 @@ lcd_line:
     add     r30, r25                ; Z = Z + stepx
     adc     r31, r24
     mov     r0, r27                 ; Copy mask to r0
-    lac     Z, r0                   ; Atomic OR and write
+    lac     Z, r0                   ; Clear bits in display data
     dec     r21
     rjmp    .Horizontal_Loop
 
@@ -179,7 +179,7 @@ lcd_line:
     ret                             ; if dyabs == 0, exit
     add     r23, r20                ; e += dxabs
     cp      r23, r18                ; if (e >= dyabs)
-    brlo    .VerticalStepY          ; Branch if lower (no x step needed)
+    brlo    .VerticalStepY          ; Branch if lower
     sub     r23, r18                ; e -= dyabs
     add     r30, r25                ; Z = Z + stepx
     adc     r31, r24
@@ -203,14 +203,14 @@ lcd_line:
     sbci    r31, 0                  ; Z = Z - 1
 .VerticalSetPixel:
     mov     r0, r27                 ; Copy mask to r0
-    lac     Z, r0                   ; Atomic OR and write
+    lac     Z, r0                   ; Clear bits in display data
     dec     r21
     rjmp    .Vertical_Loop
 
 // Black background
 #else
 
-; LS013B7DH03 128x128 memoryu LCD
+; LS013B7DH03 128x128 memory LCD
 ; Disp_send.display_data[(uint16_t)((127-x)*18) + (y>>3)] |= (uint8_t)(0x80 >> (y & 0x07));
 .global set_pixel                   ; void setpixel(uint8_t x, uint8_t y);
 set_pixel:                          ; Disp_send+2 is Disp_send.DataAddress
@@ -235,12 +235,12 @@ set_pixel:                          ; Disp_send+2 is Disp_send.DataAddress
     lsr     r24	                    ; r24 >>= 1
     dec     r22                     ; Decrement y
     brpl    0b                      ; repeat while y >= 0
-    las     z, r24                  ; OR bits in display data
+    las     z, r24                  ; Set bits in display data
     ret
 
 ; Disp_send.buffer[((uint16_t)((127-x)*18)) + (u8CursorY)] |= data;
 .global display_or                  ; void write_display(uint8_t data);
-display_or:                         ; OR byte on display buffer
+display_or:                         ; Set bits on display buffer
     lds     r30, u8CursorX          ; r30 = u8CursorX
     inc     r30                     ; r30++
     sts     u8CursorX, r30          ; u8CursorX = r30
@@ -256,7 +256,7 @@ display_or:                         ; OR byte on display buffer
     add     r30,r0                  ; r31:r30 += y
     adc     r31,r1
     ; Address is ready, now put data
-    las     z, r24                  ; OR bits in display data
+    las     z, r24                  ; Set bits in display data
     ret
 
 ; void lcd_line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
@@ -338,7 +338,7 @@ lcd_line:
     ret                             ; if dxabs == 0, exit
     add     r23, r18                ; e += dyabs
     cp      r23, r20                ; if (e >= dxabs)
-    brlo    .HorizontalStepx        ; Branch if lower (no y step needed)
+    brlo    .HorizontalStepx        ; Branch if lower
     sub     r23, r20                ; e -= dxabs
     ; Update bit mask and buffer pointer for y change
     tst     r26                     ; check stepy sign
@@ -361,7 +361,7 @@ lcd_line:
     add     r30, r25                ; Z = Z + stepx
     adc     r31, r24
     mov     r0, r27                 ; Copy mask to r0
-    las     Z, r0                   ; Atomic OR and write
+    las     Z, r0                   ; Set bits in display data
     dec     r21
     rjmp    .Horizontal_Loop
 
@@ -376,7 +376,7 @@ lcd_line:
     ret                             ; if dyabs == 0, exit
     add     r23, r20                ; e += dxabs
     cp      r23, r18                ; if (e >= dyabs)
-    brlo    .VerticalStepY          ; Branch if lower (no x step needed)
+    brlo    .VerticalStepY          ; Branch if lower
     sub     r23, r18                ; e -= dyabs
     add     r30, r25                ; Z = Z + stepx
     adc     r31, r24
@@ -400,53 +400,11 @@ lcd_line:
     sbci    r31, 0                  ; Z = Z - 1
 .VerticalSetPixel:
     mov     r0, r27                 ; Copy mask to r0
-    las     Z, r0                   ; Atomic OR and write
+    las     Z, r0                   ; Set bits in display data
     dec     r21
     rjmp    .Vertical_Loop
 
 #endif
-
-; Disp_send.buffer[((uint16_t)((127-x)*18)) + (u8CursorY)] = data;
-.global display_set                 ; void write_display(uint8_t data);
-display_set:                        ; OR byte on display buffer
-    lds     r30, u8CursorX          ; r30 = u8CursorX
-    inc     r30                     ; r30++
-    sts     u8CursorX, r30          ; u8CursorX = r30
-    dec     r30                     ; r30 = original u8CursorX
-    ldi     r31,0x12	            ; r31 = 18
-    mul     r30,r31                 ; r1:r0 = x*18    
-    lds     r30,Disp_send+2         ; r31:r30 = addr + 127*18
-    lds     r31,Disp_send+3
-    sub     r30,r0                  ; r31:r30 = addr + 127*18 - x*18
-    sbc     r31,r1
-    clr     r1                      ; r1 = 0 gcc needs r1 cleared
-    lds     r0, u8CursorY           ; r0 = u8CursorY
-    add     r30,r0                  ; r31:r30 += y
-    adc     r31,r1
-    ; Address is ready, now put data
-    std     z+0, r24	            ; SET data in display
-    ret
-
-; Disp_send.buffer[((uint16_t)((127-x)*18)) + (u8CursorY)] ^= data;
-.global display_xor               ; void write_display(uint8_t data);
-display_xor:                      ; OR byte on display buffer
-    lds     r30, u8CursorX          ; r30 = u8CursorX
-    inc     r30                     ; r30++
-    sts     u8CursorX, r30          ; u8CursorX = r30
-    dec     r30                     ; r30 = original u8CursorX
-    ldi     r31,0x12	            ; r31 = 18
-    mul     r30,r31                 ; r1:r0 = x*18    
-    lds     r30,Disp_send+2         ; r31:r30 = addr + 127*18
-    lds     r31,Disp_send+3
-    sub     r30,r0                  ; r31:r30 = addr + 127*18 - x*18
-    sbc     r31,r1
-    clr     r1                      ; r1 = 0 gcc needs r1 cleared
-    lds     r0, u8CursorY           ; r0 = u8CursorY
-    add     r30,r0                  ; r31:r30 += y
-    adc     r31,r1
-    ; Address is ready, now put data
-    lat     z, r24                  ; XOR bits in display data
-    ret
 
 ;----------------------------------------------------------------------------;
 ; ADD with Saturation

@@ -5,7 +5,7 @@
 #include "mso.h"
 #include "USB\usb_xmega.h"
 
-void LogicDMA(void);
+void ConfigLogicDMA(void);
 void DisplayData(uint8_t side, uint8_t page);
 
 //    0   1   2   3   4   5   6   7
@@ -92,7 +92,7 @@ const uint16_t TCC1val[8] PROGMEM = {
     277,    // 115200
 };
 
-void LogicDMA(void) {
+void ConfigLogicDMA(void) {
     setbit(DMA.CH0.CTRLA,6);    // reset DMA CH0
     setbit(DMA.CH1.CTRLA,6);    // reset DMA CH1
     // Flush receive buffers
@@ -101,9 +101,9 @@ void LogicDMA(void) {
     }
     if(SPIC.STATUS) (void)SPIC.DATA;	// dummy read
 
-	uint8_t src_addr_lo;
-    uint8_t src_addr_hi;
-	uint8_t trig_src;
+	uint8_t src_addr_lo=0;
+    uint8_t src_addr_hi=0;
+	uint8_t trig_src=0;
 
 	// Configure CH0 for RX data
     DMA.CH0.ADDRCTRL  = 0b10000101;     // reload source addr after each burst, incr dest, reload dest end block
@@ -155,6 +155,7 @@ void Sniff(void) {
     uint8_t page=0; // 16 pages to display 1024 bytes of data
                     // one page has 8 lines, each line will display
                     // 8 bytes in this format: "FF+ "
+    WaitDisplay();      // Finish last transmission
     clr_display();
     uint8_t *p=T.LOGIC.data.All.decoded;
     for(; i<BUFFER_SERIAL*2+2; i++) *p++=0;   // Erase buffers and index
@@ -164,7 +165,7 @@ void Sniff(void) {
     PR.PRPC  = 0x00;        // Enable PORTC peripherals
     uint8_t spictrl=0;
     if(M.CHDdecode==i2c) {
-        print3x6(PSTR("I2C SNIFFER\nBIT0:SDA BIT1:SCL"));
+        print5x8(PSTR("I2C SNIFFER\nBIT0:SDA BIT1:SCL"));
         T.LOGIC.addr_ack_ptr =  T.LOGIC.data.I2C.addr_ack;
         T.LOGIC.data_ptr = T.LOGIC.data.I2C.decoded;
         T.LOGIC.addr_ack_pos = 0x80;      // counter for keeping track of all bits
@@ -173,7 +174,7 @@ void Sniff(void) {
         PORTC.INTCTRL   = 0x03; // Enable PortC INT 0, High Priority
     }
     else if(M.CHDdecode==rs232) {
-        print3x6(PSTR("UART SNIFFER\nBIT2:RX BIT3:TX"));
+        print5x8(PSTR("UART SNIFFER\nBIT2:RX BIT3:TX"));
         // Initialize USART for RX
         uint8_t baud, databits;
         baud=Sniffer&0x07;
@@ -196,7 +197,7 @@ void Sniff(void) {
     }
     else if(M.CHDdecode==spi) {
         uint8_t pin7ctrl=1;   // Sense rising edge
-        print3x6(PSTR("SPI SNIFFER\nBIT4:/SS\nBIT5:MOSI\nBIT6:MISO\nBIT7:SCK"));
+        print5x8(PSTR("SPI SNIFFER\nBIT4:/SS\nBIT5:MOSI\nBIT6:MISO\nBIT7:SCK"));
         if(testbit(Sniffer,CPOL)) {    // CPOL == 1
             pin7ctrl = PORT_INVEN_bm+1;   // Invert SCK, Sense rising edge
         }
@@ -208,7 +209,7 @@ void Sniff(void) {
             PORTC.PIN4CTRL = PORT_INVEN_bm;
         }
     }
-    LogicDMA();
+    ConfigLogicDMA();
     dma_display(); WaitDisplay();
     while((T.LOGIC.indrx==0) && (T.LOGIC.indtx==0)) {
         WDR();
@@ -351,7 +352,7 @@ void Sniff(void) {
                         setbit(SPIC.CTRL,6);        // Enable SPI
                     }
                     if(testbit(Mcursors, singlesniff)) {
-                        LogicDMA();
+                        ConfigLogicDMA();
                     }
                 }
             }
@@ -406,7 +407,7 @@ void DisplayData(uint8_t side, uint8_t page) {
             if(i>=index) break;
         }
         uint8_t data=p[i];
-        i++; if(i>=BUFFER_SERIAL) i=0;    // Increase data index        
+        i++; if(i>=BUFFER_SERIAL) i=0;    // Increase data index
         if(testbit(CHDctrl,ascii)) {
                  if(data==0x0A) putchar3x6(0x14); // Line Feed
             else if(data==0x0D) putchar3x6(0x15); // Carriage Return

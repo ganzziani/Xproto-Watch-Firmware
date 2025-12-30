@@ -849,9 +849,7 @@ void MSO(void) {
                 // i will scan display, j will scan data starting at M.HPos
                 for(i=0; i<128; i++, k++, j++) {
                     uint8_t chdpos, chddata;
-                    uint8_t och1,och2;
                     if(Srate>=11 && testbit(Mcursors,roll)) i=k>>1;
-                    och1=temp1; och2=temp2;
                     chddata = DC.CHDdata[j];
                     // Show Digital Data
                     chdpos = M.CHDpos;
@@ -886,6 +884,9 @@ void MSO(void) {
                         lcd_goto(i,chdpos>>3);
                         printhex3x6(chddata);
                     }
+                    // Store previous points
+                    uint8_t och1,och2;
+                    och1=temp1; och2=temp2;
                     // Apply position
                     temp1=addwsat(DC.CH1data[j],M.CH1pos);
                     temp2=addwsat(DC.CH2data[j],M.CH2pos);
@@ -894,7 +895,7 @@ void MSO(void) {
                     if(temp1>DISPLAY_MAX_Y) temp1=DISPLAY_MAX_Y;
                     if(temp2>DISPLAY_MAX_Y) temp2=DISPLAY_MAX_Y;
                     if(testbit(Display, line)) {
-                        if(i==0) continue;
+                        if(i==0) continue;  // No previous sample
                         if((temp1!=och1) || (temp1 && och1<DISPLAY_MAX_Y))
                             if(testbit(CH1ctrl,chon))          lcd_line(i, temp1, prev, och1);
                         if((temp2!=och2) || (temp2 && och2<DISPLAY_MAX_Y))
@@ -1956,7 +1957,7 @@ void MSO(void) {
             else {  // Only clear menu area (bottom of the display)
                 uint8_t *p;
                 p=Disp_send.DataAddress+15;  // Locate pointer at the bottom right byte
-                for(uint8_t i=0; i<128; i++) {
+                for(uint8_t i=128; i; i--) {
                     *p=0;
                     p+=18;                  // Go Next line
                 }
@@ -2475,7 +2476,7 @@ void MSO(void) {
 
 void AutoSet(void) {
     clrbit(MStatus,stop);
-    // Set Free Trigger
+    // Set Free Trigger by clearing normal, single and autotrg flags
     clrbit(Trigger, normal);    // Clear Normal trigger
     clrbit(Trigger, single);    // Clear Single trigger
     clrbit(Trigger, autotrg);   // Clear Auto trigger

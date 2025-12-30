@@ -329,7 +329,7 @@ D:if (--MP<SA) {               /* stack pointer decrement and underrun check */
  X=0;//myrand()&~M;                                /* start at random field    */
 
  while(d++<n||d<3||                            /* iterative deepening loop */
-   z&K==I&&(N>=0&d<98||                         /* root: deepen upto time   */
+   z&K==I&&(N>=0&d<98||                        /* root: deepen upto time   */
    (K=X,L=Y&~M,d=3)))                          /* time's up: go do best    */
  {x=B=X;                                       /* start scan at prev. best */
   h=Y&S;                                       /* request try noncastl. 1st*/

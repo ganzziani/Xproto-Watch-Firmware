@@ -319,7 +319,7 @@ typedef struct {
     uint8_t     AWGtype;        // 37 Waveform type
     uint8_t     AWGduty;        // 38 Duty cycle range: [1,255]
     int8_t      AWGoffset;      // 39 Offset
-    uint32_t    AWGdesiredF;    // 40 41 42 43 Desired frequency
+    uint32_t    AWGdesiredF;    // 40 41 42 43 Desired frequency multiplied by 100
 } NVMVAR;
 
 extern TempData T;

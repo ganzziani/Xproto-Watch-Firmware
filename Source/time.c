@@ -83,7 +83,7 @@ ISR(TCF0_OVF_vect, ISR_NAKED) {
 
 // TCF0 Compare Interrupt (every minute), disabled during oscilloscope mode
 ISR(TCF0_CCA_vect) {
-    TCF0.CCA+=60;   // Set next interrupt on next minute
+    TCF0.CCA+=60;                           // Prepare next interrupt on next minute
     if(TCF0.CCA>43199) TCF0.CCA=59;
     NowSecond=0;
     NowMinute++;                            // Update minute
