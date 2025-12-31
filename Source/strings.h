@@ -29,5 +29,6 @@ extern const char STR_CPU[];
 extern const char STR_P1[];
 extern const char STR_P2[];
 extern const char STR_Human[];
+extern const char STR_Profiles[];
 
 #endif

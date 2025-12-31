@@ -205,6 +205,10 @@
       <SubType>compile</SubType>
       <Link>bitmaps.c</Link>
     </Compile>
+    <Compile Include="Source\config.c">
+      <SubType>compile</SubType>
+      <Link>config.c</Link>
+    </Compile>
     <Compile Include="Source\data.c">
       <SubType>compile</SubType>
       <Link>data.c</Link>

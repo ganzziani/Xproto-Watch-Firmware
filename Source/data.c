@@ -49,7 +49,7 @@ uint8_t EEMEM EEGPIO[12] = {
 uint8_t EEMEM EEGPIO_User[8][12] = { 0 };
 
 // Default settings stored in flash
-const NVMVAR FLM PROGMEM = {            // Flash Copy
+const NVMVAR FLM PROGMEM = {    // Flash Copy
     1,      //  CH1gain;        // Channel 1 gain
     1,      //  CH2gain;        // Channel 2 gain
     64,     //  HPos:           // Center of the buffer
@@ -81,7 +81,7 @@ const NVMVAR FLM PROGMEM = {            // Flash Copy
 }; 
 
 // Saved settings stored in EEProm
-NVMVAR EEMEM EEM = {                    // EEMEM Copy
+NVMVAR EEMEM EEM = {            // EEMEM Copy
     1,      //  CH1gain;        // Channel 1 gain
     1,      //  CH2gain;        // Channel 2 gain
     64,     //  HPos:           // Center of the buffer
@@ -115,7 +115,7 @@ NVMVAR EEMEM EEM = {                    // EEMEM Copy
 NVMVAR EEMEM EEM_User[8] = { 0 };
 
 // Maximum values
-const NVMVAR MAXM PROGMEM = {            // Flash Copy
+const NVMVAR MAXM PROGMEM = {   // Flash Copy
     6,      //  CH1gain;        // Max Gain is 6
     6,      //  CH2gain;        // Max Gain is 6
     127,    //  HPos            // Max Horizontal Position

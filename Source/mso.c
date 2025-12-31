@@ -726,7 +726,13 @@ void MSO(void) {
             if(testbit(Sweep,SweepF)) {
                 uint32_t freqv;
                 freqv = pgm_read_dword_near(freqval+Srate)/4096;    // Sweep will have 256 * 16 steps
-                if(Srate<=6) M.AWGdesiredF = (uint32_t)(AWGsweepi)*(freqv) / 2; // AWGSweepi max is 4095
+                if(Srate<=6) {
+                    M.AWGdesiredF = (uint32_t)(AWGsweepi)*(freqv) / 2; // AWGSweepi max is 4095
+                    uint8_t Fcomp8 = M.AWGdesiredF >> 16;   // Use only 8bits for comparison
+                    if(Fcomp8>0xBE) {               //  AWGdesiredF > 12517375 ?
+                        M.AWGdesiredF=0x00BEFFFF;   //  AWGdesiredF = 12517375
+                    }
+                }
                 else M.AWGdesiredF = (uint32_t)(AWGsweepi)*(freqv) / 2000;
             }
             if(testbit(Sweep,SweepA)) M.AWGamp    = -(uint8_t)(AWGsweepi>>5);

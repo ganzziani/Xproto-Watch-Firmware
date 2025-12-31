@@ -30,7 +30,7 @@ const char STRS_mainmenu[][17] PROGMEM = {           // Menus:
 
 const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
     "Hora Calendario      ",    // Watch
-    "Cargar Guardar  Start",    // Oscilloscope
+    "Perfil          Start",    // Oscilloscope
     "Snake   Pong  Ajedrez",    // Games
     "Ajuste Diagnos. Sobre",    // Settings
 };
@@ -56,6 +56,8 @@ const char STR_Player[]     PROGMEM = "Jugador";
 const char STR_Human[]      PROGMEM = "Humano";
 const char STR_GameMenu[]   PROGMEM = "Jugadr1 Jugadr2 Start";
 
+const char STR_Profiles[]   PROGMEM = " Perfiles";
+
 #else   // English
 
 const char STRS_mainmenu[][17] PROGMEM = {           // Menus:
@@ -67,7 +69,7 @@ const char STRS_mainmenu[][17] PROGMEM = {           // Menus:
 
 const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
     "Time  Calendar       ",    // Watch
-    "Load    Save    Start",    // Oscilloscope
+    "Profile         Start",    // Oscilloscope
     "Snake   Pong    Chess",    // Games
     "Config Diagnose About",    // Settings
 };
@@ -92,6 +94,8 @@ const char STR_Level[]      PROGMEM = "Level:  ";
 const char STR_Player[]     PROGMEM = "Player ";
 const char STR_Human[]      PROGMEM = "Human ";
 const char STR_GameMenu[]   PROGMEM = "Player1 Player2 Start";
+
+const char STR_Profiles[]   PROGMEM = " Profiles";
 
 #endif
 
