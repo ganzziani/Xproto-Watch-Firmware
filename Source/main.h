@@ -78,7 +78,7 @@
 #define grid0       0       // Grid settings (2 bits)
 #define grid1       1
 #define elastic     2       // Average on successive traces
-#define disp_inv    3       // Invert display
+#define screenshot  3       // Invert display
 #define flip        4       // Flip display
 #define persistent  5       // Persistent Display
 #define line        6       // Continuous Drawing

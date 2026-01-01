@@ -822,11 +822,11 @@ void MSO(void) {
                     ny2=eeprom_read_byte(&EECHREF2[j]);
                     // Add position
                     ny1=addwsat(ny1,eech1pos);
-                    ny1=ny1>>1; // Scale to LCD (128x64)
-                    if(ny1>=64) ny1=63;
+                    ny1=ny1>>1; // Scale to LCD (128x128)
+                    if(ny1>=128) ny1=127;
                     ny2=addwsat(ny2,eech2pos);
-                    ny2=ny2>>1; // Scale to LCD (128x64)
-                    if(ny2>=64) ny2=63;
+                    ny2=ny2>>1; // Scale to LCD (128x128)
+                    if(ny2>=128) ny2=127;
 
                     nx=i;
                     ox=i-1;
@@ -1125,7 +1125,7 @@ void MSO(void) {
                             M.Tlevel = center2;
                             if(testbit(CH2ctrl,chinvert)) M.Tlevel=255-M.Tlevel;
                         }
-                        if(testbit(MFFT, scopemode)) {
+                        if(testbit(MFFT, scopemode)) {  // FFT Mode
                             // If both channels, reduce gain and adjust positions
                             M.CH1pos = -center1/2;
                             M.CH2pos = -center2/2;
@@ -1184,7 +1184,11 @@ void MSO(void) {
                     return;
                 }
                 Menu=Mdefault;
-            }                 
+            }
+            // Take screenshot
+            if(testbit(Buttons,KUR) && testbit(Buttons,KUL)) {
+                setbit(Display,screenshot);
+            }
             // Check key inputs depending on the menu
             if(testbit(Buttons,KBR)) {  // Next menu item
                 if(Menu==MSNIFFER) setbit(MStatus, gosniffer);
@@ -1600,15 +1604,12 @@ void MSO(void) {
                         togglebit(Mcursors, reference);
                         if(testbit(Mcursors, reference)) {
                             // Save waveform to EEPROM
-                            tiny_printp(50,4,PSTR("SAVING...")); dma_display();
-                            eeprom_write_byte(&EECH1Pos, M.CH1pos);
-                            eeprom_write_byte(&EECH2Pos, M.CH2pos);
-                            eeprom_write_byte(&EEHPos, M.HPos);
-                            uint8_t i=0;
-                            do {     // Apply position
-                                eeprom_write_byte(&EECHREF1[i], DC.CH1data[i]);
-                                eeprom_write_byte(&EECHREF2[i], DC.CH2data[i]);
-                            } while(++i);
+                            eeprom_write_byte(&EECH1Pos, M.CH1pos);     // Save CH1 position
+                            eeprom_write_byte(&EECH2Pos, M.CH2pos);     // Save CH2 position
+                            eeprom_write_byte(&EEHPos, M.HPos);         // Save Horizontal position
+                            eeprom_busy_wait();
+                            eeprom_write_block(DC.CH1data, EECHREF1, 256);
+                            eeprom_write_block(DC.CH2data, EECHREF2, 256);
                         }
                     }
                 break;
@@ -2461,7 +2462,11 @@ void MSO(void) {
             }
         }
 ///////////////////////////////////////////////////////////////////////////////
-// Finished using DMA, now use a DMA to transfer data to the display
+// Finished writing to screen, now use a DMA to transfer data to the display
+        if(testbit(Display,screenshot)) {
+            SaveScreenshot();
+            clrbit(Display,screenshot);
+        }
         WaitDisplay();      // Finish last transmission
         dma_display();      // Send new data
         if(testbit(USB.STATUS,USB_SUSPEND_bp) && USB.ADDR) USB_ResetInterface();

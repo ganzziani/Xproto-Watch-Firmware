@@ -3,7 +3,7 @@
 
 //#define SPANISH
 
-const char VERSION[]    PROGMEM = "FW 2.73";
+const char VERSION[]    PROGMEM = "FW 2.74";
 
 // Strings with special characters:
 // 0x1F = delta
@@ -30,8 +30,8 @@ const char STRS_mainmenu[][17] PROGMEM = {           // Menus:
 
 const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
     "Hora Calendario      ",    // Watch
-    "Perfil          Start",    // Oscilloscope
-    "Snake   Pong  Ajedrez",    // Games
+    "Perfil  Imagen  Start",    // Oscilloscope
+    "Culebra Pong  Ajedrez",    // Games
     "Ajuste Diagnos. Sobre",    // Settings
 };
 
@@ -69,7 +69,7 @@ const char STRS_mainmenu[][17] PROGMEM = {           // Menus:
 
 const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
     "Time  Calendar       ",    // Watch
-    "Profile         Start",    // Oscilloscope
+    "Profile Image   Start",    // Oscilloscope
     "Snake   Pong    Chess",    // Games
     "Config Diagnose About",    // Settings
 };

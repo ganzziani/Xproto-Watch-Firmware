@@ -30,7 +30,7 @@ void SwitchBuffers(void) {
 
 // Clear active display buffer
 void clr_display(void) {
-    uint8_t *p=Disp_send.SPI_Address+2;  // Locate pointer at start of data buffer;
+    uint8_t *p=Disp_send.SPI_Address+2;  // Locate pointer at start of active buffer;
     #ifdef INVERT_DISPLAY
     const uint8_t cleared=255;
     #else

@@ -225,8 +225,8 @@ int main(void) {
                     if(testbit(Buttons,K1)) {   // Profile
                         Profiles();
                     }
-                    if(testbit(Buttons,K2)) {   //
-
+                    if(testbit(Buttons,K2)) {   // Show Screenshot
+                        ShowScreenshot();
                     }
                     if(testbit(Buttons,K3)) {   // Start Oscilloscope
                         AnalogOn();

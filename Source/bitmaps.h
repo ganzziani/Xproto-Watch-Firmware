@@ -2,6 +2,7 @@
 #define _BITMAPS_H
 
 #include <stdint.h>
+#include <avr/eeprom.h>
 
 #define FONT3x6_d1      0x06    // Long d character part 1
 #define FONT3x6_d2      0x0E    // Long d character part 2
@@ -62,5 +63,6 @@ extern const uint8_t    GamesBMP[];
 extern const uint8_t    SettingsBMP[];
 extern const uint16_t   BMPs[];
 extern const uint16_t   ChessBMPs[];
+extern uint8_t EEMEM    EEDISPLAY[2048];
 
 #endif
