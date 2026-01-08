@@ -424,6 +424,34 @@ saddwsat:
     subi R24, 0x80  ; Back-Transform [0x80, 0x7f] -> [0x00, 0xff]
     ret
 
+;------------------------------------------------------------
+; Digit-by-digit binary square root algorithm
+; uint8_t isqrt16(uint16_t n)
+;------------------------------------------------------------
+.global isqrt16
+.func isqrt16
+isqrt16:
+    clr     r18             ; result = 0
+    ldi     r19, 0x80       ; bit = 1 << 7
+loop:
+    mov     r20, r18
+    or      r20, r19        ; tentative result
+    mul     r20, r20        ; r1:r0 = t * t
+    cp      r0, r24         ; unsigned compare: (t*t) <= n ?
+    cpc     r1, r25
+    brlo    accept          ; t*t < n
+    breq    accept          ; t*t == n
+    rjmp    reject          ; t*t > n
+accept:
+    mov     r18, r20        ; accept bit
+reject:
+    lsr     r19             ; next bit
+    brne    loop
+    mov     r24, r18        ; return value
+    clr     r1              ; ABI requirement
+    ret
+.endfunc
+
 ; Digital Trigger Rising Edge
 ;----------------------------------------------------------------------------;
 ;
@@ -1138,7 +1166,7 @@ windowCH2:
 .section .bss
 .global endpoints   // Endpoints configuration tables
 .align 2            // Align to word
-endpoints:  .dc.b 1,2,3,4,5,6,7,8    ; ep0 out
-            .dc.b 1,2,3,4,5,6,7,8    ; ep0 in
-            .dc.b 1,2,3,4,5,6,7,8    ; ep1 out
-            .dc.b 1,2,3,4,5,6,7,8    ; ep1 in
+endpoints:  .dc.b 0,0,0,0,0,0,0,0    ; ep0 out
+            .dc.b 0,0,0,0,0,0,0,0    ; ep0 in
+            .dc.b 0,0,0,0,0,0,0,0    ; ep1 out
+            .dc.b 0,0,0,0,0,0,0,0    ; ep1 in

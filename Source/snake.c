@@ -198,30 +198,30 @@ void SnakeBoard(void) {
                 case  EMPTY:
                 break;
                 case FRUIT:
-                                      pixel(x+1,y  ,PIXEL_SET); pixel(x+2,y  ,PIXEL_SET); 
-                    pixel(x,y+1,PIXEL_SET);                                         pixel(x+3,y+1,PIXEL_SET);
-                    pixel(x,y+2,PIXEL_SET);                                         pixel(x+3,y+2,PIXEL_SET);
-                                      pixel(x+1,y+3,PIXEL_SET); pixel(x+2,y+3,PIXEL_SET); 
+                                      set_pixel(x+1,y  ); set_pixel(x+2,y  ); 
+                    set_pixel(x,y+1);                                         set_pixel(x+3,y+1);
+                    set_pixel(x,y+2);                                         set_pixel(x+3,y+2);
+                                      set_pixel(x+1,y+3); set_pixel(x+2,y+3); 
                 break;
                 case HUMAN_PLAYER1:
                 case CPU_PLAYER1:
-                    pixel(x,y  ,PIXEL_SET); pixel(x+1,y  ,PIXEL_SET); pixel(x+2,y  ,PIXEL_SET); pixel(x+3,y  ,PIXEL_SET);
-                    pixel(x,y+1,PIXEL_SET);                                         pixel(x+3,y+1,PIXEL_SET);
-                    pixel(x,y+2,PIXEL_SET);                                         pixel(x+3,y+2,PIXEL_SET);
-                    pixel(x,y+3,PIXEL_SET); pixel(x+1,y+3,PIXEL_SET); pixel(x+2,y+3,PIXEL_SET); pixel(x+3,y+3,PIXEL_SET);
+                    set_pixel(x,y  ); set_pixel(x+1,y  ); set_pixel(x+2,y  ); set_pixel(x+3,y  );
+                    set_pixel(x,y+1);                                         set_pixel(x+3,y+1);
+                    set_pixel(x,y+2);                                         set_pixel(x+3,y+2);
+                    set_pixel(x,y+3); set_pixel(x+1,y+3); set_pixel(x+2,y+3); set_pixel(x+3,y+3);
                 break;
                 case HUMAN_PLAYER2:
                 case CPU_PLAYER2:
-                    pixel(x,y  ,PIXEL_SET); pixel(x+1,y  ,PIXEL_SET); pixel(x+2,y  ,PIXEL_SET); pixel(x+3,y  ,PIXEL_SET);
-                    pixel(x,y+1,PIXEL_SET); pixel(x+1,y+1,PIXEL_SET); pixel(x+2,y+1,PIXEL_SET); pixel(x+3,y+1,PIXEL_SET);
-                    pixel(x,y+2,PIXEL_SET); pixel(x+1,y+2,PIXEL_SET); pixel(x+2,y+2,PIXEL_SET); pixel(x+3,y+2,PIXEL_SET);
-                    pixel(x,y+3,PIXEL_SET); pixel(x+1,y+3,PIXEL_SET); pixel(x+2,y+3,PIXEL_SET); pixel(x+3,y+3,PIXEL_SET);
+                    set_pixel(x,y  ); set_pixel(x+1,y  ); set_pixel(x+2,y  ); set_pixel(x+3,y  );
+                    set_pixel(x,y+1); set_pixel(x+1,y+1); set_pixel(x+2,y+1); set_pixel(x+3,y+1);
+                    set_pixel(x,y+2); set_pixel(x+1,y+2); set_pixel(x+2,y+2); set_pixel(x+3,y+2);
+                    set_pixel(x,y+3); set_pixel(x+1,y+3); set_pixel(x+2,y+3); set_pixel(x+3,y+3);
                 break;
                 default:
-                                      pixel(x+1,y  ,PIXEL_SET);                     pixel(x+3,y  ,PIXEL_SET);
-                    pixel(x,y+1,PIXEL_SET);                     pixel(x+2,y+1,PIXEL_SET); 
-                                      pixel(x+1,y+2,PIXEL_SET);                     pixel(x+3,y+2,PIXEL_SET);
-                    pixel(x,y+3,PIXEL_SET);                     pixel(x+2,y+3,PIXEL_SET);
+                                      set_pixel(x+1,y  );                     set_pixel(x+3,y  );
+                    set_pixel(x,y+1);                     set_pixel(x+2,y+1); 
+                                      set_pixel(x+1,y+2);                     set_pixel(x+3,y+2);
+                    set_pixel(x,y+3);                     set_pixel(x+2,y+3);
                 break;
             }
         }

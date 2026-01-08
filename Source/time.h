@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define EPOCH_YEAR      1944
+
 typedef struct {
     uint8_t sec;                 // Seconds         [0-59]
     uint8_t min;                 // Minutes         [0-59]
@@ -24,6 +26,7 @@ typedef struct {
 
 extern volatile Type_Time now;
 extern Type_Time EEMEM EE_saved_time;
+extern uint8_t EEMEM EE_WSettings;      // 24Hr format, Date Format, Hour Beep, Alarm On,
 
 void Watch(void);
 void Calendar(void);
@@ -32,6 +35,8 @@ void SetTimeTimer(void);
 void GetTimeTimer(void);
 void SetMinuteInterrupt(void);
 uint8_t DaysInMonth(Type_Time *timeptr);
+uint16_t DaysAwayfromToday(Type_Time *timeptr);
+uint8_t FutureDate(Type_Time *timeptr);
 
 // Change item definitions
 #define SET_SECOND          1

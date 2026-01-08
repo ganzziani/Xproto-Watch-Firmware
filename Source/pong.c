@@ -111,13 +111,13 @@ void PongBoard(void) {
     lcd_goto(96,8); printN_5x8(T.PONG.Player2.points);
     lcd_hline(T.PONG.Player1.x1, T.PONG.Player1.x2, T.PONG.Player1.y,PIXEL_SET);
     lcd_hline(T.PONG.Player2.x1, T.PONG.Player2.x2, T.PONG.Player2.y,PIXEL_SET);
-    pixel(x-1,y-3,PIXEL_TGL); pixel(x,y-3,PIXEL_TGL); pixel(x+1,y-3,PIXEL_TGL);
-    pixel(x-2,y-2,PIXEL_TGL); pixel(x+2,y-2,PIXEL_TGL);
-    pixel(x-3,y-1,PIXEL_TGL); pixel(x+3,y-1,PIXEL_TGL);
-    pixel(x-3,y,  PIXEL_TGL); pixel(x+3,y  ,PIXEL_TGL);
-    pixel(x-3,y+1,PIXEL_TGL); pixel(x+3,y+1,PIXEL_TGL);
-    pixel(x-2,y+2,PIXEL_TGL); pixel(x+2,y+2,PIXEL_TGL);
-    pixel(x-1,y+3,PIXEL_TGL); pixel(x,y+3,PIXEL_TGL); pixel(x+1,y+3,PIXEL_TGL);
+    set_pixel(x-1,y-3); set_pixel(x,y-3  ); set_pixel(x+1,y-3);
+    set_pixel(x-2,y-2); set_pixel(x+2,y-2);
+    set_pixel(x-3,y-1); set_pixel(x+3,y-1);
+    set_pixel(x-3,y  ); set_pixel(x+3,y  );
+    set_pixel(x-3,y+1); set_pixel(x+3,y+1);
+    set_pixel(x-2,y+2); set_pixel(x+2,y+2);
+    set_pixel(x-1,y+3); set_pixel(x,y+3  ); set_pixel(x+1,y+3);
 }
 
 void PongEngine(void) {
@@ -166,13 +166,14 @@ void PongEngine(void) {
         MovePaddle(&T.PONG.Player1);
         MovePaddle(&T.PONG.Player2);
         PongBoard();
+        lcd_goto(27,13);
         if(T.PONG.Player1.points>=10) {
             setbit(WSettings, goback);
-            lcd_goto(27,13); print5x8(PSTR("Player 1 Wins"));
+            print5x8(PSTR("Player 1 Wins"));
         }
         if(T.PONG.Player2.points>=10) {
             setbit(WSettings, goback);
-            lcd_goto(27,13); print5x8(PSTR("Player 2 Wins"));
+            print5x8(PSTR("Player 2 Wins"));
         }
         WaitDisplay();
         dma_display();

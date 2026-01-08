@@ -3,7 +3,7 @@
 
 //#define SPANISH
 
-const char VERSION[]    PROGMEM = "FW 2.74";
+const char VERSION[]    PROGMEM = "FW 2.75";
 
 // Strings with special characters:
 // 0x1F = delta
@@ -29,7 +29,7 @@ const char STRS_mainmenu[][17] PROGMEM = {           // Menus:
 };
 
 const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
-    "Hora Calendario      ",    // Watch
+    "Hora Calendario  Luna",    // Watch
     "Perfil  Imagen  Start",    // Oscilloscope
     "Culebra Pong  Ajedrez",    // Games
     "Ajuste Diagnos. Sobre",    // Settings
@@ -68,7 +68,7 @@ const char STRS_mainmenu[][17] PROGMEM = {           // Menus:
 };
 
 const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
-    "Time  Calendar       ",    // Watch
+    "Time  Calendar   Moon",    // Watch
     "Profile Image   Start",    // Oscilloscope
     "Snake   Pong    Chess",    // Games
     "Config Diagnose About",    // Settings
@@ -99,6 +99,19 @@ const char STR_Profiles[]   PROGMEM = " Profiles";
 
 #endif
 
+const char STRS_MoonPhase[][16] PROGMEM = {
+    "   New Moon    ",
+    "Waxing Crescent",
+    " First Quarter ",
+    "Waxing Gibbous ",
+    "   Full Moon   ",
+    "Waning Gibbous ",
+    " Last quarter  ",
+    "Waning Crescent",
+};
+
+const char STR_ON[] PROGMEM = " ON";
+const char STR_OFF[] PROGMEM = " OFF";
 const char STR_CPU[] PROGMEM = "CPU   ";
 const char STR_P1[] PROGMEM = " 1: ";
 const char STR_P2[] PROGMEM = " 2: ";

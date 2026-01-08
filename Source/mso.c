@@ -8,6 +8,7 @@
 #include "interface.h"
 #include "USB\usb_xmega.h"
 #include "utils.h"
+#include "config.h"
 
 // Function prototypes
 void Reduce(void);

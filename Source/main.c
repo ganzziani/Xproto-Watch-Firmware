@@ -2,24 +2,32 @@
 // exit scope from slow sampling rates, causes a blank vertical line on the scope icon
 // pressing buttons multiple times on the Diagnose screen causes a reset
 // TODO & Optimizations:
-/*      Sniffer IRDA, 1 Wire, MIDI
+/*      Custom bootloader
+            - Save constants tables in bootloader
+            - Calibration in User Signature Row
+	    Crystal check
         Gain Calibration
+        Detect low voltage with comparator
+        Check if pretrigger samples completed with DMA (last part of mso.c)
+        Share buffer between CH1 and CH2
+        MSO Logic Analyzer more SPS, with DMA
+        Force trigger, Trigger timeout in menu
+        USE NVM functions from BOOT
+        Sniffer IRDA, 1 Wire, MIDI
 		PC control digital lines -> bus driver! SPI / I2C / UART ...
         Custom AWG backup in User Signature Row
         UART Auto baud rate
         Programmer mode
         If no sleeptime, check if menu timeout works
-        Check if pretrigger samples completed with DMA (last part of mso.c)
-        Make Srate signed, so tests like Srate>=11 become Srate>=0
-        Share buffer between CH1 and CH2
-        MSO Logic Analyzer more SPS, with DMA
-        Force trigger, Trigger timeout in menu
 		USB Frame counter
         Channel math in meter mode
-		USE NVM functions from BOOT */
-// TODO When 64k parts come out:
-/*      Vertical zoom
-        Use as a programmer
+		Channel AC/DC control
+        Vertical zoom
+        Filter mode (Audio in -> Filter -> Audio Out)
+        Pulse width and Period vmeasurements
+        Add CRC to serial communication
+        Logic Port Invert: Select individual channels
+        Protocol trigger
         Terminal mode
         FFT waterfall
         Setting profiles
@@ -114,6 +122,7 @@
 #include "time.h"
 #include "utils.h"
 #include "config.h"
+#include "moon.h"
 
 FUSES = {
 	.FUSEBYTE0 = 0xFF,  // JTAG not used, ***NEEDS*** to be off
@@ -219,7 +228,7 @@ int main(void) {
                         old_menu=1;
                     }                        
                     if(testbit(Buttons,K2)) Calendar();
-                    //if(testbit(Buttons,K3)) Tasks();
+                    if(testbit(Buttons,K3)) Moon();
                 break;
                 case 2:     // Oscilloscope Menu
                     if(testbit(Buttons,K1)) {   // Profile
@@ -285,7 +294,7 @@ int main(void) {
                     Menu=3;
                 break;
                 case 4:     // Settings Menu
-                    //if(testbit(Buttons,K1)) Config();
+                    if(testbit(Buttons,K1)) OWSettings();
                     if(testbit(Buttons,K2)) Diagnose();
                     if(testbit(Buttons,K3)) About();
                     Menu=4;
@@ -609,7 +618,7 @@ void CalibrateOffset(void) {
 }
 
 // Calibrate gain, inputs must be connected to 4.000V
-void CalibrateGain(void) {
+/*void CalibrateGain(void) {
     #ifndef NODISPLAY
         Buttons=0;
         clr_display();
@@ -652,7 +661,7 @@ void CalibrateGain(void) {
         eeprom_write_byte((uint8_t *)&gain8CH2, avrg2);
     }
     Buttons=0;
-}
+}*/
 
 // Fill up channel data buffers
 void SimpleADC(void) {

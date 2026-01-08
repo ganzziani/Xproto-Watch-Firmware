@@ -7,6 +7,7 @@
 #include "games.h"
 #include "build.h"
 #include "config.h"
+#include "time.h"
 
 // Diagnostic tests
 void Diagnose(void) {
@@ -86,11 +87,24 @@ void Diagnose(void) {
     setbit(MStatus, update);
 }
 
+void PrintDate(uint8_t row, uint8_t col) {
+    lcd_goto(row, col);
+    if(NowYear<56) {
+        print5x8(PSTR("19")); printN5x8(44+NowYear);
+    }
+    else {
+        print5x8(PSTR("20")); printN5x8(NowYear-56);
+    }
+    putchar5x8('/');
+    printN5x8(NowMonth); putchar5x8('/');
+    printN5x8(NowDay);
+}
+
 void About(void) {
     Sound(TuneIntro);
     clr_display();
     u8CursorX=30; u8CursorY=1;
-    uint16_t pointer = Logo;
+    uint16_t pointer = (uint16_t)Logo;
     for(uint8_t i=0; i<69; i++) {
         display_or(pgm_read_byte_near(pointer++)); // Print logo
     }
@@ -103,21 +117,12 @@ void About(void) {
     lcd_goto(0,14); print5x8(PSTR("Build Date 20")); printN5x8(BUILD_YEAR);
     putchar5x8('/'); printN5x8(BUILD_MONTH);
     putchar5x8('/'); printN5x8(BUILD_DAY);
-    lcd_goto(0,15); print5x8(PSTR("Reset Cause: ")); printhex5x8(RST.STATUS);    // Show reset cause
+    lcd_goto(0,15); print5x8(PSTR("RST:")); printhex5x8(RST.STATUS);    // Show reset cause
     uint8_t timeout=120;
     do {
         ANALOG_ON();        // Turn on analog circuits to be ready to read Vref
         GetTimeTimer();     // Sync variables from TCF0
-        lcd_goto(34,6);
-        if(NowYear<56) {
-            print5x8(PSTR("19")); printN5x8(44+NowYear);
-        }
-        else {
-            print5x8(PSTR("20")); printN5x8(NowYear-56);
-        }
-        putchar5x8('/');
-        printN5x8(NowMonth); putchar5x8('/');
-        printN5x8(NowDay);
+        PrintDate(34,6);
         lcd_goto(40,7);
         printN_5x8(NowHour); putchar5x8(':');
         printN5x8(NowMinute); putchar5x8(':');
@@ -147,8 +152,6 @@ void Profiles(void) {
             lcd_goto(5,i+2);
             if(i==slot) {
                 putchar5x8('-'); putchar5x8(0x81); // Print arrow
-            } else {
-                putchar5x8(' '); putchar5x8(' ');
             }
             print5x8(PSTR(" Slot: "));
             putchar5x8('0'+i);
@@ -236,5 +239,44 @@ void ShowScreenshot(void) {
         WaitDisplay();
         SLP();          // Sleep
     } while(!testbit(WSettings, goback));
+    setbit(MStatus, update);
+}
+
+void OWSettings(void) {
+    WSettings = eeprom_read_byte(&EE_WSettings);
+    clrbit(WSettings, goback);
+    uint8_t select=0;
+    do {
+        clr_display();
+        lcd_goto(28,0); print5x8(&STRS_mainmenu[3][0]);    // STRS_mainmenu[3][0] contains the word Settings
+        lcd_goto(16,2); print5x8(PSTR("Hourly Beep"));
+        if(testbit(WSettings, hourbeep)) print5x8(STR_ON); else print5x8(STR_OFF);
+        lcd_goto(16,3); print5x8(PSTR("24 Hour Format"));
+        if(testbit(WSettings, time24))   print5x8(STR_ON); else print5x8(STR_OFF);
+        for(uint8_t i=0; i<3; i++) {
+            lcd_goto(2,i+2);
+            if(i==select) {
+                putchar5x8('-'); putchar5x8(0x81); // Print arrow
+            }
+        }
+        lcd_goto(0,15); print5x8(PSTR("TOGGLE"));
+        if(testbit(Misc,userinput)) {
+            clrbit(Misc, userinput);
+            if(testbit(Buttons,KBR) || testbit(Buttons,KBL)) select++;
+            if(testbit(Buttons,KUR) || testbit(Buttons,KUL)) select--;
+            if(testbit(Buttons,KML)) setbit(WSettings, goback);
+            if(testbit(Buttons,K1)) {   // Toggle
+                switch(select) {
+                    case 0: togglebit(WSettings, hourbeep); break;
+                    case 1: togglebit(WSettings, time24);   break;
+                }
+            }
+            if(select>=2) select=0;
+        }
+        dma_display();
+        WaitDisplay();
+        SLP();          // Sleep
+    } while(!testbit(WSettings, goback));
+    eeprom_write_byte(&EE_WSettings, WSettings);    // Save Watch settings
     setbit(MStatus, update);
 }

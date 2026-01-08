@@ -220,7 +220,6 @@ void Watch(void) {
                 }                        
                 if(testbit(Buttons, KUL)) setbit(VPORT1.OUT, LEDWHITE); // Turn on backlight
                 if(testbit(Buttons, KBL)) {
-                    togglebit(WSettings, time24);       // Toggle 24 hour format
                     if(testbit(WatchBits,keyrep)) {     // Check if this is a long press
                         Menu=SET_SECOND;                // User can change the time now
                         clrbit(WatchBits,keyrep);       // Prevent repeat key
@@ -1031,10 +1030,53 @@ void findweekday(void) {
     NowWeekDay = days;                              // Return week day. Saturday is 0
 }
 
-// Returns number of days on this month
+// Returns the number of days in the month in the date pointed by timeptr
 uint8_t DaysInMonth(Type_Time *timeptr) {
     uint8_t daysinmonth;
     daysinmonth = pgm_read_byte_near(monthDays+timeptr->month-1);
     if (timeptr->month==2 && LEAP_YEAR(timeptr->year)) daysinmonth++;
     return daysinmonth;
+}
+
+// Absolute days away from Now date
+uint16_t DaysAwayfromToday(Type_Time *timeptr) {
+    uint16_t days=0;
+    int8_t delta;
+    uint8_t y1 = NowYear;
+    uint8_t y2 = timeptr->year;
+    if(y2>=y1) delta = 1; else delta = -1;
+    while(y1!=y2) {     // Count days for every year
+        days += 365;
+        if (LEAP_YEAR(y1)) days++;
+        y1+=delta;
+    }     
+    uint8_t m1 = NowMonth-1;
+    uint8_t m2 = timeptr->month-1;
+    if(m2>=m1) delta = 1; else delta = -1;
+    while(m1!=m2) {     // Count days for every month
+        days += pgm_read_byte_near(monthDays+m1);
+        if (m1==1 && LEAP_YEAR(NowYear)) days++;
+        m1+=delta;
+    }
+    uint8_t d1 = NowDay;
+    uint8_t d2 = timeptr->day;
+    if(d2>=d1) delta = d2-d1; else delta = d1-d2;
+    days += delta;      // Add remaining days
+    return days;
+}
+
+// Date is equal or greater than today?
+uint8_t FutureDate(Type_Time *timeptr) {
+    uint8_t y1 = NowYear;
+    uint8_t y2 = timeptr->year;
+    if(y2>y1) return 1;
+    if(y2<y1) return 0;
+    uint8_t m1 = NowMonth;
+    uint8_t m2 = timeptr->month;
+    if(m2>m1) return 1;
+    if(m2<m1) return 0;
+    uint8_t d1 = NowDay;
+    uint8_t d2 = timeptr->day;
+    if(d2>d1) return 1;
+    return 0;
 }

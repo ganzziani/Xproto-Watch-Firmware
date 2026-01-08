@@ -50,19 +50,16 @@ void clr_display(void) {
 // Clear display buffers 1 and 2
 void clr_display_all(void) {
     uint8_t *p;
-    #ifdef INVERT_DISPLAY
-    const uint8_t cleared=255;
-    #else
-    const uint8_t cleared=0;
-    #endif
     p=Disp_send.display_data1;
     for(uint8_t i=0; i<2; i++) {
         for(uint8_t j=0; j<128; j++) {
-            // Unroll inner loop for speed - Clear 16 lines
-            *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
-            *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
-            *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
-            *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
+            for(uint8_t k=0; k<16; k++) {
+                #ifdef INVERT_DISPLAY
+                *p++=255;
+                #else
+                *p++=0;
+                #endif
+            }
             p+=2;   // Skip line LCD setup
         }
         p=Disp_send.display_data2;
@@ -78,7 +75,6 @@ void sprite(uint8_t x, uint8_t y, const int8_t *ptr) {
         set_pixel(x+a,y+b);
     } while(1);
 }
-
 
 // Print a char on the display using the 3x6 font
 void putchar3x6(char u8Char) {
@@ -595,7 +591,7 @@ void printN_5x8(uint8_t Data) {
     putchar5x8(Data+0x30);
 }
 
-// Print Number 0-255 with the small 7 segment font
+// Print Number 0-255 with the 11x21 font
 void printN11x21(uint8_t x, uint8_t y, uint8_t Data, uint8_t digits) {
     uint8_t n=Data, d=0, h=0;
     while(n>=100) { h++; n-=100; }

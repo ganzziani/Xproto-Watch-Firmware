@@ -142,13 +142,13 @@
 
 // Watch Global variables, using GPIO for optimized access
 #define NOW         0       // Address of Now variables
-#define NowSecond   GPIO0   // Second
-#define NowMinute   GPIO1   // Minute
-#define NowHour     GPIO2   // Hour
-#define NowDay      GPIO3   // Day
-#define NowMonth    GPIO4   // Month
-#define NowYear     GPIO5   // Year
-#define NowWeekDay  GPIO6   // Day of the Week
+#define NowSecond   GPIO0   // Second          [0-59]
+#define NowMinute   GPIO1   // Minute          [0-59]
+#define NowHour     GPIO2   // Hour            [0-23]
+#define NowDay      GPIO3   // Day             [1-31]
+#define NowMonth    GPIO4   // Month           [1-12]
+#define NowYear     GPIO5   // Year since 1944
+#define NowWeekDay  GPIO6   // Day of the Week [0-6] Sunday is 0
 #define AlarmHour   GPIO7   // Alarm Hour
 #define AlarmMinute GPIO8   // Alarm Minute
 #define SecTimeout  GPIO9   // Remaining seconds to display seconds
@@ -157,7 +157,6 @@
 #define WatchBits   GPIOC   // Watch Bits
 #define AlarmTune   GPIOD   // Alarm Tune
 #define Menu        GPIOE   // Menu
-
 
 // WSettings         (GPIOB) -  Watch Persistent Settings - some bits are shared
 #define update      0       // Update
