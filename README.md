@@ -1,11 +1,7 @@
 Xproto-Watch
 ============
 
-Source Code for the Oscilloscope Watch
-http://www.gabotronics.com/oscilloscopes/oscilloscope-watch.htm
-
-The project is developed using Atmel Studio 6, available from atmel.com
-
+The project is developed using Microchip Studio 7 and version 4.0.0 of the AVR 8-Bit Toolchain.
 
 The Oscilloscope Watch has all the features of a modern watch (time, calendar, alarm, etc...) combined with all the features of the popular Xprotolab (Oscilloscope, Waveform Generator, Logic Analyzer, Protocol Sniffer, Frequency Counter). The Xprotolab has been featured in several other online magazines, such as Hack a Day. and Elektor.
 
@@ -61,3 +57,11 @@ AWG specifications:
     Buffer size: 512
     Output Voltage: +/- 4V
 
+Overall hardware block diagram:
+<img width="1152" height="1003" alt="OW-Block_Diagram-1" src="https://github.com/user-attachments/assets/2c863071-3402-4acf-a937-3d8bb5933992" />
+
+System architecture:
+<img width="1152" height="860" alt="OW-Block_Diagram-2" src="https://github.com/user-attachments/assets/ea4f4227-9057-472e-b661-218465e0dba0" />
+
+Clock and Frequency Counter:
+<img width="1152" height="912" alt="OW-Block_Diagram-3" src="https://github.com/user-attachments/assets/edc9af9b-a5d9-45af-ba30-8bb7c8bc39f3" />
