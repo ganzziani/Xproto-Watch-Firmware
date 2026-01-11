@@ -4,7 +4,6 @@
 #include "moon.h"
 #include "main.h"
 #include "utils.h"
-#include "time.h"
 #include "ffft.h"
 #include "config.h"
 
@@ -77,16 +76,17 @@ void Moon(void) {
 		    print5x8(&STRS_optionmenu[0][17]);    // STRS_optionmenu[0][17] contains the word Moon
 		    print5x8(PSTR(" Phase"));
             PrintDate(34,1,&date);
-            uint8_t index = 0;
-            if(Phase<14) index=0;
-            else if(Phase<44) index=1;
-            else if(Phase<73) index=2;
-            else if(Phase<103) index=3;
-            else if(Phase<132) index=4;
-            else if(Phase<162) index=5;
-            else if(Phase<191) index=6;
-            else if(Phase<221) index=7;
-            lcd_goto(24,14); print5x8(STRS_MoonPhase[index]);
+            uint8_t index;
+            if(Phase < 7) index = 0;           // New Moon: 0-6 (0-3%)
+            else if(Phase < 52) index = 1;     // Waxing Crescent: 7-51 (3-22%)
+            else if(Phase < 66) index = 2;     // First Quarter: 52-65 (22-28%)
+            else if(Phase < 111) index = 3;    // Waxing Gibbous: 66-110 (28-47%)
+            else if(Phase < 125) index = 4;    // Full Moon: 111-124 (47-53%)
+            else if(Phase < 170) index = 5;    // Waning Gibbous: 125-169 (53-72%)
+            else if(Phase < 184) index = 6;    // Last Quarter: 170-183 (72-78%)
+            else if(Phase < 229) index = 7;    // Waning Crescent: 184-228 (78-97%)
+            else index = 0;                    // Back to New Moon: 229-236
+            lcd_goto(24,13); print5x8(STRS_MoonPhase[index]);
             lcd_goto(0,15);  print5x8(STR_MoonMenu);
             dma_display();
             // Moon bitmap with realistic phase shading

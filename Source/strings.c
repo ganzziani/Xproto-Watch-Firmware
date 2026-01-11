@@ -3,7 +3,7 @@
 
 //#define SPANISH
 
-const char VERSION[]    PROGMEM = "FW 2.75";
+const char VERSION[]    PROGMEM = "FW 2.76";
 
 // Strings with special characters:
 // 0x1F = delta
@@ -108,7 +108,7 @@ const char STRS_MoonPhase[][16] PROGMEM = {
     "Waxing Gibbous ",
     "   Full Moon   ",
     "Waning Gibbous ",
-    " Last quarter  ",
+    " Last Quarter  ",
     "Waning Crescent",
 };
 

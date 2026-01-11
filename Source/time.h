@@ -2,6 +2,7 @@
 #define _TIME_H
 
 #include <stdint.h>
+#include <avr/eeprom.h>
 
 #define EPOCH_YEAR      1944
 
