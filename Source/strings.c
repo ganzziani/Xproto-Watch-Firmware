@@ -55,6 +55,7 @@ const char STR_Level[]      PROGMEM = "Nivel:  ";
 const char STR_Player[]     PROGMEM = "Jugador";
 const char STR_Human[]      PROGMEM = "Humano";
 const char STR_GameMenu[]   PROGMEM = "Jugadr1 Jugadr2 Start";
+const char STR_MoonMenu[]   PROGMEM = "Prev.LL Hoy  Prox.LL";
 
 const char STR_Profiles[]   PROGMEM = " Perfiles";
 
@@ -94,6 +95,7 @@ const char STR_Level[]      PROGMEM = "Level:  ";
 const char STR_Player[]     PROGMEM = "Player ";
 const char STR_Human[]      PROGMEM = "Human ";
 const char STR_GameMenu[]   PROGMEM = "Player1 Player2 Start";
+const char STR_MoonMenu[]   PROGMEM = "Prev.FM Today Next.FM";
 
 const char STR_Profiles[]   PROGMEM = " Profiles";
 

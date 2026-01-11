@@ -44,8 +44,10 @@ void Pong(void) {
             clrbit(MStatus, update);
             if(testbit(Misc,userinput)) {
                 clrbit(Misc, userinput);
-                if(testbit(Buttons, K1)) p1++; if(p1>CPU_PLAYER1) p1=HUMAN_PLAYER1;
-                if(testbit(Buttons, K2)) p2++; if(p2>CPU_PLAYER2) p2=HUMAN_PLAYER2;
+                if(testbit(Buttons, K1)) p1++;
+                if(p1>CPU_PLAYER1) p1=HUMAN_PLAYER1;
+                if(testbit(Buttons, K2)) p2++;
+                if(p2>CPU_PLAYER2) p2=HUMAN_PLAYER2;
                 if(testbit(Buttons, K3)) {
                     T.PONG.Player1.state = p1;
                     T.PONG.Player2.state = p2;

@@ -19,8 +19,8 @@ enum {  // Menu reference:
     MDISPLAY1,  // " GRID   \0  FLIP DISPLAY \0  INVERT ", // Display
     MMETER,     // "  VDC      \0   V P-P  \0 FREQUENCY ", // Meter mode
     MAWG,       // "  SINE    \0    SQUARE  \0  TRIANGLE", // AWG
-    MCH1OPT,    // " POSITION  \0   INVERT   \0    MATH ", // Channel 1 options
-    MCH2OPT,    // " POSITION  \0   INVERT   \0    MATH ", // Channel 2 options
+    MCH1OPT,    // " POSITION  \0  AC COUPLE \0    MATH ", // Channel 1 options
+    MCH2OPT,    // " POSITION  \0  AC COUPLE \0    MATH ", // Channel 2 options
     MCHDOPT1,   // " POSITION  \0   INVERT  \0   THICK0 ", // Logic Options 1
     MMAIN1,     // "  CH1   \0       CH2  \0       LOGIC", // Menu Select 1 - Channel
     MMAIN2,     // "TRIGTYPE  \0    TRIGSRC  \0 MORETRIG", // Menu Select 2 - Trigger
@@ -48,8 +48,10 @@ enum {  // Menu reference:
     MCHDPULL,   // " NO PULL  \0   PULL UP  \0 PULL DOWN", // Logic Inputs Pull
     MDISPLAY2,  // " PERSISTENT  \0   LINE   \0    SHOW ", // Display
     MSPI,       // " CPOL     \0     CPHA    \0      GO ", // SPI Clock polarity and phase
-    MCH1MATH,   // " SUBTRACT \0   MULTIPLY \0  AVERAGE ", // Channel 1 math
-    MCH2MATH,   // " SUBTRACT \0   MULTIPLY \0  AVERAGE ", // Channel 2 math
+    MCH1MATH,   // " OPERATOR \0   INVERT   \0  AVERAGE ", // Channel 1 math
+    MCH2MATH,   // " OPERATOR \0   INVERT   \0  AVERAGE ", // Channel 2 math
+    MCH1OPER,   // " SUBTRACT \0  MULTIPLY  \0 DERIVATV ", // Operators
+    MCH2OPER,   // " SUBTRACT \0  MULTIPLY  \0 DERIVATV ", // Operators
     MAWG3,      // "AMPLITUDE \0  DUTY CYCLE \0   OFFSET", // AWG Menu 3
     MSWMODE,    // "  DOWN    \0  PINGPONG   \0   ACCEL ", // Sweep Mode Menu
     MUART,                                                 // UART Settings

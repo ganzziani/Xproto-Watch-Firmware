@@ -35,13 +35,13 @@
 // CH1ctrl bits    (GPIO1)
 // CH2ctrl bits    (GPIO2)
 #define chon        0       // Channel on
-#define x10         1       // x10 probe
-#define bwlimit     2       // Bandwidth Limit
+#define chx10       1       // x10 probe
+#define derivative  2       // Math: derivative
 #define acdc        3       // AC/DC Select
 #define chinvert    4       // Invert channel
 #define chaverage   5       // Average samples
-#define chmath      6       // math (Subtract or Multiply active)
-#define submult     7       // Subtract or Multiply
+#define chmath      6       // Math (Subtract or Multiply active)
+#define submult     7       // Math: Multiply
 
 // CHDctrl bits    (GPIO3)
 #define chon        0       // Channel on

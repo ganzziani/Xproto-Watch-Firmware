@@ -141,7 +141,7 @@ extern const uint16_t milivolts[];
 // Print Voltage, multiply by 10 if using the x10 probe
 void printV(int16_t Data, uint8_t gain, uint8_t CHCtrl) {
     int32_t Data32 = (int32_t)Data*milivolts[gain];
-    if(testbit(CHCtrl,x10)) Data32*=10;
+    if(testbit(CHCtrl,chx10)) Data32*=10;
     printF(u8CursorX,u8CursorY,Data32/8);
 }    
 
@@ -342,8 +342,10 @@ void fillTriangle(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2,uint8_t x3,uint8_t
 			else              t2x += signx2;
 		}
 	next2:
-		if(minx>t1x) minx=t1x; if(minx>t2x) minx=t2x;
-		if(maxx<t1x) maxx=t1x; if(maxx<t2x) maxx=t2x;
+		if(minx>t1x) minx=t1x;
+        if(minx>t2x) minx=t2x;
+		if(maxx<t1x) maxx=t1x;
+        if(maxx<t2x) maxx=t2x;
 	   	lcd_hline(minx, maxx, y,c);    // Draw line from min to max points found on the y
 		// Now increase y
 		if(!changed1) t1x += signx1;
@@ -397,8 +399,10 @@ void fillTriangle(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2,uint8_t x3,uint8_t
 		}	   	   
 	next4:
 
-		if(minx>t1x) minx=t1x; if(minx>t2x) minx=t2x;
-		if(maxx<t1x) maxx=t1x; if(maxx<t2x) maxx=t2x;
+		if(minx>t1x) minx=t1x;
+        if(minx>t2x) minx=t2x;
+		if(maxx<t1x) maxx=t1x;
+        if(maxx<t2x) maxx=t2x;
 	   	lcd_hline(minx, maxx, y,c);    // Draw line from min to max points found on the y
 		// Now increase y
 		if(!changed1) t1x += signx1;

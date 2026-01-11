@@ -49,6 +49,10 @@
 #define ANALOG_OFF()    clrbit(VPORT0.OUT, ANPOW)
 #define LOGIC_ON()      PORTA.OUTSET = 0x02
 #define LOGIC_OFF()     PORTA.OUTCLR = 0x02
+#define CH1_AC_CPL()    PORTA.OUTSET = 0x04
+#define CH1_DC_CPL()    PORTA.OUTCLR = 0x04
+#define CH2_AC_CPL()    PORTA.OUTSET = 0x20
+#define CH2_DC_CPL()    PORTA.OUTCLR = 0x20
 #define LOGIC_DIROUT()  clrbit(VPORT0.OUT, LOGIC_DIR)
 #define LOGIC_DIRIN()   setbit(VPORT0.OUT, LOGIC_DIR)
 #define EXTCOMMH()      setbit(VPORT3.OUT, EXTCOMM)

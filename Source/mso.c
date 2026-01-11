@@ -106,7 +106,7 @@ const char menustxt[][35] PROGMEM = {           // Menus:
     " GRID   \0  FLIP DISPLAY \0  INVERT ",     // 7  Display
     "  VDC      \0   V P-P  \0 FREQUENCY ",     // 8  Meter mode
     "  SINE    \0    SQUARE  \0  TRIANGLE",     // 9  AWG
-    "POSITION   \0   INVERT   \0    MATH ",     // 10 Channel options
+    "POSITION   \0  AC COUPLE \0    MATH ",     // 10 Channel options
     "POSITION   \0   INVERT  \0   THICK0 ",     // 11 Logic options 1
     " CH1 \0          CH2 \0        LOGIC",     // 12 Menu Select 1 - Channel
     "TRIGTYPE  \0   TRIGSRC   \0 MORETRIG",     // 13 Menu Select 2 - Trigger
@@ -125,14 +125,15 @@ const char menustxt[][35] PROGMEM = {           // Menus:
     " NO PULL  \0   PULL UP  \0 PULL DOWN",     // 26 Logic Inputs Pull
     " PERSISTENT  \0  LINE   \0     SHOW ",     // 27 Display
     " CPOL     \0    CPHA    \0 INVERT SS",     // 28 SPI Clock polarity and phase
-    " SUBTRACT \0  MULTIPLY  \0  AVERAGE ",     // 29 Channel math
+    " OPERATOR \0   INVERT   \0  AVERAGE ",     // 29 Channel math
     "AMPLITUDE \0  DUTY CYCLE \0   OFFSET",     // 30 AWG Menu 3
     " ROLL     \0   ELASTIC  \0  XY MODE ",     // 31 Scope options
     "TRIGMODE  \0  POSTTRIG \0   TRIGHOLD",     // 32 Menu Trigger 2
     " EXP      \0    NOISE   \0   CUSTOM ",     // 33 AWG Menu 4
     " SPEED    \0    MODE    \0    RANGE ",     // 34 AWG Menu 5
     "SW FREQ    \0  SW AMP   \0  SW DUTY ",     // 35 AWG Menu 6
-    "  DOWN    \0  PINGPONG   \0  ACCEL\0",     // 36 Sweep Mode Menu
+    "  DOWN    \0  PINGPONG   \0  ACCEL\0",     // 36 Sweep Mode Menu, Leave last character space for icon
+    " SUBTRACT \0  MULTIPLY  \0 DIFFRNTL ",     // 37 Operators
 //  " FREQUENCY \0  COUNTER \0 PUL WIDTH ",     //    Frequency counter menu
 //  " IRDA     \0   1 WIRE    \0    MIDI ",     //    More Sniffer protocols
 //  " SWEEP    \0  CV/GATE  \0 POS. RANGE",     //    Advanced Sweep Settings
@@ -163,8 +164,8 @@ const char menupoint[] PROGMEM = {  // Menu text table
     33, // MAWG4 AWG Menu 4
     34, // MAWG5 AWG Menu 5
     35, // MAWG6 AWG Menu 6
-//    37, // MAWG7 AWG Menu 7
-//    38, // MCVG CV/Gate Menu
+//    38, // MAWG7 AWG Menu 7
+//    39, // MCVG CV/Gate Menu
     31, // MSCOPEOPT Scope options
     32, // MTRIG2 Trigger menu 2
     18, // MTRIGMODE Trigger edge and mode
@@ -182,6 +183,8 @@ const char menupoint[] PROGMEM = {  // Menu text table
     28, // MSPI SPI Clock polarity and phase
     29, // MCH1MATH Channel 1 math
     29, // MCH2MATH Channel 2 math
+    37, // MCH1OPER Math Operators
+    37, // MCH2OPER Math Operators
     30, // MAWG3 AWG Menu 3
     36, // MSWMODE Sweep Mode Menu
 };
@@ -231,6 +234,8 @@ const char Next[] PROGMEM = {  // Next Menu
     MSNIFFER,   // MSPI SPI Clock polarity and phase
     Mdefault,   // MCH1MATH Channel 1 math
     Mdefault,   // MCH2MATH Channel 2 math
+    Mdefault,   // MCH1OPER Math Operator
+    Mdefault,   // MCH2OPER Math Operator
     Mdefault,   // MAWG3 AWG Menu 3
     MAWG5,      // MSWMODE Sweep mode menu
     MSNIFFER,   // MUART UART Settings
@@ -302,6 +307,8 @@ const char Prev[] PROGMEM = {  // Previous Menu
     MPROTOCOL,  // MSPI SPI Clock polarity and phase
     MCH1OPT,    // MCH1MATH Channel 1 math
     MCH2OPT,    // MCH2MATH Channel 2 math
+    MCH1MATH,   // MCH1OPER Math Operator
+    MCH2MATH,   // MCH2OPER Math Operator
     MAWG2,      // MAWG3 AWG Menu 3
     MAWG5,      // MSWMODE Sweep mode menu
     MPROTOCOL,  // MUART UART Settings
@@ -597,7 +604,7 @@ void MSO(void) {
                         q2=(int8_t *)T.IN.CH2;
                         q3=(int8_t *)T.IN.CHD;
                     }
-                    if(Srate) {   // Srate 0 only has 256 data points
+                    if(Srate) {   // Srate 0 only has 256 data points, all others have 512
                         if(testbit(CH1ctrl,chaverage)) {
                             ch1raw=((int8_t)(ch1raw)>>1)+((int8_t)(*q1)>>1);
                         }
@@ -611,6 +618,12 @@ void MSO(void) {
                         q1=(int8_t *)T.IN.CH1;
                         q2=(int8_t *)T.IN.CH2;
                         q3=(int8_t *)T.IN.CHD;
+                    }
+                    if(testbit(CH1ctrl,derivative) && i) {
+                        ch1raw=(*q1)-ch1raw;
+                    }
+                    if(testbit(CH2ctrl,derivative) && i) {
+                        ch2raw=(*q2)-ch2raw;
                     }
                     ch1end = saddwsat(ch1raw, CH1.offset);
                     if(testbit(CH1ctrl,chinvert)) ch1end = 255-ch1end;
@@ -1433,23 +1446,17 @@ void MSO(void) {
                     setbit(MStatus, updateawg);
                 break;
                 case MCH1OPT:    // CH1 Menu 2
-                    if(testbit(Buttons,K1)) Menu = MCH1POS;  // CH1 Position
-                    if(testbit(Buttons,K2)) {   // Invert Channel
-                        togglebit(CH1ctrl,chinvert);
-                        setbit(Misc, redraw);
-                    }
-                    if(testbit(Buttons,K3)) Menu = MCH1MATH;    // Math
+                    if(testbit(Buttons,K1)) Menu = MCH1POS;             // CH1 Position
+                    if(testbit(Buttons,K2)) togglebit(CH1ctrl,acdc);    // CH1 AC Coupling
+                    if(testbit(Buttons,K3)) Menu = MCH1MATH;            // CH1 Math
                 break;
                 case MCH2OPT:    // CH2 Menu 2
-                    if(testbit(Buttons,K1)) Menu=MCH2POS;   // CH2 Position
-                    if(testbit(Buttons,K2)) {   // Invert Channel
-                        togglebit(CH2ctrl,chinvert);
-                        setbit(Misc, redraw);
-                    }
-                    if(testbit(Buttons,K3)) Menu=MCH2MATH;  // Math
+                    if(testbit(Buttons,K1)) Menu=MCH2POS;               // CH2 Position
+                    if(testbit(Buttons,K2)) togglebit(CH2ctrl,acdc);    // CH2 AC Coupling
+                    if(testbit(Buttons,K3)) Menu = MCH2MATH;            // CH2 Math
                 break;
                 case MCHDOPT1:    // Logic Analyzer Options
-                    if(testbit(Buttons,K1)) M.CHDpos+=8;              // Logic Position
+                    if(testbit(Buttons,K1)) M.CHDpos+=8;                    // Logic Position
                     if(testbit(Buttons,K2)) togglebit(CHDctrl,chinvert);    // Invert Channel
                     if(testbit(Buttons,K3)) togglebit(CHDctrl,low);         // Thick line when logic '0'
                 break;
@@ -1694,9 +1701,25 @@ void MSO(void) {
                 case MSPI:    // SPI Menu
                     if(testbit(Buttons,K1)) togglebit(Sniffer,CPOL);        // Toggle CPOL
                     if(testbit(Buttons,K2)) togglebit(Sniffer,CPHA);        // Toggle CPHA
-                    if(testbit(Buttons,K3)) togglebit(Sniffer,SSINV);        // Toggle CPHA
+                    if(testbit(Buttons,K3)) togglebit(Sniffer,SSINV);       // Toggle CPHA
                 break;
-                case MCH1MATH:    // Channel 1 math
+                case MCH1MATH:    // Channel 1 Math
+                    if(testbit(Buttons,K1)) Menu = MCH1OPER;                // Go to Operator menu
+                    if(testbit(Buttons,K2)) {                               // Invert Channel
+                        togglebit(CH1ctrl,chinvert);
+                        setbit(Misc, redraw);
+                    }
+                    if(testbit(Buttons,K3)) togglebit(CH1ctrl,chaverage);   // Average
+                break;
+                case MCH2MATH:    // Channel 2 Math
+                    if(testbit(Buttons,K1)) Menu = MCH2OPER;                // Go to Operator menu
+                    if(testbit(Buttons,K2)) {                               // Invert Channel
+                        togglebit(CH2ctrl,chinvert);
+                        setbit(Misc, redraw);
+                    }
+                    if(testbit(Buttons,K3)) togglebit(CH2ctrl,chaverage);   // Average
+                break;
+                case MCH1OPER:  // Channel 1 Operator
                     if(testbit(Buttons,K1)) {   // Subtract
                         if(testbit(CH1ctrl,chmath)) {
                             togglebit(CH1ctrl,submult);
@@ -1717,9 +1740,9 @@ void MSO(void) {
                             clrbit(CH1ctrl,submult);
                         }
                     }
-                    if(testbit(Buttons,K3)) togglebit(CH1ctrl,chaverage);   // Average
+                    if(testbit(Buttons,K3)) togglebit(CH1ctrl,derivative);   // Average
                 break;
-                case MCH2MATH:    // Channel 2 math
+                case MCH2OPER:  // Channel 2 Operator
                     if(testbit(Buttons,K1)) {   // Subtract
                         if(testbit(CH2ctrl,chmath)) {
                             togglebit(CH2ctrl,submult);
@@ -1740,7 +1763,7 @@ void MSO(void) {
                             clrbit(CH2ctrl,submult);
                         }
                     }
-                    if(testbit(Buttons,K3)) togglebit(CH2ctrl,chaverage);   // Average
+                    if(testbit(Buttons,K3)) togglebit(CH2ctrl,derivative);   // Average
                 break;
                 case MAWG3:     // AWG Menu 3
                     if(testbit(Buttons,K1)) Menu=MAWGAMP;    // Amplitude
@@ -2032,11 +2055,11 @@ void MSO(void) {
                                 (i==2 && M.AWGtype==3) ) setbit(Misc,negative);
                         break;
                         case MCH1OPT:
-                            if( (i==1 && testbit(CH1ctrl,chinvert)) ||
+                            if( (i==1 && testbit(CH1ctrl,acdc)) ||
                                 (i==2 && testbit(CH1ctrl,chmath)) ) setbit(Misc,negative);
                         break;
                         case MCH2OPT:
-                            if( (i==1 && testbit(CH2ctrl,chinvert)) ||
+                            if( (i==1 && testbit(CH2ctrl,acdc)) ||
                                 (i==2 && testbit(CH2ctrl,chmath)) ) setbit(Misc,negative);
                         break;
                         case MCHDOPT1:
@@ -2128,14 +2151,24 @@ void MSO(void) {
                             if( (i==2 && testbit(Sniffer,SSINV)) ) setbit(Misc,negative);
                         break;
                         case MCH1MATH:
-                            if( (i==0 && testbit(CH1ctrl,chmath) && testbit(CH1ctrl,submult)) ||
-                                (i==1 && testbit(CH1ctrl,chmath) && !testbit(CH1ctrl,submult)) ||
+                            if( (i==0 && testbit(CH1ctrl,chmath)) ||
+                                (i==1 && testbit(CH1ctrl,chinvert)) ||
                                 (i==2 && testbit(CH1ctrl,chaverage)) ) setbit(Misc,negative);
                         break;
                         case MCH2MATH:
+                            if( (i==0 && testbit(CH2ctrl,chmath)) ||
+                                (i==1 && testbit(CH2ctrl,chinvert)) ||
+                                (i==2 && testbit(CH2ctrl,chaverage)) ) setbit(Misc,negative);
+                        break;
+                        case MCH1OPER:
+                            if( (i==0 && testbit(CH1ctrl,chmath) && testbit(CH1ctrl,submult)) ||
+                                (i==1 && testbit(CH1ctrl,chmath) && !testbit(CH1ctrl,submult)) ||
+                                (i==2 && testbit(CH1ctrl,derivative)) ) setbit(Misc,negative);
+                        break;
+                        case MCH2OPER:
                             if( (i==0 && testbit(CH2ctrl,chmath) && testbit(CH2ctrl,submult)) ||
                                 (i==1 && testbit(CH2ctrl,chmath) && !testbit(CH2ctrl,submult)) ||
-                                (i==2 && testbit(CH2ctrl,chaverage)) ) setbit(Misc,negative);
+                                (i==2 && testbit(CH2ctrl,derivative)) ) setbit(Misc,negative);
                         break;
                         case MSWMODE:
                             if( (i==0 && testbit(Sweep,swdown)) ||
@@ -2340,8 +2373,8 @@ void MSO(void) {
                         lcd_goto(76,0);
                         if(testbit(CH1ctrl,chinvert)) putchar3x6('-'); else putchar3x6(' ');
                         print3x6(menustxt[12]+1);  // CH1 text
-                        if(testbit(CH1ctrl,x10)) print3x6(gainx10txt[M.CH1gain]);  // Using 10x probe
-                        else print3x6(gaintxt[M.CH1gain]);                         // Using 1x probe
+                        if(testbit(CH1ctrl,chx10)) print3x6(gainx10txt[M.CH1gain]); // Using 10x probe
+                        else print3x6(gaintxt[M.CH1gain]);                          // Using 1x probe
                         print3x6(STR_Vdiv);    // V/div
                     }
                     ypos++;
@@ -2364,8 +2397,8 @@ void MSO(void) {
                         lcd_goto(76,ypos);
                         if(testbit(CH2ctrl,chinvert)) putchar3x6('-'); else putchar3x6(' ');
                         print3x6(menustxt[12]+16); // CH2 text
-                        if(testbit(CH2ctrl,x10)) print3x6(gainx10txt[M.CH2gain]);  // Using 10x probe
-                        else print3x6(gaintxt[M.CH2gain]);                         // Using 1x probe
+                        if(testbit(CH2ctrl,chx10)) print3x6(gainx10txt[M.CH2gain]); // Using 10x probe
+                        else print3x6(gaintxt[M.CH2gain]);                          // Using 1x probe
                         print3x6(STR_Vdiv);    // V/div
                     }
                     ypos++;
@@ -3037,6 +3070,11 @@ void Apply(void) {
 	if(Srate>7) srateoff=7;
     CH1.offset=-(eeprom_read_byte((uint8_t *)&offset8CH1[srateoff][M.CH1gain]));
     CH2.offset=-(eeprom_read_byte((uint8_t *)&offset8CH2[srateoff][M.CH2gain]));
+    // AC Coupling
+    if(testbit(CH1ctrl, acdc)) CH1_AC_CPL();
+    else CH1_DC_CPL();
+    if(testbit(CH2ctrl, acdc)) CH2_AC_CPL();
+    else CH2_DC_CPL();    
     // Logic input options
     uint8_t temp;
     temp=1;         // Sense rising edge (for freq. counter)

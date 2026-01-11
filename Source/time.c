@@ -575,8 +575,10 @@ void CountDown(void) {
                 start = !start;
             }
             if(testbit(Buttons,K1)) hour++;
-            if(testbit(Buttons,K2)) minute++; if(minute>=60) minute=0;
-            if(testbit(Buttons,K3)) second++; if(second>=60) second=0;
+            if(testbit(Buttons,K2)) minute++;
+            if(minute>=60) minute=0;
+            if(testbit(Buttons,K3)) second++;
+            if(second>=60) second=0;
             if(testbit(Buttons,KBR)) {
                 if(start) {    // LAP
                     lap++;
@@ -1065,18 +1067,109 @@ uint16_t DaysAwayfromToday(Type_Time *timeptr) {
     return days;
 }
 
-// Date is equal or greater than today?
-uint8_t FutureDate(Type_Time *timeptr) {
-    uint8_t y1 = NowYear;
-    uint8_t y2 = timeptr->year;
+uint32_t DaysSinceEpoch(const Type_Time *t) {
+    uint32_t days = 0;
+    // Years
+    for (uint16_t y = 0; y < t->year; y++) {
+        days += 365;
+        if (LEAP_YEAR(y)) {
+            days++;
+        }
+    }
+    // Months
+    for (uint8_t m = 1; m < t->month; m++) {
+        days += pgm_read_byte_near(monthDays + (m - 1));
+        if (m == 2 && LEAP_YEAR(t->year)) {
+            days++;
+        }
+    }
+    // Days
+    days += (t->day - 1);
+    return days;
+}
+
+// Distance in days from two dates
+uint16_t DaysDifference(const Type_Time *t1, const Type_Time *t2) {
+    uint32_t d1 = DaysSinceEpoch(t1);
+    uint32_t d2 = DaysSinceEpoch(t2);
+    return (d1 > d2) ? (d1 - d2) : (d2 - d1);
+}
+
+// Add a day to a date
+void AddDay(Type_Time *timeptr) {
+    uint8_t day = timeptr->day;
+    uint8_t month = timeptr->month;
+    uint8_t year = timeptr->year;
+    day++;
+    if(day>DaysInMonth(timeptr)) {
+        day=1;
+        month++;
+        if(month>12) {
+            month=1;
+            year++;
+        }
+    }
+    timeptr->day = day;
+    timeptr->month = month;
+    timeptr->year = year;
+}
+
+// Add a day to a date
+void SubDay(Type_Time *timeptr) {
+    uint8_t day = timeptr->day;
+    uint8_t month = timeptr->month;
+    uint8_t year = timeptr->year;
+    day--;
+    if(day==0) {
+        month--;
+        if(month==0) {
+            year--;
+            month=12;
+        }
+        timeptr->month = month;
+        timeptr->year = year;
+        day=DaysInMonth(timeptr);
+    }
+    timeptr->day = day;
+}
+
+// Compare dates
+uint8_t CompareDate(const Type_Time *timeptr1, const Type_Time *timeptr2) {
+    uint8_t y1 = timeptr1->year;
+    uint8_t y2 = timeptr2->year;
     if(y2>y1) return 1;
     if(y2<y1) return 0;
-    uint8_t m1 = NowMonth;
-    uint8_t m2 = timeptr->month;
+    uint8_t m1 = timeptr1->month;
+    uint8_t m2 = timeptr2->month;
     if(m2>m1) return 1;
     if(m2<m1) return 0;
-    uint8_t d1 = NowDay;
-    uint8_t d2 = timeptr->day;
+    uint8_t d1 = timeptr1->day;
+    uint8_t d2 = timeptr2->day;
     if(d2>d1) return 1;
     return 0;
+}
+
+void PrintDate(uint8_t row, uint8_t col, Type_Time *timeptr) {
+    uint8_t day;
+    uint8_t month;
+    uint8_t year;
+    if(timeptr==0) {    // Print today's date
+        day = NowDay;
+        month = NowMonth;
+        year = NowYear;
+    } else {
+        day = timeptr->day;
+        month = timeptr->month;
+        year = timeptr->year;
+    }
+    lcd_goto(row, col);
+    if(year<56) {
+        print5x8(PSTR("19")); printN5x8(44+year);
+    }
+    else {
+        print5x8(PSTR("20")); printN5x8(year-56);
+    }
+    putchar5x8('/');
+    printN5x8(month); putchar5x8('/');
+    printN5x8(day);
 }

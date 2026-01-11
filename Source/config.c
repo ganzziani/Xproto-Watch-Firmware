@@ -87,19 +87,6 @@ void Diagnose(void) {
     setbit(MStatus, update);
 }
 
-void PrintDate(uint8_t row, uint8_t col) {
-    lcd_goto(row, col);
-    if(NowYear<56) {
-        print5x8(PSTR("19")); printN5x8(44+NowYear);
-    }
-    else {
-        print5x8(PSTR("20")); printN5x8(NowYear-56);
-    }
-    putchar5x8('/');
-    printN5x8(NowMonth); putchar5x8('/');
-    printN5x8(NowDay);
-}
-
 void About(void) {
     Sound(TuneIntro);
     clr_display();
@@ -122,7 +109,7 @@ void About(void) {
     do {
         ANALOG_ON();        // Turn on analog circuits to be ready to read Vref
         GetTimeTimer();     // Sync variables from TCF0
-        PrintDate(34,6);
+        PrintDate(34,6,0);
         lcd_goto(40,7);
         printN_5x8(NowHour); putchar5x8(':');
         printN5x8(NowMinute); putchar5x8(':');

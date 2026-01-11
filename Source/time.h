@@ -36,7 +36,12 @@ void GetTimeTimer(void);
 void SetMinuteInterrupt(void);
 uint8_t DaysInMonth(Type_Time *timeptr);
 uint16_t DaysAwayfromToday(Type_Time *timeptr);
-uint8_t FutureDate(Type_Time *timeptr);
+uint8_t CompareDate(const Type_Time *timeptr1, const Type_Time *timeptr2);
+uint32_t DaysSinceEpoch(const Type_Time *timeptr);
+uint16_t DaysDifference(const Type_Time *t1, const Type_Time *t2);
+void AddDay(Type_Time *timeptr);
+void SubDay(Type_Time *timeptr);
+void PrintDate(uint8_t row, uint8_t col, Type_Time *timeptr);
 
 // Change item definitions
 #define SET_SECOND          1
