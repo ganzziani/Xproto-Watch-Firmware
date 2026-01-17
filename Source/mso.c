@@ -836,11 +836,11 @@ void MSO(void) {
                     ny2=eeprom_read_byte(&EECHREF2[j]);
                     // Add position
                     ny1=addwsat(ny1,eech1pos);
-                    ny1=ny1>>1; // Scale to LCD (128x128)
-                    if(ny1>=128) ny1=127;
+                    ny1=ny1>>1; // Scale to LCD
+                    //if(ny1>DISPLAY_MAX_Y) ny1=DISPLAY_MAX_Y;  // Commented out, ny1 is always between 0 and 127
                     ny2=addwsat(ny2,eech2pos);
-                    ny2=ny2>>1; // Scale to LCD (128x128)
-                    if(ny2>=128) ny2=127;
+                    ny2=ny2>>1; // Scale to LCD
+                    //if(ny2>DISPLAY_MAX_Y) ny2=DISPLAY_MAX_Y;  // Commented out, ny2 is always between 0 and 127
 
                     nx=i;
                     ox=i-1;
@@ -910,10 +910,10 @@ void MSO(void) {
                     // Apply position
                     temp1=addwsat(DC.CH1data[j],M.CH1pos);
                     temp2=addwsat(DC.CH2data[j],M.CH2pos);
-                    temp1=temp1>>1; // Scale to LCD (128x64)
-                    temp2=temp2>>1; // Scale to LCD (128x64)
-                    if(temp1>DISPLAY_MAX_Y) temp1=DISPLAY_MAX_Y;
-                    if(temp2>DISPLAY_MAX_Y) temp2=DISPLAY_MAX_Y;
+                    temp1=temp1>>1; // Scale to LCD
+                    temp2=temp2>>1; // Scale to LCD
+                    // if(temp1>DISPLAY_MAX_Y) temp1=DISPLAY_MAX_Y;  // Commented out, temp1 is always between 0 and 127
+                    // if(temp2>DISPLAY_MAX_Y) temp2=DISPLAY_MAX_Y;  // Commented out, temp2 is always between 0 and 127
                     if(testbit(Display, line)) {
                         if(i==0) continue;  // No previous sample
                         if((temp1!=och1) || (temp1 && och1<DISPLAY_MAX_Y))
@@ -1139,10 +1139,10 @@ void MSO(void) {
                             M.Tlevel = center2;
                             if(testbit(CH2ctrl,chinvert)) M.Tlevel=255-M.Tlevel;
                         }
-                        if(testbit(MFFT, scopemode)) {  // FFT Mode
+                        if(testbit(MFFT, scopemode)) {  // Scope Mode
                             // If both channels, reduce gain and adjust positions
-                            M.CH1pos = -center1/2;
-                            M.CH2pos = -center2/2;
+                            M.CH1pos = 64-center1/2;
+                            M.CH2pos = 64-center2/2;
                             if(testbit(CH1ctrl,chon) && testbit(CH2ctrl,chon)) {
                                 if(M.CH1pos>=-96) M.CH1pos-=32; else M.CH1pos=-128;
                                 if(M.CH2pos< -32) M.CH2pos+=32; else M.CH2pos=0;
@@ -1987,15 +1987,15 @@ void MSO(void) {
             }
             else {  // Only clear menu area (bottom of the display)
                 uint8_t *p;
-                p=Disp_send.DataAddress+15;  // Locate pointer at the bottom right byte
+                p=Disp_send.DataAddress+15;  // Locate pointer at the bottom left byte
                 for(uint8_t i=128; i; i--) {
                     *p=0;
-                    p+=18;                  // Go Next line
+                    p-=18;                  // Go Next line
                 }
             }
         }
         //if(testbit(Misc,lowbatt)) {
-        // Low battery icon
+        	// Display low battery icon
         //}
         // Print menu, also determine which items are selected and
         // print them on a black background (inverted print)
@@ -2211,8 +2211,14 @@ void MSO(void) {
             else text = STR_V;
             switch(Menu) {
                 case MSPI:  // SPI Configuration
-                    if(testbit(Sniffer,CPOL))   memcpy_P(Disp_send.DataAddress+(128*7+33),  &PulseNegIcon, 8);   // Pulse icon
-                    else                        memcpy_P(Disp_send.DataAddress+(128*7+33),  &PulsePosIcon, 8);   // Pulse icon
+                    if(testbit(Sniffer,CPOL)) {   // Pulse icon
+                        lcd_goto(33,15);
+                        putData(PulseNegIcon, 8);
+                    }
+                    else {   // Pulse icon
+                        lcd_goto(33,15);
+                        putData(PulsePosIcon, 8);
+                    }
                     if(testbit(Sniffer,CPHA))   set_pixel(38,DISPLAY_MAX_Y-6);
                     else                        set_pixel(35,DISPLAY_MAX_Y-6);
                 break;
@@ -2316,27 +2322,28 @@ void MSO(void) {
         if(MFFT>=0x20) { // Not Meter mode
             // Grid
             if(!testbit(MFFT, fftmode)) {
-                uint8_t ch1gnd;
+                uint8_t ch1gnd, ch2gnd;
                 ch1gnd = (M.CH1pos+128)/2;
                 if(ch1gnd>DISPLAY_MAX_Y) ch1gnd=DISPLAY_MAX_Y;
-                temp2 = (M.CH2pos+128)/2;
-                if(temp2>DISPLAY_MAX_Y) temp2=DISPLAY_MAX_Y;
+                ch2gnd = (M.CH2pos+128)/2;
+                if(ch2gnd>DISPLAY_MAX_Y) ch2gnd=DISPLAY_MAX_Y;
                 if(testbit(MFFT, xymode)) {   //XY Mode
-                    ch1gnd = temp2 = 64/*-(M.HPos/2)*/;
+                    ch1gnd = ch2gnd = 64/*-(M.HPos/2)*/;
                 }
                 switch(Display&0x03) {
-                    case 1:
-                        set_pixel(64,16);       // Vertical dot
-                        set_pixel(64,32);       // Vertical dot
-                        set_pixel(64,48);       // Vertical dot
-                        set_pixel(64,64);       // Vertical dot
-                        set_pixel(64,80);       // Vertical dot
-                        set_pixel(64,96);       // Vertical dot
-                        set_pixel(64,112);      // Vertical dot
+                    case 1: // Vertical dots
+                        {   // Set dots at: (64,16), (64,32), (64,48), (64,64), (64,80), (64,96), (64,112)
+                            uint8_t *p;
+                            p=Disp_send.DataAddress-(64*18)+(16/8);  // Locate pointer at (64,16)
+                            for(uint8_t i=7; i; i--) {
+                                *p|=0x80;   // OR one pixel
+                                p+=2;       // Move 2 bars below
+                            }
+                        }
                     case 2:
                         for(i=16; i<=112; i+=16) {
                             if(testbit(CH1ctrl,chon)) set_pixel(i,ch1gnd);          // CH1 ground
-                            if(testbit(CH2ctrl,chon)) set_pixel(i,temp2);           // CH2 ground
+                            if(testbit(CH2ctrl,chon)) set_pixel(i,ch2gnd);          // CH2 ground
                         }
                     break;
                     case 3: // Graticule

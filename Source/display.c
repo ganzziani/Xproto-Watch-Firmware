@@ -76,6 +76,13 @@ void sprite(uint8_t x, uint8_t y, const int8_t *ptr) {
     } while(1);
 }
 
+// Send n bytes of data to the display
+void putData(uint8_t *p, uint8_t n) {
+    for(uint8_t i=0; i<n; i++) {
+        display_or(pgm_read_byte(p++));
+    }
+}
+
 // Print a char on the display using the 3x6 font
 void putchar3x6(char u8Char) {
     uint16_t pointer;

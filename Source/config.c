@@ -69,6 +69,7 @@ void Diagnose(void) {
                 else CPU_Slow();
             }
         }
+        // Invert the text at bar
         uint8_t *DisplayPointer = Disp_send.DataAddress + bar;
         for(uint8_t i=0; i<128; i++) {
             *DisplayPointer = ~(*DisplayPointer);
@@ -90,11 +91,8 @@ void Diagnose(void) {
 void About(void) {
     Sound(TuneIntro);
     clr_display();
-    u8CursorX=30; u8CursorY=1;
-    uint16_t pointer = (uint16_t)Logo;
-    for(uint8_t i=0; i<69; i++) {
-        display_or(pgm_read_byte_near(pointer++)); // Print logo
-    }
+    lcd_goto(30, 1);
+    putData(Logo, 69);
     lcd_goto(10,3);
     print5x8(&STRS_mainmenu[1][0]);    // STRS_mainmenu[1][0] contains the word Oscilloscope
     print5x8(&STRS_mainmenu[0][3]);    // STRS_mainmenu[0][2] contains the word Watch
