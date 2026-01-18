@@ -408,13 +408,10 @@ static inline uint8_t average (uint8_t a, uint8_t b) {
 
 // Main MSO Application
 void MSO(void) {
-    uint8_t i,j,ypos;
-    uint8_t temp1,temp2,temp3;
     uint16_t Tpost;
     int16_t AWGsweepi;          // AWG sweep counter
     uint8_t AWGspeed;           // AWG sweep increment
     uint8_t chdtrigpos;         // Digital channel trigger position
-    const char *text;           // Pointer to constant text
 
     LoadEE();                   // Load settings
     
@@ -479,7 +476,7 @@ void MSO(void) {
 // Wait for trigger, start acquisition
         if(!testbit(MStatus, stop) &&       // MSO not stopped and
            !testbit(MStatus, triggered)) {  // Trigger not set already
-			i=M.Thold;	// Trigger hold
+			uint8_t i=M.Thold;	// Trigger hold
             while(i!=0) {
                 if(testbit(MStatus,update)) break;
                 delay_ms(1); i--;
@@ -591,7 +588,7 @@ void MSO(void) {
                 q1=(int8_t *)T.IN.CH1+circular;
                 q2=(int8_t *)T.IN.CH2+circular;
                 q3=(int8_t *)T.IN.CHD+circular;
-                i=0;
+                uint8_t i=0;
                 do {
                     uint8_t ch1raw, ch2raw, ch1end,ch2end;
                     *p3++ = *q3++;    // get Logic data
@@ -629,17 +626,17 @@ void MSO(void) {
                     if(testbit(CH1ctrl,chinvert)) ch1end = 255-ch1end;
                     ch2end = saddwsat(ch2raw, CH2.offset);
                     if(testbit(CH2ctrl,chinvert)) ch2end = 255-ch2end;
-                    uint8_t tempch2;
-                    temp1 = (int8_t)(ch1end-128);
+                    uint8_t tempch1, tempch2, chMult;
+                    tempch1 = (int8_t)(ch1end-128);
                     tempch2 = (int8_t)(ch2end-128);
-                    temp3=128+FMULS8(temp1,-(int8_t)tempch2);    // CH1*CH2
+                    chMult=128+FMULS8(tempch1,-(int8_t)tempch2);    // CH1*CH2
                     if(testbit(CH1ctrl,chmath)) {
                         if(testbit(CH1ctrl,submult)) ch1end=addwsat(ch1end,-(int8_t)tempch2); // CH1-CH2
-                        else ch1end=temp3;    // CH1*CH2
+                        else ch1end=chMult;    // CH1*CH2
                     }
                     if(testbit(CH2ctrl,chmath)) {
-                        if(testbit(CH2ctrl,submult)) ch2end=addwsat(ch2end,-(int8_t)temp1); // CH2-CH1
-                        else ch2end=temp3;    // CH1*CH2
+                        if(testbit(CH2ctrl,submult)) ch2end=addwsat(ch2end,-(int8_t)tempch1); // CH2-CH1
+                        else ch2end=chMult;    // CH1*CH2
                     }
                     if(testbit(Display,elastic)) {
                         *p1=average(*p1,ch1end);    // Can't increase in the same operation
@@ -799,7 +796,7 @@ void MSO(void) {
             uint8_t ch1max, ch1min, ch2max, ch2min;
             ch1min = ch1max = DC.CH1data[0];
             ch2min = ch2max = DC.CH2data[0];
-            i=0; do {
+            uint8_t i=0; do {
                 uint8_t curCH1,curCH2;
                 curCH1=DC.CH1data[i]; curCH2=DC.CH2data[i];
                 if(curCH1>ch1max) ch1max=curCH1;
@@ -864,10 +861,12 @@ void MSO(void) {
             if(Srate<11 || testbit(Mcursors,roll)) {
                 uint8_t k=0, prev=0;
                 // Display new data
+                uint8_t j;
                 if(Srate>=11 && testbit(Mcursors,roll)) j=(Index&0xFE)+1;    // clear last bit to prevent flicker
                 else j=M.HPos;
                 // i will scan display, j will scan data starting at M.HPos
-                for(i=0; i<128; i++, k++, j++) {
+                uint8_t adjustedCH1=0, adjustedCH2=0;
+                for(uint8_t i=0; i<128; i++, k++, j++) {
                     uint8_t chdpos, chddata;
                     if(Srate>=11 && testbit(Mcursors,roll)) i=k>>1;
                     chddata = DC.CHDdata[j];
@@ -906,25 +905,25 @@ void MSO(void) {
                     }
                     // Store previous points
                     uint8_t och1,och2;
-                    och1=temp1; och2=temp2;
+                    och1=adjustedCH1; och2=adjustedCH2;
                     // Apply position
-                    temp1=addwsat(DC.CH1data[j],M.CH1pos);
-                    temp2=addwsat(DC.CH2data[j],M.CH2pos);
-                    temp1=temp1>>1; // Scale to LCD
-                    temp2=temp2>>1; // Scale to LCD
+                    adjustedCH1=addwsat(DC.CH1data[j],M.CH1pos);
+                    adjustedCH2=addwsat(DC.CH2data[j],M.CH2pos);
+                    adjustedCH1=adjustedCH1>>1; // Scale to LCD
+                    adjustedCH2=adjustedCH2>>1; // Scale to LCD
                     // if(temp1>DISPLAY_MAX_Y) temp1=DISPLAY_MAX_Y;  // Commented out, temp1 is always between 0 and 127
                     // if(temp2>DISPLAY_MAX_Y) temp2=DISPLAY_MAX_Y;  // Commented out, temp2 is always between 0 and 127
                     if(testbit(Display, line)) {
                         if(i==0) continue;  // No previous sample
-                        if((temp1!=och1) || (temp1 && och1<DISPLAY_MAX_Y))
-                            if(testbit(CH1ctrl,chon))          lcd_line(i, temp1, prev, och1);
-                        if((temp2!=och2) || (temp2 && och2<DISPLAY_MAX_Y))
-                            if(testbit(CH2ctrl,chon)) lcd_line(i, temp2, prev, och2);
+                        if((adjustedCH1!=och1) || (adjustedCH1 && och1<DISPLAY_MAX_Y))
+                            if(testbit(CH1ctrl,chon))          lcd_line(i, adjustedCH1, prev, och1);
+                        if((adjustedCH2!=och2) || (adjustedCH2 && och2<DISPLAY_MAX_Y))
+                            if(testbit(CH2ctrl,chon)) lcd_line(i, adjustedCH2, prev, och2);
                     }
                     else {
                         // Don't draw when data==0 or data==DISPLAY_MAX_Y, signal could be clipping
-                        if(testbit(CH1ctrl,chon) && temp1 && temp1<DISPLAY_MAX_Y)          set_pixel(i, temp1);
-                        if(testbit(CH2ctrl,chon) && temp2 && temp2<DISPLAY_MAX_Y) set_pixel(i, temp2);
+                        if(testbit(CH1ctrl,chon) && adjustedCH1 && adjustedCH1<DISPLAY_MAX_Y) set_pixel(i, adjustedCH1);
+                        if(testbit(CH2ctrl,chon) && adjustedCH2 && adjustedCH2<DISPLAY_MAX_Y) set_pixel(i, adjustedCH2);
                     }
                     prev=i;
                 }
@@ -939,13 +938,12 @@ void MSO(void) {
             p1=DC.CH1data;
             p2=DC.CH2data;
             uint8_t i=0; do {
-                uint8_t y;
                 if(Srate>=11 && !testbit(Mcursors,roll)) {
                     if(i==Index) break; // Don't display old data in slow sampling rate
                 }
-                temp1=255-(*p1++);
-                y=(*p2++)/*-M.HPos*/;
-                set_pixel(temp1>>1, y>>1); // Scale to 128
+                uint8_t x = 255-(*p1++);
+                uint8_t y = (*p2++)/*-M.HPos*/;
+                set_pixel(x>>1, y>>1); // Scale to 128
             } while(++i);
             // Show reference waveforms
             if(testbit(Mcursors, reference)) {
@@ -963,15 +961,15 @@ void MSO(void) {
 // Display Frequency Spectrum
         if(testbit(MFFT, fftmode)) {
             if(!testbit(MStatus, triggered)) {    // Data ready
-                uint8_t divide, fft2pos;
+                uint8_t divide, fft1pos, fft2pos;
                 // Both channels on -> Show CH1 on upper half, CH2 on lower half of display
                 if(testbit(CH1ctrl,chon) && testbit(CH2ctrl,chon)) {
-                    temp1 = (DISPLAY_MAX_Y/2)-4; 	// position CH1
+                    fft1pos = (DISPLAY_MAX_Y/2)-4; 	// position CH1
                     fft2pos = (DISPLAY_MAX_Y-8);	// position CH2
                     divide = 2;  // divide by 4
                 }
                 else {  // Only one channel on
-                    temp1 = (DISPLAY_MAX_Y-8);		// position CH1
+                    fft1pos = (DISPLAY_MAX_Y-8);    // position CH1
                     fft2pos = (DISPLAY_MAX_Y-8);	// position CH2
                     divide = 1;  // divide by 2
                 }
@@ -992,19 +990,19 @@ void MSO(void) {
                 else {
                     if(testbit(CH1ctrl,chon)) {     // Display new FFT data
                         CH1.f=fft_stuff(DC.CH1data);
-                        for(i=0,j=0; j<FFT_N/2; i++,j++) {
+                        for(uint8_t i=0,j=0; j<FFT_N/2; i++,j++) {
     				        uint8_t fftdata=T.FFT.magn[j]>>divide;
-							if(fftdata>temp1) fftdata=temp1;
-                            if(testbit(Display, line)) lcd_line(i, temp1-fftdata, i, temp1);
-                            else set_pixel(i, temp1-fftdata);
+							if(fftdata>fft1pos) fftdata=fft1pos;    // Clip
+                            if(testbit(Display, line)) lcd_line(i, fft1pos-fftdata, i, fft1pos);
+                            else set_pixel(i, fft1pos-fftdata);
                         }
                     }
                     if(testbit(CH2ctrl,chon)) {
                         CH2.f=fft_stuff(DC.CH2data);
                         // Display new FFT data
-                        for(i=0,j=0; j<FFT_N/2; i++,j++) {
+                        for(uint8_t i=0,j=0; j<FFT_N/2; i++,j++) {
 							uint8_t fftdata=T.FFT.magn[j]>>divide;
-							if(fftdata>temp1) fftdata=temp1;    
+							if(fftdata>fft1pos) fftdata=fft1pos;    // Clip
                             if(testbit(Display, line)) lcd_line(i, fft2pos-fftdata, i, fft2pos);
                             else set_pixel(i, fft2pos-fftdata);
                         }
@@ -1058,6 +1056,7 @@ void MSO(void) {
                             if(testbit(MStatus, stop)) Source = 0;
                         }
                         else {                          // Frequency mode
+                            const char *text;           // Pointer to constant text
                             tiny_printp(98,3, STR_KHZ);
                             if(Srate<=6) text = STR_KHZ;
                             else text = STR_KHZ+1;  // Hz: Use same text as kHz, with + 1 offset
@@ -1096,13 +1095,13 @@ void MSO(void) {
             CH1.f=fft_stuff(DC.CH1data);
             CH2.f=fft_stuff(DC.CH2data);
 			MFFT=tempmfft;
-            j=5;
+            uint8_t MaxGain=5;
             if(MFFT<0x20) { // Meter Mode
-                if(testbit(MStatus, vp_p) || testbit(MStatus, vdc)) j=3; // Limit maximum gain on meter mode when measuring V
+                if(testbit(MStatus, vp_p) || testbit(MStatus, vdc)) MaxGain=3; // Limit maximum gain on meter mode when measuring V
             }
-            checknext:
-            if(M.CH1gain>j) M.CH1gain=j;  // Check maximum gain on CH1
-            if(M.CH2gain>j) M.CH2gain=j;  // Check maximum gain on CH2
+checknext:
+            if(M.CH1gain>MaxGain) M.CH1gain=MaxGain;  // Check maximum gain on CH1
+            if(M.CH2gain>MaxGain) M.CH2gain=MaxGain;  // Check maximum gain on CH2
             // Check sampling rate
             if(Srate>10) Srate=10;
             switch(adjusting) {
@@ -1163,8 +1162,8 @@ void MSO(void) {
                 break;
                 case 1: // Increase gain
                 case 5:
-                    if((CH1.max<188 && CH1.min>73) && M.CH1gain<j)      M.CH1gain++;
-                    if((CH2.max<188 && CH2.min>73) && M.CH2gain<j)      M.CH2gain++;
+                    if((CH1.max<188 && CH1.min>73) && M.CH1gain<MaxGain)    M.CH1gain++;
+                    if((CH2.max<188 && CH2.min>73) && M.CH2gain<MaxGain)    M.CH2gain++;
                 break;
                 case 2: // Decrease gain
                 case 6:
@@ -1178,7 +1177,7 @@ void MSO(void) {
                     if(CH1.f<50 && CH2.f<50 && Srate<10) Srate++;
                 break;
                 case 7: // Start with fastest sampling rate;
-                    Srate=1;
+                    Srate=0;
                 break;
             }
             // Check if settings have changed
@@ -2004,7 +2003,7 @@ void MSO(void) {
                 const char *menuch;
                 lcd_goto(0,TEXT_LAST_LINE);  // Menu position
                 menuch=menustxt[pgm_read_byte_near(menupoint+Menu-1)];
-                for(i=0; i<3; i++) {    // 3 Items in the menu
+                for(uint8_t i=0; i<3; i++) {    // 3 Items in the menu
                     clrbit(Misc,negative);    // negative font
                     switch(Menu) {
                         case MCH1:
@@ -2199,16 +2198,18 @@ void MSO(void) {
 			}
             // Info menus: AWG settings, Trigger Level, etc...
             lcd_goto(0,TEXT_LAST_LINE);
+            uint8_t tempGain, tempCtrl;
             if(M.Tsource==0) {
-                temp1=M.CH1gain;
-                temp2=CH1ctrl;
+                tempGain=M.CH1gain;
+                tempCtrl=CH1ctrl;
             }                
             else {
-                temp1=M.CH2gain;
-                temp2=CH2ctrl;
-            }                
-            if(temp1>=4) text = STR_mV;
-            else text = STR_V;
+                tempGain=M.CH2gain;
+                tempCtrl=CH2ctrl;
+            }
+            const char *textV_Unit;           // Pointer to constant text
+            if(tempGain>=4) textV_Unit = STR_mV;
+            else textV_Unit = STR_V;
             switch(Menu) {
                 case MSPI:  // SPI Configuration
                     if(testbit(Sniffer,CPOL)) {   // Pulse icon
@@ -2271,23 +2272,23 @@ void MSO(void) {
                         uint8_t mtlevel;
                         mtlevel=0x80-M.Tlevel;
                         if(mtlevel>=128) mtlevel=-mtlevel;
-                        printF(0,TEXT_LAST_LINE,((int32_t)mtlevel)*((int32_t)milivolts[temp1]*6400/(pgm_read_word_near(timeval+Srate))));
-                        print3x6(text);  // Display V or mV
+                        printF(0,TEXT_LAST_LINE,((int32_t)mtlevel)*((int32_t)milivolts[tempGain]*6400/(pgm_read_word_near(timeval+Srate))));
+                        print3x6(textV_Unit);  // Display V or mV
                         putchar3x6('/');
                         if(Srate<=6) putchar3x6(0x17);    // micro
                         else if(Srate<=15) { putchar3x6(0x1A); putchar3x6(0x1B); } // mili
                         putchar3x6('s');  // seconds
                     }
                     else {  // Edge or Dual edge trigger mode
-                        printV((int16_t)(128-M.Tlevel)*128,temp1,temp2);
-                        print3x6(text);
+                        printV((int16_t)(128-M.Tlevel)*128,tempGain,tempCtrl);
+                        print3x6(textV_Unit);
                     }
                 break;
                 case MTW1:  // "1:"
-                    print3x6(STR_F1+1); printV((int16_t)(128-M.Window1)*128,temp1,temp2); print3x6(text);
+                    print3x6(STR_F1+1); printV((int16_t)(128-M.Window1)*128,tempGain,tempCtrl); print3x6(textV_Unit);
                 break;
                 case MTW2:  // "2:"
-                    print3x6(STR_F2+1); printV((int16_t)(128-M.Window2)*128,temp1,temp2); print3x6(text);
+                    print3x6(STR_F2+1); printV((int16_t)(128-M.Window2)*128,tempGain,tempCtrl); print3x6(textV_Unit);
                 break;
                 case MSW1:  // "1:"
                     print3x6(STR_F1+1); printN3x6(M.Sweep1);
@@ -2333,22 +2334,21 @@ void MSO(void) {
                 switch(Display&0x03) {
                     case 1: // Vertical dots
                         {   // Set dots at: (64,16), (64,32), (64,48), (64,64), (64,80), (64,96), (64,112)
-                            uint8_t *p;
-                            p=Disp_send.DataAddress-(64*18)+(16/8);  // Locate pointer at (64,16)
+                            uint8_t *p=Disp_send.DataAddress-(64*18)+(16/8);  // Locate pointer at (64,16)
                             for(uint8_t i=7; i; i--) {
                                 *p|=0x80;   // OR one pixel
                                 p+=2;       // Move 2 bars below
                             }
                         }
                     case 2:
-                        for(i=16; i<=112; i+=16) {
+                        for(uint8_t i=16; i<=112; i+=16) {
                             if(testbit(CH1ctrl,chon)) set_pixel(i,ch1gnd);          // CH1 ground
                             if(testbit(CH2ctrl,chon)) set_pixel(i,ch2gnd);          // CH2 ground
                         }
                     break;
                     case 3: // Graticule
-                        for(j=16; j<=(DISPLAY_MAX_Y-15); j+=16) {
-                            for(i=16; i<=(DISPLAY_MAX_X-15); i+=16) set_pixel(i,j);
+                        for(uint8_t j=16; j<=(DISPLAY_MAX_Y-15); j+=16) {
+                            for(uint8_t i=16; i<=(DISPLAY_MAX_X-15); i+=16) set_pixel(i,j);
                         }
                     break;
                 }
@@ -2360,7 +2360,7 @@ void MSO(void) {
                 if(testbit(Mcursors, cursorv)) ShowCursorV();
             }
             // Display time and gain settings
-            ypos=0;
+            uint8_t ypos=0;
             if(testbit(Display, showset)) {
                 if(testbit(CH1ctrl,chon)) {
                     if(testbit(CH1ctrl,chmath)) {
@@ -2420,7 +2420,6 @@ void MSO(void) {
                 }
                 ypos++;
             }
-            i=ypos;
             // Trigger mark if tsource is CH1 or CH2
             if((testbit(Trigger, normal) || testbit(Trigger, autotrg)) && testbit(MFFT, scopemode)) {
                 chdtrigpos = 255;

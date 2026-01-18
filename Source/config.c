@@ -137,7 +137,7 @@ void Profiles(void) {
             lcd_goto(5,i+2);
             if(i==slot) {
                 putchar5x8('-'); putchar5x8(0x81); // Print arrow
-            }
+            } else u8CursorX+=12;
             print5x8(PSTR(" Slot: "));
             putchar5x8('0'+i);
         }
@@ -234,17 +234,32 @@ void OWSettings(void) {
     do {
         clr_display();
         lcd_goto(28,0); print5x8(&STRS_mainmenu[3][0]);    // STRS_mainmenu[3][0] contains the word Settings
-        lcd_goto(16,2); print5x8(PSTR("Hourly Beep"));
-        if(testbit(WSettings, hourbeep)) print5x8(STR_ON); else print5x8(STR_OFF);
-        lcd_goto(16,3); print5x8(PSTR("24 Hour Format"));
-        if(testbit(WSettings, time24))   print5x8(STR_ON); else print5x8(STR_OFF);
-        for(uint8_t i=0; i<3; i++) {
-            lcd_goto(2,i+2);
+        for(uint8_t i=0; i<2; i++) {
+            lcd_goto(2,i+2); 
             if(i==select) {
                 putchar5x8('-'); putchar5x8(0x81); // Print arrow
+            } else u8CursorX+=12;
+            switch(i) {
+                case 0: // Hourly beep
+                    if(testbit(WSettings, hourbeep)) setbit(Misc,negative);
+                break;
+                case 1: // 24 Hour format
+                    if(testbit(WSettings, time24)) setbit(Misc,negative);
+                break;
+                case 2: // Year at the end
+                    //if(testbit(,)) setbit(Misc,negative);
+                break;
+                case 3: // Month after day
+                    //if(testbit(,)) setbit(Misc,negative);
+                break;
             }
+            print5x8(STRS_Settings[i]);
+            clrbit(Misc,negative);
+            
         }
         lcd_goto(0,15); print5x8(PSTR("TOGGLE"));
+        // lcd_goto(30,15); print5x8(PSTR("ALTITUDE")); 
+        // lcd_goto(80,15); print5x8(PSTR("LONGITUDE"));
         if(testbit(Misc,userinput)) {
             clrbit(Misc, userinput);
             if(testbit(Buttons,KBR) || testbit(Buttons,KBL)) select++;

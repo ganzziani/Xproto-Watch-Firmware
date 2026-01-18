@@ -27,6 +27,7 @@ extern const char STR_Player[];
 extern const char STR_GameMenu[];
 extern const char STR_MoonMenu[];
 extern const char STRS_MoonPhase[][16];
+extern const char STRS_Settings[][18];
 extern const char STR_ON[];
 extern const char STR_OFF[];
 extern const char STR_CPU[];

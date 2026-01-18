@@ -73,8 +73,7 @@ void Moon(void) {
             newday=date.day;
             uint8_t Phase = MoonPhase(&date);
 		    lcd_goto(34,0);
-		    print5x8(&STRS_optionmenu[0][17]);    // STRS_optionmenu[0][17] contains the word Moon
-		    print5x8(PSTR(" Phase"));
+		    print5x8(PSTR("Moon Phase"));
             PrintDate(34,1,&date);
             uint8_t index;
             if(Phase < 7) index = 0;           // New Moon: 0-6 (0-3%)
