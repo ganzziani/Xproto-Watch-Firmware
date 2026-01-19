@@ -658,25 +658,23 @@ Send a run length encoded image from program memory to the LCD
     BMP[0] contains width/8
     BMP[1] contains height
 ----------------------------------------------------------------------------*/
-void bitmap(uint8_t x, uint8_t y, const uint8_t *BMP) {
+void bitmap(uint8_t x, uint8_t y, uint8_t *BMP) {
     uint8_t *p;
 	uint8_t data=0,count=0;
 	uint8_t width,height;
-    uint8_t const *b;
-    width=pgm_read_byte(&BMP[0]);
-    height=pgm_read_byte(&BMP[1])/8;
-    b=&BMP[2];
+    width=pgm_read_byte(BMP++);
+    height=pgm_read_byte(BMP++)/8;
     p= &Disp_send.DataAddress[(uint16_t)((-x)*18)+y];
   	for (uint8_t col=0; col < width; col++) {
 		for (uint8_t row=0; row<height; row++) {
 			if(count==0) {
-				data = pgm_read_byte(b++);
-				if(data==pgm_read_byte(b++)) {
-					count = pgm_read_byte(b++);
+				data = pgm_read_byte(BMP++);
+				if(data==pgm_read_byte(BMP++)) {
+					count = pgm_read_byte(BMP++);
 				}
 				else {
 					count = 1;
-					b--;
+					BMP--;
 				}
 			}
 			count--;
@@ -710,26 +708,25 @@ Send a run length encoded image from program memory to the LCD
     BMP[0] contains width/8
     BMP[1] contains height
 ----------------------------------------------------------------------------*/
-void bitmap_safe(int8_t x, int8_t y, const uint8_t *BMP, uint8_t c) {
+void bitmap_safe(int8_t x, int8_t y, uint8_t *BMP, uint8_t c) {
+    if(BMP==0) return;
     uint8_t *p;
 	uint8_t data=0,count=0;
     int16_t width,height;
-	uint8_t const *b;
-    width=pgm_read_byte(&BMP[0]);
-    height=pgm_read_byte(&BMP[1])/8;
-    b=&BMP[2];    
-    if(BMP==0 || width<0 || y+height<=0) return;
+    width=pgm_read_byte(BMP++);
+    height=pgm_read_byte(BMP++)/8;
+    if(width<0 || y+height<=0) return;
     p= &Disp_send.DataAddress[(int16_t)((-x)*18)+y];
   	for (int16_t col=x ; col < x+width; col++) {
 		for (int16_t row=y; row<y+height; row++) {
 			if(count==0) {
-				data = pgm_read_byte(b++);
-				if(data==pgm_read_byte(b++)) {
-					count = pgm_read_byte(b++);
+				data = pgm_read_byte(BMP++);
+				if(data==pgm_read_byte(BMP++)) {
+					count = pgm_read_byte(BMP++);
 				}
 				else {
 					count = 1;
-					b--;
+					BMP--;
 				}
 			}
 			count--;
@@ -749,6 +746,42 @@ void bitmap_safe(int8_t x, int8_t y, const uint8_t *BMP, uint8_t c) {
                 else if(c==3)   *p |= ~data;
                 else if(c==4)   *p ^= data;
                 else            *p = data;
+                #endif
+            }
+            p++;
+		}
+        p-=18+height;   // Next line
+	}
+}
+
+void bitmap_safe_far(int8_t x, int8_t y, uint_farptr_t BMP) {
+    if(BMP==0) return;
+    uint8_t *p;
+	uint8_t data=0,count=0;
+    int16_t width,height;
+    width=pgm_read_byte_far(BMP++);
+    height=pgm_read_byte_far(BMP++)/8;
+    if(width<0 || y+height<=0) return;
+    p= &Disp_send.DataAddress[(int16_t)((-x)*18)+y];
+  	for (int16_t col=x ; col < x+width; col++) {
+		for (int16_t row=y; row<y+height; row++) {
+			if(count==0) {
+				data = pgm_read_byte_far(BMP++);
+				if(data==pgm_read_byte_far(BMP++)) {
+					count = pgm_read_byte_far(BMP++);
+				}
+				else {
+					count = 1;
+					BMP--;
+				}
+			}
+			count--;
+            // Check if pixel stays within boundaries
+            if(col>=0 && col<128 && row>=0 && row<16) {
+                #ifdef INVERT_DISPLAY
+                *p &= ~data;
+                #else
+                *p &= data;
                 #endif
             }
             p++;

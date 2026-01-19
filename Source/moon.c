@@ -89,12 +89,12 @@ void Moon(void) {
             lcd_goto(0,15);  print5x8(STR_MoonMenu);
             dma_display();
             // Moon bitmap with realistic phase shading
-            uint8_t const *b = MoonBMP;
+            uint_farptr_t far_data = pgm_get_far_address(MoonBMP);
             uint8_t data;
             uint8_t *p = &Disp_send.DataAddress[(uint16_t)((-96)*18)+4];
             for (int8_t x = -32; x < 32; x++) {
                 for (uint8_t row = 0; row < 8; row++) {
-                    data = pgm_read_byte(b++);
+                    data = pgm_read_byte_far(far_data++);
                     uint8_t output = 0;
         
                     for (uint8_t bit = 0; bit < 8; bit++) {

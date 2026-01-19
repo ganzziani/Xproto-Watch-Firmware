@@ -61,7 +61,6 @@ extern const uint8_t    ScopeBMP[];
 extern const uint8_t    WatchBMP[];
 extern const uint8_t    GamesBMP[];
 extern const uint8_t    SettingsBMP[];
-extern const uint16_t   BMPs[];
 extern const uint16_t   ChessBMPs[];
 extern const uint8_t    MoonBMP[];
 extern uint8_t EEMEM    EEDISPLAY[2048];

@@ -318,6 +318,13 @@ int main(void) {
                 n = step=15;
                 from=-101;
             }
+            const uint_farptr_t BMPs[] = {
+                0,
+                pgm_get_far_address(WatchBMP),
+                pgm_get_far_address(ScopeBMP),
+                pgm_get_far_address(GamesBMP),
+                pgm_get_far_address(SettingsBMP),
+            };
             for(; n<118 && n>-118; n+=step) {   // Slide animation
                 if(testbit(Misc, userinput)) {  // Button pressed during animation
                     clrbit(Misc, userinput);
@@ -340,8 +347,8 @@ int main(void) {
                 if(step<-1) step++;
                 SwitchBuffers();
                 clr_display();
-                bitmap_safe(from+n,4,(uint8_t *)pgm_read_word(BMPs+Menu),PIXEL_SET);
-                bitmap_safe(16+n,4,(uint8_t *)pgm_read_word(BMPs+old_menu),PIXEL_SET);
+                bitmap_safe_far(from+n,4,BMPs[Menu]);
+                bitmap_safe_far(16+n,4,BMPs[old_menu]);
                 WaitDisplay();
                 dma_display();
             }
