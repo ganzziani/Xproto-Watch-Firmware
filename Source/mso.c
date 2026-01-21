@@ -2522,11 +2522,10 @@ checknext:
             if(!(Srate>=11 && testbit(Mcursors,roll))) ONGRN();
         }
         if(Srate<11 && MFFT>=0x20) {    // Use display double buffer with fast sample rates and not in Meter Mode
-            SwitchBuffers();    // Switch buffers
-            clr_display();
-        }
+            SwitchBuffers();            // Switch buffers
+        } else WaitDisplay();           // Finish last transmission
 		if(testbit(MStatus, updateawg)) BuildWave();
-        // VCC measurement
+        // Battery measurement
 //       if() setbit(Misc, lowbatt);
 //       else clrbit(Misc, lowbatt);
 
@@ -2810,7 +2809,6 @@ cancelvdc:
             printN3x6(minute); putchar3x6(':');
             printN3x6(second);
         }
-
         setbit(Misc,negative);
         printF(8,5,freqv);          // Print count
         T.IN.METER.Freq = freqv;

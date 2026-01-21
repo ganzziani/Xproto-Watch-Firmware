@@ -349,7 +349,7 @@ int main(void) {
             }
             old_menu=Menu;
             lcd_goto(28,2); print5x8(STRS_mainmenu[Menu-1]);
-            lcd_goto(0,15); print5x8(STRS_optionmenu[Menu-1]);
+            lcd_goto(1,15); print5x8(STRS_optionmenu[Menu-1]);
             WaitDisplay();  // Finish previous transmission
             dma_display();
             clrbit(MStatus, update);

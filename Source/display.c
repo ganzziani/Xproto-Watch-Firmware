@@ -216,19 +216,33 @@ void printF(uint8_t x, uint8_t y, int32_t Data) {
             // Upper side
             DisplayPointer--;
             for(uint8_t i=10; i; i--) {
-                *DisplayPointer = pgm_read_byte_near(FontPointer++);
+                uint8_t data = pgm_read_byte_near(FontPointer++);
+                #ifdef INVERT_DISPLAY
+                *DisplayPointer = ~data;
+                #else
+                *DisplayPointer = data;
+                #endif
                 DisplayPointer -= 18;
             }
             // Lower Side
             DisplayPointer = TempPointer;
             for(uint8_t i=10; i; i--) {
-                *DisplayPointer = pgm_read_byte_near(FontPointer++);
+                uint8_t data = pgm_read_byte_near(FontPointer++);
+                #ifdef INVERT_DISPLAY
+                *DisplayPointer = ~data;
+                #else
+                *DisplayPointer = data;
+                #endif
                 DisplayPointer -= 18;
             }
             DisplayPointer -=36;
 			if(point==i) { // putchar10x15('.'); Small point to Save space
                 for(uint8_t j=2; j; j--) {
+                    #ifdef INVERT_DISPLAY
+                    *DisplayPointer = ~0x06;
+                    #else
                     *DisplayPointer = 0x06;
+                    #endif
                     DisplayPointer -= 18;
                 }
                 DisplayPointer -=36;

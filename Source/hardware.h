@@ -4,7 +4,7 @@
 #ifndef HARDWARE_H
 #define HARDWARE_H
 
-//#define INVERT_DISPLAY
+#define INVERT_DISPLAY
 
 #include "LS013B7DH03.h"
 

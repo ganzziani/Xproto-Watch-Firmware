@@ -48,7 +48,7 @@ void Diagnose(void) {
         lcd_goto(0,8); print5x8(PSTR("VRef:   ")); print16_5x8(MeasureVRef());
         ANALOG_OFF();
         lcd_goto(0,9); print5x8(PSTR("Clock:  ")); printhex5x8(CLK.CTRL); printhex5x8(OSC.CTRL); printhex5x8(OSC.STATUS); printhex5x8(OSC.XOSCFAIL);
-        lcd_goto(0,15); print5x8(PSTR("OFFSET  LIGHT   SPEED"));
+        lcd_goto(1,15); print5x8(PSTR("OFFSET  LIGHT   SPEED"));
         OFFRED();
         OFFGRN();
         for(uint8_t i=0; i<16; i++) {           // Print GPIO registers
@@ -96,13 +96,13 @@ void About(void) {
     lcd_goto(10,3);
     print5x8(&STRS_mainmenu[1][0]);    // STRS_mainmenu[1][0] contains the word Oscilloscope
     print5x8(&STRS_mainmenu[0][3]);    // STRS_mainmenu[0][2] contains the word Watch
-    lcd_goto(0,13);
+    lcd_goto(1,13);
     print5x8(VERSION); print5x8(PSTR(" Build: "));
     printhex5x8(BUILD_NUMBER>>8); printhex5x8(BUILD_NUMBER&0x00FF);
-    lcd_goto(0,14); print5x8(PSTR("Build Date 20")); printN5x8(BUILD_YEAR);
+    lcd_goto(1,14); print5x8(PSTR("Build Date 20")); printN5x8(BUILD_YEAR);
     putchar5x8('/'); printN5x8(BUILD_MONTH);
     putchar5x8('/'); printN5x8(BUILD_DAY);
-    lcd_goto(0,15); print5x8(PSTR("RST:")); printhex5x8(RST.STATUS);    // Show reset cause
+    lcd_goto(1,15); print5x8(PSTR("RST:")); printhex5x8(RST.STATUS);    // Show reset cause
     uint8_t timeout=120;
     do {
         ANALOG_ON();        // Turn on analog circuits to be ready to read Vref
@@ -260,9 +260,9 @@ void OWSettings(void) {
             clrbit(Misc,negative);
         }
         GetTimeTimer();     // Sync variables from TCF0
-        PrintDate(0,13,0);
-        PrintTime(69,13);
-        lcd_goto(0,15); print5x8(PSTR("TOGGLE"));
+        PrintDate(1,13,0);
+        PrintTime(68,13);
+        lcd_goto(1,15); print5x8(PSTR("TOGGLE"));
         // lcd_goto(30,15); print5x8(Language); 
         // lcd_goto(30,15); print5x8(PSTR("ALTITUDE")); 
         // lcd_goto(80,15); print5x8(PSTR("LONGITUDE"));
