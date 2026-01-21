@@ -1988,7 +1988,11 @@ checknext:
                 uint8_t *p;
                 p=Disp_send.DataAddress+15;  // Locate pointer at the bottom left byte
                 for(uint8_t i=128; i; i--) {
+                    #ifdef INVERT_DISPLAY
+                    *p=0xFF;
+                    #else
                     *p=0;
+                    #endif
                     p-=18;                  // Go Next line
                 }
             }
@@ -2336,7 +2340,11 @@ checknext:
                         {   // Set dots at: (64,16), (64,32), (64,48), (64,64), (64,80), (64,96), (64,112)
                             uint8_t *p=Disp_send.DataAddress-(64*18)+(16/8);  // Locate pointer at (64,16)
                             for(uint8_t i=7; i; i--) {
+                                #ifdef INVERT_DISPLAY
+                                *p&=~0x80;  // AND one pixel
+                                #else
                                 *p|=0x80;   // OR one pixel
+                                #endif
                                 p+=2;       // Move 2 bars below
                             }
                         }
@@ -3246,7 +3254,13 @@ ISR(TCE1_OVF_vect) {
 					u8CursorY=0;
 					uint8_t *p=Disp_send.DataAddress;       // Locate pointer at upper left byte
 					p -= (uint16_t)(Index>>1)*18;           // Offset pointer with current sample
-					for(uint8_t i=0; i<16; i++) *p++=0;     // Clear next vertical line
+					for(uint8_t i=0; i<16; i++) {
+                        #ifdef INVERT_DISPLAY
+                        *p++=0xFF;  // Clear next vertical line
+                        #else
+                        *p++=0;     // Clear next vertical line
+                        #endif
+                    }                        
                 }
             }
         }

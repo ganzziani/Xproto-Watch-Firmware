@@ -159,7 +159,11 @@ void Moon(void) {
                             }
                         }
                     }
+                    #ifdef INVERT_DISPLAY
+                    *p++ = ~output;
+                    #else
                     *p++ = output;
+                    #endif
                 }
                 p += 18 - 8;   // Next line
                 if(!testbit(LCD_CTRL,LCD_CS)) dma_display();    // Send new data if previous transfer ended
