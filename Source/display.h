@@ -57,7 +57,6 @@ void tiny_printp(uint8_t x, uint8_t y, const char *ptr);
 void clearRectangle(uint8_t x, uint8_t y, uint8_t width, uint8_t height);
 void bitmap(uint8_t x, uint8_t y, uint8_t *BMP);
 void bitmap_safe(int8_t x, int8_t y, uint8_t *BMP, uint8_t c);
-void bitmap_safe_far(int8_t x, int8_t y, uint_farptr_t BMP);
 void printhex3x6(uint8_t n);           // Prints a HEX number
 void printhex5x8(uint8_t Data);
 

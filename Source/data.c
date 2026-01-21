@@ -46,8 +46,6 @@ uint8_t EEMEM EEGPIO[12] = {
     _BV(vdc),                               // GPIOB MStatus
 };
 
-uint8_t EEMEM EEGPIO_User[8][12] = { 0 };
-
 // Default settings stored in flash
 const NVMVAR FLM PROGMEM = {    // Flash Copy
     1,      //  CH1gain;        // Channel 1 gain
@@ -112,6 +110,7 @@ NVMVAR EEMEM EEM = {            // EEMEM Copy
     44000,  //  AWGdesiredF;    // Desired frequency 440Hz
 };
 
+uint8_t EEMEM EEGPIO_User[8][12] = { 0 };
 NVMVAR EEMEM EEM_User[8] = { 0 };
 
 // Maximum values

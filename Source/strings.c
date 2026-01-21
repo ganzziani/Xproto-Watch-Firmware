@@ -115,9 +115,8 @@ const char STRS_MoonPhase[][16] PROGMEM = {
 const char STRS_Settings[][18] PROGMEM = {
     " Hourly Beep     ",
     " 24 Hour Format  ",
-/*  " Year at the end ",
+    " Year at the end ",
     " Month after day ",
-*/
 };
 
 const char STR_ON[] PROGMEM = " ON";
@@ -125,3 +124,6 @@ const char STR_OFF[] PROGMEM = " OFF";
 const char STR_CPU[] PROGMEM = "CPU   ";
 const char STR_P1[] PROGMEM = " 1: ";
 const char STR_P2[] PROGMEM = " 2: ";
+
+const char STR_am[] PROGMEM = "am";
+const char STR_pm[] PROGMEM = "pm";

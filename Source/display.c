@@ -754,38 +754,3 @@ void bitmap_safe(int8_t x, int8_t y, uint8_t *BMP, uint8_t c) {
 	}
 }
 
-void bitmap_safe_far(int8_t x, int8_t y, uint_farptr_t BMP) {
-    if(BMP==0) return;
-    uint8_t *p;
-	uint8_t data=0,count=0;
-    int16_t width,height;
-    width=pgm_read_byte_far(BMP++);
-    height=pgm_read_byte_far(BMP++)/8;
-    if(width<0 || y+height<=0) return;
-    p= &Disp_send.DataAddress[(int16_t)((-x)*18)+y];
-  	for (int16_t col=x ; col < x+width; col++) {
-		for (int16_t row=y; row<y+height; row++) {
-			if(count==0) {
-				data = pgm_read_byte_far(BMP++);
-				if(data==pgm_read_byte_far(BMP++)) {
-					count = pgm_read_byte_far(BMP++);
-				}
-				else {
-					count = 1;
-					BMP--;
-				}
-			}
-			count--;
-            // Check if pixel stays within boundaries
-            if(col>=0 && col<128 && row>=0 && row<16) {
-                #ifdef INVERT_DISPLAY
-                *p &= ~data;
-                #else
-                *p &= data;
-                #endif
-            }
-            p++;
-		}
-        p-=18+height;   // Next line
-	}
-}

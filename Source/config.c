@@ -14,7 +14,7 @@ void Diagnose(void) {
     uint8_t bar=0, speed=0;
     setbit(MStatus, update);
     setbit(Misc,bigfont);
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     PR.PRPC  &= 0b11111100;         // Enable TCC0 TCC1 clocks
     EVSYS.CH0MUX = 0b11000000;      // Event CH0 = TCC0 overflow
     TCC0.CNT = 0;
@@ -58,7 +58,7 @@ void Diagnose(void) {
         }
         if(testbit(Misc,userinput)) {
             clrbit(Misc, userinput);
-            if(testbit(Buttons,KML)) setbit(WSettings, goback);
+            if(testbit(Buttons,KML)) setbit(MStatus, goback);
             if(testbit(Buttons,K1)) { CalibrateOffset(); setbit(Misc, redraw); }
             if(testbit(Buttons,K2)) {
                 togglebit(VPORT1.OUT, LEDWHITE);   // Check backlight
@@ -79,7 +79,7 @@ void Diagnose(void) {
         dma_display();
         WaitDisplay();
         SLP();          // Sleep
-    } while(!testbit(WSettings, goback));
+    } while(!testbit(MStatus, goback));
     OFFWHITE();
     LOGIC_OFF();
     TCC0.CTRLA = 0;
@@ -108,10 +108,7 @@ void About(void) {
         ANALOG_ON();        // Turn on analog circuits to be ready to read Vref
         GetTimeTimer();     // Sync variables from TCF0
         PrintDate(34,6,0);
-        lcd_goto(40,7);
-        printN_5x8(NowHour); putchar5x8(':');
-        printN5x8(NowMinute); putchar5x8(':');
-        printN5x8(NowSecond);
+        PrintTime(34,7);
         dma_display();
         WaitDisplay();
         int16_t Vref = MeasureVRef();
@@ -127,7 +124,7 @@ void About(void) {
 }
 
 void Profiles(void) {
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     uint8_t slot=0;
     do {
         clr_display();
@@ -146,7 +143,7 @@ void Profiles(void) {
             clrbit(Misc, userinput);
             if(testbit(Buttons,KBR) || testbit(Buttons,KBL)) slot++;
             if(testbit(Buttons,KUR) || testbit(Buttons,KUL)) slot--;
-            if(testbit(Buttons,KML)) setbit(WSettings, goback);
+            if(testbit(Buttons,KML)) setbit(MStatus, goback);
             if(testbit(Buttons,K1)) {   // Restore Default Settings
                 LoadProfile(0);
             }
@@ -161,7 +158,7 @@ void Profiles(void) {
         dma_display();
         WaitDisplay();
         SLP();          // Sleep
-    } while(!testbit(WSettings, goback));
+    } while(!testbit(MStatus, goback));
     setbit(MStatus, update);
 }
 
@@ -207,7 +204,7 @@ void SaveScreenshot(void) {
 }
 
 void ShowScreenshot(void) {
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     clr_display();
     uint8_t *p=Disp_send.SPI_Address+2;  // Locate pointer at start of active buffer;
     for(uint8_t i=0; i<128; i++) {
@@ -218,23 +215,23 @@ void ShowScreenshot(void) {
     do {
         if(testbit(Misc,userinput)) {
             clrbit(Misc, userinput);
-            if(testbit(Buttons,KML)) setbit(WSettings, goback);
+            if(testbit(Buttons,KML)) setbit(MStatus, goback);
         }
         dma_display();
         WaitDisplay();
         SLP();          // Sleep
-    } while(!testbit(WSettings, goback));
+    } while(!testbit(MStatus, goback));
     setbit(MStatus, update);
 }
 
 void OWSettings(void) {
-    WSettings = eeprom_read_byte(&EE_WSettings);
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     uint8_t select=0;
+    uint8_t timeout=255;
     do {
         clr_display();
         lcd_goto(28,0); print5x8(&STRS_mainmenu[3][0]);    // STRS_mainmenu[3][0] contains the word Settings
-        for(uint8_t i=0; i<2; i++) {
+        for(uint8_t i=0; i<4; i++) {
             lcd_goto(2,i+2); 
             if(i==select) {
                 putchar5x8('-'); putchar5x8(0x81); // Print arrow
@@ -247,36 +244,48 @@ void OWSettings(void) {
                     if(testbit(WSettings, time24)) setbit(Misc,negative);
                 break;
                 case 2: // Year at the end
-                    //if(testbit(,)) setbit(Misc,negative);
+                    if(testbit(WSettings,PostYear)) setbit(Misc,negative);
                 break;
                 case 3: // Month after day
-                    //if(testbit(,)) setbit(Misc,negative);
+                    if(testbit(WSettings,PostMonth)) setbit(Misc,negative);
+                break;
+                case 4: // Language
+                break;
+                case 5: // Latitude
+                break;
+                case 6: // Longitude
                 break;
             }
             print5x8(STRS_Settings[i]);
             clrbit(Misc,negative);
-            
         }
+        GetTimeTimer();     // Sync variables from TCF0
+        PrintDate(0,13,0);
+        PrintTime(69,13);
         lcd_goto(0,15); print5x8(PSTR("TOGGLE"));
+        // lcd_goto(30,15); print5x8(Language); 
         // lcd_goto(30,15); print5x8(PSTR("ALTITUDE")); 
         // lcd_goto(80,15); print5x8(PSTR("LONGITUDE"));
         if(testbit(Misc,userinput)) {
             clrbit(Misc, userinput);
+            timeout = 255;
             if(testbit(Buttons,KBR) || testbit(Buttons,KBL)) select++;
             if(testbit(Buttons,KUR) || testbit(Buttons,KUL)) select--;
-            if(testbit(Buttons,KML)) setbit(WSettings, goback);
+            if(testbit(Buttons,KML)) setbit(MStatus, goback);
             if(testbit(Buttons,K1)) {   // Toggle
                 switch(select) {
-                    case 0: togglebit(WSettings, hourbeep); break;
-                    case 1: togglebit(WSettings, time24);   break;
+                    case 0: togglebit(WSettings, hourbeep);    break;
+                    case 1: togglebit(WSettings, time24);      break;
+                    case 2: togglebit(WSettings, PostYear);    break;
+                    case 3: togglebit(WSettings, PostMonth);   break;
                 }
             }
-            if(select>=2) select=0;
+            if(select>=4) select=0;
         }
         dma_display();
         WaitDisplay();
         SLP();          // Sleep
-    } while(!testbit(WSettings, goback));
+    } while(timeout-- && !testbit(MStatus, goback));
     eeprom_write_byte(&EE_WSettings, WSettings);    // Save Watch settings
     setbit(MStatus, update);
 }

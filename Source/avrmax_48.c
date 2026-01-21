@@ -94,7 +94,7 @@ void PlayChess(void) ;
 void Chess(void) {
     uint8_t p=2;
     setbit(MStatus,update);
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     T.CHESS.level=0;
     clr_display();
     do {
@@ -105,7 +105,7 @@ void Chess(void) {
                 if(testbit(Buttons, K1)) p++; if(p>3) p=0;
                 if(testbit(Buttons, K2)) { if(++T.CHESS.level>=16) T.CHESS.level=0; }
                 if(testbit(Buttons, K3)) PlayChess();
-                if(testbit(Buttons, KML)) setbit(WSettings, goback);
+                if(testbit(Buttons, KML)) setbit(MStatus, goback);
             }
             lcd_goto(50,0); print5x8(&STRS_optionmenu[2][14]);  // STRS_optionmenu[2][14] contains the word Chess
             lcd_goto(0,2); print5x8(STR_White);
@@ -120,7 +120,7 @@ void Chess(void) {
         dma_display();
         WaitDisplay();
         SLP();          // Sleep
-    } while(!testbit(WSettings, goback));
+    } while(!testbit(MStatus, goback));
     setbit(MStatus, update);
 }
 
@@ -188,7 +188,7 @@ void PlayChess(void) {
     uint8_t *player;
     player = &T.CHESS.Player1;
     T.CHESS.MP=T.CHESS.SA+U;  // Initialize engine stack pointer
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     k=16;DD=O=Q=R=0;
     
     for(uint8_t i=0; i<sizeof b; ++i) b[i]=0;
@@ -199,7 +199,7 @@ void PlayChess(void) {
         b[16*L+W+8]=(W-4)*(W-4)+(L+L-7)*(L+L-7)/4;       /* center-pts table   */
         }                                                  /*(in unused half b[])*/
     do {
-        while(DD>-I+1 && !testbit(WSettings, goback)) {    // Until checkmate
+        while(DD>-I+1 && !testbit(MStatus, goback)) {    // Until checkmate
             printboard();
             if(player==&T.CHESS.Player1) {
                 Rectangle(122,2,127,7,PIXEL_CLR);
@@ -209,13 +209,13 @@ void PlayChess(void) {
                 Rectangle(122,120,127,125,PIXEL_CLR);
             }
             if(lastx<8 && lasty<8) Cursor(lastx, lasty, 1);
-            if(testbit(Buttons, KML)) setbit(WSettings, goback);
+            if(testbit(Buttons, KML)) setbit(MStatus, goback);
             if(*player==HUMAN_PLAYER1) {
                 clrbit(WatchBits, enter);   // Use blink bit as Enter
                 do {                        // Get user input
                     if(testbit(Misc,userinput)) {
                         clrbit(Misc, userinput);
-                        if(testbit(Buttons, KML)) setbit(WSettings, goback);
+                        if(testbit(Buttons, KML)) setbit(MStatus, goback);
                         if(testbit(Buttons, K1)) newx--;
                         if(testbit(Buttons, K3)) newx++;
                         if(testbit(Buttons, KUR)) newy--;
@@ -252,7 +252,7 @@ void PlayChess(void) {
                     WaitDisplay();
                     OFFRED();
                     SLP();          // Sleep
-                } while(!(testbit(WSettings, goback) || testbit(WatchBits, enter)));
+                } while(!(testbit(MStatus, goback) || testbit(WatchBits, enter)));
             }            
             else {
                 K=I;                    // Computer move
@@ -279,8 +279,8 @@ void PlayChess(void) {
             lastx = L&0x07;
             lasty = L>>4;
         }
-        if(testbit(Buttons, KML)) setbit(WSettings, goback);
-    } while(!testbit(WSettings, goback));
+        if(testbit(Buttons, KML)) setbit(MStatus, goback);
+    } while(!testbit(MStatus, goback));
 }
 
 /* better readability of working struct variables */

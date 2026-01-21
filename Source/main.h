@@ -153,20 +153,20 @@
 #define AlarmMinute GPIO8   // Alarm Minute
 #define SecTimeout  GPIO9   // Remaining seconds to display seconds
 #define BattLevel   GPIOA   // Battery Level (0 to 11)
-#define WSettings   GPIOB   // Watch Options
+#define MStatus     GPIOB   // Status and Miscellaneous bits
 #define WatchBits   GPIOC   // Watch Bits
-#define AlarmTune   GPIOD   // Alarm Tune
+#define WSettings   GPIOD   // Watch Settings
 #define Menu        GPIOE   // Menu
 
-// WSettings         (GPIOB) -  Watch Persistent Settings - some bits are shared
+// MStatus          (GPIOB) - Status and Miscellaneous bits
 #define update      0       // Update
-#define hourbeep    1       // On the hour beep
+//#define           1       // 
 #define alarm_on    2       // Alarm on
-#define time24      3       // 24 Hour format
-#define analog_face 4       // Display analog watch
-#define style       5       // Two styles on each face
+//#define           3       // 
+//#define           4       // 
+//#define           5       // 
 #define goback      6       // Stay in function until exit
-#define sound_on    7       // Sound off
+#define sound_on    7       // Sound is active
 
 // WatchBits        (GPIOC) -  Watch Volatile bits - some bits are shared
 #define keyrep      0       // Automatic key repeat
@@ -177,6 +177,16 @@
 #define hourChanged 5       // Hour Changed
 #define userinput   6       // Valid input received
 #define disp_select 7       // Select active display buffer
+
+// WSettings       (GPIOD) -  Watch Persistent Settings
+#define PostYear    0       // Display Year at the end
+#define PostMonth   1       // Display Month after day
+#define time24      2       // 24 Hour format
+#define analog_face 3       // Display analog watch
+#define style       4       // Two styles on each face
+//#define             5       //
+//#define             6       //
+#define hourbeep    7       // On the hour beep
 
 // Key              (GPIOF) // Key input
 #define KBR         0       // Button Bottom Right pressed
@@ -245,6 +255,7 @@ typedef union {
     } LOGIC;
 	struct {
         uint8_t oldHour, oldMinute, oldBattery;
+        uint8_t AlarmTune;           // Alarm Tune
 	} TIME;
     struct {
         uint8_t level;            // Level (Sets thinking time)

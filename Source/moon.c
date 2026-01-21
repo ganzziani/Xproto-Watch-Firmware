@@ -33,13 +33,13 @@ void Moon(void) {
     date.year = NowYear;
 	uint8_t timeout=255;
     setbit(Misc, redraw);
-	clrbit(WSettings, goback);
+	clrbit(MStatus, goback);
     do {
         if(testbit(Misc,userinput)) {
             uint8_t Phase = MoonPhase(&date);
             timeout=255;
             clrbit(Misc, userinput);
-            if(testbit(Buttons,KML)) setbit(WSettings, goback);
+            if(testbit(Buttons,KML)) setbit(MStatus, goback);
             if(testbit(Buttons,KUR) || testbit(Buttons,KUL)) AddDay(&date);
             if(testbit(Buttons,KBR) || testbit(Buttons,KBL)) SubDay(&date);
             if(testbit(Buttons,K1)) { // Previous full moon
@@ -89,12 +89,12 @@ void Moon(void) {
             lcd_goto(0,15);  print5x8(STR_MoonMenu);
             dma_display();
             // Moon bitmap with realistic phase shading
-            uint_farptr_t far_data = pgm_get_far_address(MoonBMP);
+            uint8_t const *b = MoonBMP;
             uint8_t data;
             uint8_t *p = &Disp_send.DataAddress[(uint16_t)((-96)*18)+4];
             for (int8_t x = -32; x < 32; x++) {
                 for (uint8_t row = 0; row < 8; row++) {
-                    data = pgm_read_byte_far(far_data++);
+                    data = pgm_read_byte(b++);
                     uint8_t output = 0;
         
                     for (uint8_t bit = 0; bit < 8; bit++) {
@@ -169,7 +169,7 @@ void Moon(void) {
         }
         WaitDisplay();
         SLP();
-    } while(timeout-- && !testbit(WSettings, goback));
+    } while(timeout-- && !testbit(MStatus, goback));
     clrbit(Misc, userinput);
     setbit(MStatus, update);
 }

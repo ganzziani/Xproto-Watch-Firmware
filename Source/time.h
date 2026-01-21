@@ -27,7 +27,7 @@ typedef struct {
 
 extern volatile Type_Time now;
 extern Type_Time EEMEM EE_saved_time;
-extern uint8_t EEMEM EE_WSettings;      // 24Hr format, Date Format, Hour Beep, Alarm On,
+extern uint8_t EEMEM EE_WSettings;     // 24Hr format, Date Format, Hour Beep, Alarm On,
 
 void Watch(void);
 void Calendar(void);
@@ -43,6 +43,7 @@ uint16_t DaysDifference(const Type_Time *t1, const Type_Time *t2);
 void AddDay(Type_Time *timeptr);
 void SubDay(Type_Time *timeptr);
 void PrintDate(uint8_t row, uint8_t col, Type_Time *timeptr);
+void PrintTime(uint8_t row, uint8_t col);
 
 // Change item definitions
 #define SET_SECOND          1

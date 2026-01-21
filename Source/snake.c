@@ -54,7 +54,7 @@ void Snake(void) {
     T.SNAKE.Fruitx = prandom()>>3;
     T.SNAKE.Fruity = prandom()>>3;
     setbit(MStatus,update);
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     clr_display();
     do {
         if(testbit(MStatus, update)) {
@@ -70,7 +70,7 @@ void Snake(void) {
                     T.SNAKE.Player2.state = p2;
                     SnakeEngine();
                 }                    
-                if(testbit(Buttons, KML)) setbit(WSettings, goback);
+                if(testbit(Buttons, KML)) setbit(MStatus, goback);
             }
             lcd_goto(49,0); print5x8(PSTR("Snake"));
             lcd_goto(0,2); print5x8(STR_Player); print5x8(STR_P1);
@@ -86,7 +86,7 @@ void Snake(void) {
         dma_display();
         WaitDisplay();
         SLP();          // Sleep
-    } while(!testbit(WSettings, goback));
+    } while(!testbit(MStatus, goback));
     setbit(MStatus, update);
 }
 
@@ -236,12 +236,12 @@ void SnakeEngine(void) {
     TCC0.CTRLA = 5;                 // 31.25kHz clock
     InitSnake();
     NewFruit();
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     setbit(MStatus,update);
     do {
         if(testbit(Misc,userinput)) {
             clrbit(Misc, userinput);
-            if(testbit(Buttons, KML)) setbit(WSettings, goback);
+            if(testbit(Buttons, KML)) setbit(MStatus, goback);
             if(testbit(Buttons, KBL)) {
                 if(T.SNAKE.Player1.direction==GO_UP) T.SNAKE.Player1.direction=GO_LEFT;
                 else if(T.SNAKE.Player1.direction==GO_DOWN) T.SNAKE.Player1.direction=GO_RIGHT;
@@ -278,12 +278,12 @@ void SnakeEngine(void) {
             SwitchBuffers();
             if((T.SNAKE.Player1.state==0 || T.SNAKE.Player1.state==NO_PLAYER1) &&
                (T.SNAKE.Player2.state==0 || T.SNAKE.Player2.state==NO_PLAYER2)) {
-                setbit(WSettings, goback);
+                setbit(MStatus, goback);
                 lcd_goto(38,13); print5x8(PSTR("Game Over"));
             }
         }
-    } while(!testbit(WSettings, goback));
-    clrbit(WSettings, goback);
+    } while(!testbit(MStatus, goback));
+    clrbit(MStatus, goback);
     setbit(MStatus, update);
     TCC0.CTRLA = 0;
     PR.PRPC |= 0b00000001;         // Disable TCC0 TCC1C clocks

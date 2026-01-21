@@ -34,6 +34,8 @@ void EditAlarms(void);
 void FindNextAlarm(void);
 uint8_t firstdayofmonth(Type_Time *timeptr);
 uint8_t DaysInMonth(Type_Time *timeptr);
+void BigPrintMonth(void);
+void BigPrintYear(void);
 
 const uint8_t monthDays[] PROGMEM = { 31,28,31,30,31,30,31,31,30,31,30,31 };		// Days in a month
 
@@ -54,7 +56,7 @@ Type_Alarm EEMEM EE_Alarms[] = {
     { 21,  0, 0b00111111, 9 },  // 09:00pm Monday thru Saturday
 };
 
-uint8_t EEMEM EE_WSettings = 0; // 24Hr format, Date Format, Hour Beep, Alarm On, 
+uint8_t EEMEM EE_WSettings = 0; // 24Hr format, Date Format, Hour Beep, Alarm On,
 
 // The three interrupts below are Naked-ISR since there is no need to save any registers
 
@@ -191,7 +193,7 @@ void Watch(void) {
     findweekday();
     FindNextAlarm();
     LCD_PrepareBuffers();   // Construct trailer data in case it was wiped, clear all display buffers
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     setbit(Misc, redraw);
     setbit(WatchBits, dateChanged);
     setbit(WatchBits, hourChanged);
@@ -202,8 +204,8 @@ void Watch(void) {
             SecTimeout = 60;                    // Show seconds display for one minute
             clrbit(Misc, userinput);
             if(Menu==0) {                       // Currently not changing time
-                if(testbit(Buttons,KML) && !testbit(WSettings, sound_on)) { // Exit watch if no sound active
-                    setbit(WSettings, goback);
+                if(testbit(Buttons,KML) && !testbit(MStatus, sound_on)) { // Exit watch if no sound active
+                    setbit(MStatus, goback);
                 }
                 if(testbit(Buttons, K1)) Stopwatch();
                 if(testbit(Buttons, K2)) CountDown();
@@ -273,10 +275,10 @@ void Watch(void) {
                 }
                 SetTimeTimer();     // Validate time variables, update TCF0, enable interrupts
             }
-            if(testbit(WSettings, sound_on)) {  // User cancelled the alarm, find next alarm
+            if(testbit(MStatus, sound_on)) {  // User cancelled the alarm, find next alarm
                 FindNextAlarm();
                 SoundOff();
-                clrbit(WSettings, sound_on);    // Turn off alarm sound
+                clrbit(MStatus, sound_on);    // Turn off alarm sound
             }
             setbit(Misc, redraw);               // Redraw screen
         }
@@ -284,19 +286,19 @@ void Watch(void) {
         if(Menu ||                          // When user is changing the time
         testbit(Misc, redraw) ||         // Update requested (at least every minute)
         (SECPULSE() && SecTimeout) ||    // Every second when displaying seconds
-        testbit(WSettings, sound_on)) {  // The alarm is active (to toggle bell)
+        testbit(MStatus, sound_on)) {  // The alarm is active (to toggle bell)
             clrbit(Misc, redraw);
             if(SecTimeout) SecTimeout--;
-            if(AlarmHour==NowHour && AlarmMinute==NowMinute && testbit(WSettings, alarm_on)) {
-                if(NowSecond<=1) setbit(WSettings, sound_on);   // Enable Alarm until user cancels
-                if(testbit(WSettings, sound_on) && TCD1.CTRLA==0) { // Sound on and no tune active
-                    Sound((uint8_t *)pgm_read_word(TuneAlarms+AlarmTune));
+            if(AlarmHour==NowHour && AlarmMinute==NowMinute && testbit(MStatus, alarm_on)) {
+                if(NowSecond<=1) setbit(MStatus, sound_on);   // Enable Alarm until user cancels
+                if(testbit(MStatus, sound_on) && TCD1.CTRLA==0) { // Sound on and no tune active
+                    Sound((uint8_t *)pgm_read_word(TuneAlarms+T.TIME.AlarmTune));
                 }
                 SecTimeout = 60;    // Show seconds during alarm
             } else {
-                if(testbit(WSettings, sound_on)) {
+                if(testbit(MStatus, sound_on)) {
                     FindNextAlarm();                // An alarm just finished, find next alarm
-                    clrbit(WSettings, sound_on);
+                    clrbit(MStatus, sound_on);
                 }
             }                
             GetTimeTimer();                 // Update time variables before showing data on screen
@@ -334,7 +336,7 @@ void Watch(void) {
             SLEEP.CTRL = SLEEP_SMODE_IDLE_gc | SLEEP_SEN_bm;
             SLP();
         }
-    } while(!testbit(WSettings, goback));
+    } while(!testbit(MStatus, goback));
     // Going to Main menu...
     eeprom_write_byte(&EE_WSettings, WSettings);    // Save Watch settings
     Menu=1;                                         // Set Main Menu: Watch
@@ -346,21 +348,21 @@ void DigitalFace(void) {
     if(testbit(WSettings, style) && Menu==0) {      // Minimalistic style -> Only print hours and minutes
         if(testbit(WatchBits, hourChanged)) {
             clrbit(WatchBits, hourChanged);
-            uint8_t n=NowHour;
+            uint8_t H=NowHour;
             if(!testbit(WSettings, time24)) {
-                if(n>=12) n-=12;
-                if(n==0) n=12;
+                if(H>=12) H-=12;
+                if(H==0) H=12;
             }
-            if(n>=20) { n-=20; bitmap(0,5,Digit2_22x48); }
-            else if(n>=10) { n-=10; bitmap(0,5,Digit1_22x48); }
+            if(H>=20) { H-=20; bitmap(0,5,Digit2_22x48); }
+            else if(H>=10) { H-=10; bitmap(0,5,Digit1_22x48); }
             else  clearRectangle(0,5,22,6);
-            bitmap(25,5,(const uint8_t *)pgm_read_word(Digits_22x48+n));
+            bitmap(25,5,(const uint8_t *)pgm_read_word(Digits_22x48+H));
             bitmap(49,7,Dots_4x16);     // Time semicolon
         }
-        uint8_t n=NowMinute, d=0;
-        while (n>=10) { d++; n-=10; }
-        bitmap(55,5,(const uint8_t *)pgm_read_word(Digits_22x48+d));
-        bitmap(80,5,(const uint8_t *)pgm_read_word(Digits_22x48+n));
+        uint8_t Ones=NowMinute, Tens=0;
+        while (Ones>=10) { Tens++; Ones-=10; }
+        bitmap(55,5,(const uint8_t *)pgm_read_word(Digits_22x48+Tens));
+        bitmap(80,5,(const uint8_t *)pgm_read_word(Digits_22x48+Ones));
     } else {
         if(testbit(WatchBits, hourChanged) || Menu) {       // Update these items every hour
             clrbit(WatchBits, hourChanged);
@@ -371,15 +373,15 @@ void DigitalFace(void) {
                 if(testbit(SREG, CPU_T_bp)) bitmap(105,9,PM);
                 else bitmap(105,9,AM);
             }
-            uint8_t n=NowHour;
+            uint8_t H=NowHour;
             if(!testbit(WSettings, time24)) {
-                if(n>=12) n-=12;
-                if(n==0) n=12;
+                if(H>=12) H-=12;
+                if(H==0) H=12;
             }
-            if(n>=20) { n-=20; bitmap(0,9,Digit2_22x48); }
-            else if(n>=10) { n-=10; bitmap(0,9,Digit1_22x48); }
+            if(H>=20) { H-=20; bitmap(0,9,Digit2_22x48); }
+            else if(H>=10) { H-=10; bitmap(0,9,Digit1_22x48); }
             else  clearRectangle(0,9,22,6);
-            bitmap(25,9,(const uint8_t *)pgm_read_word(Digits_22x48+n));
+            bitmap(25,9,(const uint8_t *)pgm_read_word(Digits_22x48+H));
             if(SECPULSE() && Menu==SET_HOUR) {    // Flash when changing
                 fillRectangle(0,115,21,119,PIXEL_TGL);
                 fillRectangle(25,115,46,119,PIXEL_TGL);
@@ -402,15 +404,15 @@ void DigitalFace(void) {
 			else bitmap(2,0,BattPwrIcon); // If BattLevel is zero, Vin is  above 4.2V -> the device is charging
 			ShowAlarmTime(74, 0);
 			lcd_goto(118,0);
-			if(testbit(WSettings,alarm_on) &&											// Show bell character
-			(NowSecond&0x01 || !testbit(WSettings, sound_on))) putchar5x8(CHAR_BELL);   // Blink character at alarm time
+			if(testbit(MStatus,alarm_on) &&											// Show bell character
+			(NowSecond&0x01 || !testbit(MStatus, sound_on))) putchar5x8(CHAR_BELL);   // Blink character at alarm time
 			else putchar5x8(' ');
         }            
         {
-            uint8_t n=NowMinute, d=0;
-            while (n>=10) { d++; n-=10; }
-            bitmap(55,9,(const uint8_t *)pgm_read_word(Digits_22x48+d));
-            bitmap(80,9,(const uint8_t *)pgm_read_word(Digits_22x48+n));
+            uint8_t Ones=NowMinute, Tens=0;
+            while (Ones>=10) { Tens++; Ones-=10; }
+            bitmap(55,9,(const uint8_t *)pgm_read_word(Digits_22x48+Tens));
+            bitmap(80,9,(const uint8_t *)pgm_read_word(Digits_22x48+Ones));
         }        
         if(SECPULSE() && Menu==SET_MINUTE) {     // Flash when changing
             fillRectangle(55,115,76,119,PIXEL_TGL);
@@ -428,54 +430,80 @@ void DigitalFace(void) {
         if(testbit(WatchBits, dateChanged) || Menu>=SET_DAY) {  // Update these items every day
             clrbit(WatchBits, dateChanged);
 			bitmap(49,11,Dots_4x16);    // Time semicolon
-            bitmap(58,5,Dash_6x8);      // Date dash
-            bitmap(92,5,Dash_6x8);      // Date dash
             lcd_goto(40,2);
             print5x8(STRS_Days[NowWeekDay]);
+            u8CursorX = 1;
+            if(!testbit(WSettings, PostYear)) {
+                BigPrintYear();
+                bitmap(u8CursorX,5,Dash_6x8);      // Date dash
+                u8CursorX += 8;
+            }
+            if(!testbit(WSettings, PostMonth)) {
+                BigPrintMonth();
+                bitmap(u8CursorX,5,Dash_6x8);      // Date dash
+                u8CursorX += 8;
+            }
             {
-                uint8_t n=NowDay, d=0; // Day.         [1-31]
-                while (n>=10) { d++; n-=10; }
-                bitmap(101,4,(const uint8_t *)pgm_read_word(Digits_12x24+d));
-                bitmap(115,4,(const uint8_t *)pgm_read_word(Digits_12x24+n));
+                uint8_t Ones=NowDay, Tens=0; // Day.         [1-31]
+                while (Ones>=10) { Tens++; Ones-=10; }
+                bitmap(u8CursorX,4,(const uint8_t *)pgm_read_word(Digits_12x24+Tens));
+                bitmap(u8CursorX+14,4,(const uint8_t *)pgm_read_word(Digits_12x24+Ones));
             }        
             if(SECPULSE() && Menu==SET_DAY) {  // Flash when changing
-                fillRectangle(101,53,112,55,PIXEL_TGL);
-                fillRectangle(115,53,126,55,PIXEL_TGL);
+                fillRectangle(u8CursorX,53,u8CursorX+11,55,PIXEL_TGL);
+                fillRectangle(u8CursorX+14,53,u8CursorX+25,55,PIXEL_TGL);
             }
-            {
-                uint8_t n=NowMonth;    // Month.       [1-12]
-                uint8_t pos = 72;
-                if(n>=10) {
-                    n-=10; pos+=6;
-                    bitmap(64,4,Digit1_12x24);
-                    clearRectangle(76,4,2,3);
-                }
-                else clearRectangle(66,4,24,3);
-                bitmap(pos,4,(const uint8_t *)pgm_read_word(Digits_12x24+n));
-            }        
-            if(SECPULSE() && Menu==SET_MONTH) {  // Flash when changing
-                fillRectangle(66,53,89,55,PIXEL_TGL);
+            u8CursorX += 29;
+            if(testbit(WSettings, PostMonth)) {
+                bitmap(u8CursorX,5,Dash_6x8);      // Date dash
+                u8CursorX += 8;
+                BigPrintMonth();
             }
-            {
-                uint8_t n=NowYear, d=0, c=0, m=2; // Year
-                if(NowYear<56) {    // Epoch year is 1967
-                    m=1; c=9; n+=44;
-                } else n-=56;
-                while (n>=10) { d++; n-=10; }
-                bitmap( 1,4,(const uint8_t *)pgm_read_word(Digits_12x24+m));
-                bitmap(15,4,(const uint8_t *)pgm_read_word(Digits_12x24+c));
-                bitmap(29,4,(const uint8_t *)pgm_read_word(Digits_12x24+d));
-                bitmap(43,4,(const uint8_t *)pgm_read_word(Digits_12x24+n));
-            }        
-            if(SECPULSE() && Menu==SET_YEAR) {
-                fillRectangle( 1,53,12,55,PIXEL_TGL);
-                fillRectangle(15,53,26,55,PIXEL_TGL);
-                fillRectangle(29,53,40,55,PIXEL_TGL);
-                fillRectangle(43,53,54,55,PIXEL_TGL);
-            }
+            if(testbit(WSettings, PostYear)) {
+                bitmap(u8CursorX,5,Dash_6x8);      // Date dash
+                u8CursorX += 8;
+                BigPrintYear();
+            }                
         }
     }
 }
+
+void BigPrintMonth(void) {
+    uint8_t Ones=NowMonth;    // Month.       [1-12]
+    uint8_t x = u8CursorX;
+    uint8_t pos = x+6;
+    if(Ones>=10) {
+        Ones-=10; pos+=6;
+        bitmap(x,4,Digit1_8x24);
+        clearRectangle(x+8,4,4,3);  // Clean leftover from single digit month
+    }
+    else clearRectangle(x,4,24,3);  // Clean leftover from double digits
+    bitmap(pos,4,(const uint8_t *)pgm_read_word(Digits_12x24+Ones));
+    if(SECPULSE() && Menu==SET_MONTH) {  // Flash when changing
+        fillRectangle(u8CursorX,53,u8CursorX+23,55,PIXEL_TGL);
+    }
+    u8CursorX += 27;
+}
+
+void BigPrintYear(void) {
+    uint8_t Ones=NowYear, Tens=0, Hund=0, Thou=2; // Year
+    uint8_t x = u8CursorX;
+    if(NowYear<(uint8_t)(2000-EPOCH_YEAR)) {
+        Thou=1; Hund=9; Ones+=44;
+    } else Ones-=56;
+    while (Ones>=10) { Tens++; Ones-=10; }
+    bitmap(x   ,4,(const uint8_t *)pgm_read_word(Digits_12x24+Thou));
+    bitmap(x+14,4,(const uint8_t *)pgm_read_word(Digits_12x24+Hund));
+    bitmap(x+28,4,(const uint8_t *)pgm_read_word(Digits_12x24+Tens));
+    bitmap(x+42,4,(const uint8_t *)pgm_read_word(Digits_12x24+Ones));
+    if(SECPULSE() && Menu==SET_YEAR) {
+        fillRectangle(x   ,53,x+11,55,PIXEL_TGL);
+        fillRectangle(x+14,53,x+25,55,PIXEL_TGL);
+        fillRectangle(x+28,53,x+39,55,PIXEL_TGL);
+        fillRectangle(x+42,53,x+53,55,PIXEL_TGL);
+    }
+    u8CursorX += 57;
+}    
 
 // Analog Watch Face
 void AnalogFace(void) {
@@ -503,7 +531,16 @@ void AnalogFace(void) {
             }
             ShowAlarmTime(42, 10);
             // Date
-            lcd_goto(52, 4); print3x6(STRS_Months_short[NowMonth-1]); putchar3x6(' '); printN3x6(NowDay);
+            lcd_goto(52, 4);
+            if(testbit(WSettings, PostMonth)) {
+                printN3x6(NowDay);
+                putchar3x6(' ');
+            }
+            print3x6(STRS_Months_short[NowMonth-1]);
+            if(!testbit(WSettings, PostMonth)) {
+                putchar3x6(' ');
+                printN3x6(NowDay);
+            }                
         }            
     } else {    // Erase previous
         m=T.TIME.oldMinute;
@@ -525,8 +562,8 @@ void AnalogFace(void) {
     // Copy the background image from buffer 3 into the current display buffer
     if(!testbit(WSettings, style)) {
         lcd_goto(60,11);
-        if(testbit(WSettings,alarm_on) &&                                           // Show bell character
-        (NowSecond&0x01 || !testbit(WSettings, sound_on))) putchar5x8(CHAR_BELL);   // Blink character at alarm time
+        if(testbit(MStatus,alarm_on) &&                                           // Show bell character
+        (NowSecond&0x01 || !testbit(MStatus, sound_on))) putchar5x8(CHAR_BELL);   // Blink character at alarm time
         else putchar5x8(' ');
         // Seconds           
         if(SecTimeout) {    
@@ -546,7 +583,7 @@ void AnalogFace(void) {
 void ShowAlarmTime(uint8_t col, uint8_t row) {
     lcd_goto(col, row);
     uint8_t hour = AlarmHour;
-    if(testbit(WSettings,alarm_on)) {
+    if(testbit(MStatus,alarm_on)) {
         uint8_t n=AlarmHour;
         if(n>=12) n-=12;
         if(n==0) n=12;
@@ -555,8 +592,8 @@ void ShowAlarmTime(uint8_t col, uint8_t row) {
         putchar5x8(':');
         printN5x8(AlarmMinute);
         if(!testbit(WSettings, time24)) {
-            if(hour>=12) print5x8(PSTR("pm"));
-            else print5x8(PSTR("am"));
+            if(hour>=12) print5x8(STR_pm);
+            else print5x8(STR_am);
         } else print5x8(PSTR("  "));
     } else print5x8(PSTR("       "));
 }    
@@ -566,7 +603,7 @@ void CountDown(void) {
     uint8_t lapl=2, lap=0;
     uint8_t start=0, clock=0, clear=1;
     uint8_t timeout=240;
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     do {
         if(testbit(Misc,userinput)) {
             clrbit(Misc, userinput);
@@ -594,7 +631,7 @@ void CountDown(void) {
                     clear = 1;
                 }
             }
-            if(testbit(Buttons,KML)) setbit(WSettings, goback);
+            if(testbit(Buttons,KML)) setbit(MStatus, goback);
         }
         if(start) {
             if(SECPULSE() && clock==0) clock=1;
@@ -616,7 +653,7 @@ void CountDown(void) {
                 }
             }
         } else {
-            if(--timeout==0) setbit(WSettings, goback);
+            if(--timeout==0) setbit(MStatus, goback);
         }
         if(clear) {
             clear=0;
@@ -631,8 +668,8 @@ void CountDown(void) {
         dma_display();
         WaitDisplay();                  // Double buffering not needed in countdown (slow refresh rate)
         if(TCD1.CTRLA==0) SLP();        // Sleep
-    } while(!testbit(WSettings, goback));
-    clrbit(WSettings, goback);
+    } while(!testbit(MStatus, goback));
+    clrbit(MStatus, goback);
     clr_display();
 }
 
@@ -646,7 +683,7 @@ void Stopwatch(void) {
     TCC0.PER = 19999;               // 100Hz
     TCC1.CNT = 0;
     TCC1.PER = 5999;                // 1 minute
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     do {
         if(testbit(Misc,userinput)) {
             clrbit(Misc, userinput);
@@ -678,7 +715,7 @@ void Stopwatch(void) {
                     clear = 1;
                 }
             }
-            if(testbit(Buttons,KML)) setbit(WSettings, goback);
+            if(testbit(Buttons,KML)) setbit(MStatus, goback);
         }
         if(clear) { clr_display(); clear=0; }
         lcd_goto(39,1); putchar5x8(':');
@@ -691,7 +728,7 @@ void Stopwatch(void) {
         WaitDisplay();
         dma_display();
         if(TCC1.CTRLA==0) {         // Not running
-            if(--timeout==0) setbit(WSettings, goback);
+            if(--timeout==0) setbit(MStatus, goback);
             WaitDisplay();
             SLP();                  // Sleep
         } else {                    // Running, update variables
@@ -708,8 +745,8 @@ void Stopwatch(void) {
             while(temp>=100) { second++; temp-=100; }
             hundredth=lobyte(temp);
         }
-    } while(!testbit(WSettings, goback));
-    clrbit(WSettings, goback);
+    } while(!testbit(MStatus, goback));
+    clrbit(MStatus, goback);
     TCC0.CTRLA = 0;
     TCC1.CTRLA = 0;
     PR.PRPC  |= 0b00000011;         // Disable TCC0 TCC1 clocks
@@ -719,8 +756,8 @@ void Stopwatch(void) {
 void EditAlarms(void) {
     Type_Alarm Alarms[4];
     eeprom_read_block(&Alarms, &EE_Alarms, 4*sizeof(Type_Alarm));
-    uint8_t oldWSettings = WSettings;
-    clrbit(WSettings, goback);
+    uint8_t oldWSettings = MStatus;
+    clrbit(MStatus, goback);
     setbit(Misc, redraw);
     uint8_t selectx=0, selecty=0;
     do {
@@ -777,7 +814,7 @@ void EditAlarms(void) {
                 selecty++;
                 if(selecty>=4) selecty=0;
             }
-            if(testbit(Buttons,KML)) setbit(WSettings, goback);
+            if(testbit(Buttons,KML)) setbit(MStatus, goback);
         }
         if(testbit(Misc, redraw)) {
             clrbit(Misc, redraw);
@@ -786,7 +823,7 @@ void EditAlarms(void) {
             for(uint8_t i=0, j=0; i<4; i++, j+=4) {    // Print 4 alarms
                 lcd_goto(4,j); print5x8(PSTR("Alarm ")); putchar5x8('1'+i); putchar5x8(':');
                 if(Alarms[i].active & 0x80) fillRectangle(2, i*32, 45,6+(i)*32,PIXEL_TGL);
-                setbit(WSettings, alarm_on);
+                setbit(MStatus, alarm_on);
                 AlarmHour = Alarms[i].hour;
                 AlarmMinute = Alarms[i].minute;
                 ShowAlarmTime(57, j);
@@ -836,12 +873,12 @@ void EditAlarms(void) {
             SLP();
         }        
         
-    } while(!testbit(WSettings, goback) && SecTimeout);
+    } while(!testbit(MStatus, goback) && SecTimeout);
     eeprom_write_block(&Alarms, &EE_Alarms, 4*sizeof(Type_Alarm));
-    WSettings = oldWSettings;
+    MStatus = oldWSettings;
     SoundOff();
     FindNextAlarm();
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     SecTimeout = 60;
     clr_display();
 }
@@ -856,7 +893,7 @@ void FindNextAlarm(void) {
     Todaybit = Todaybit >> NowWeekDay; 
     uint8_t Tomorrowbit=0x40;
     Tomorrowbit = Tomorrowbit >> Tomorrow;
-    clrbit(WSettings, alarm_on);
+    clrbit(MStatus, alarm_on);
 	setbit(WatchBits, hourChanged);
     for(uint8_t i=0; i<4; i++) {        // Search the 4 alarms
         if(Alarms[i].active & 0x80) {   // This alarm is active
@@ -867,11 +904,11 @@ void FindNextAlarm(void) {
                 // Compare only if this alarm occurs before NOW (it is within 24 hours)
                 if(((NowHour ==NewAlarmHour) && (NowMinute>NewAlarmMinute)) ||
                     (NowHour > NewAlarmHour)) {
-                    if(!testbit(WSettings, alarm_on)) {     // Not found the next alarm yet
-                        setbit(WSettings, alarm_on);        // Just copy new alarm
+                    if(!testbit(MStatus, alarm_on)) {     // Not found the next alarm yet
+                        setbit(MStatus, alarm_on);        // Just copy new alarm
                         AlarmHour   = NewAlarmHour;
                         AlarmMinute = NewAlarmMinute;
-                        AlarmTune = Alarms[i].tune;
+                        T.TIME.AlarmTune = Alarms[i].tune;
                     } else {                                // There was a previous alarm, copy if new alarm occurs sooner
                         if(((NowHour ==AlarmHour) && (NowMinute>AlarmMinute)) ||    // Current alarm will occur tomorrow
                         (NowHour > AlarmHour)) {                    
@@ -879,7 +916,7 @@ void FindNextAlarm(void) {
                             (AlarmHour > NewAlarmHour)) {
                                 AlarmHour   = NewAlarmHour;
                                 AlarmMinute = NewAlarmMinute;
-                                AlarmTune = Alarms[i].tune;
+                                T.TIME.AlarmTune = Alarms[i].tune;
                             }                                                       // Keep existing alarm if it occurs today
                         }                        
                     }
@@ -890,23 +927,23 @@ void FindNextAlarm(void) {
                 // Compare only if this alarm occurs now or after NOW
                 if(((NowHour ==NewAlarmHour) && (NowMinute<=NewAlarmMinute)) ||
                     (NowHour < NewAlarmHour)) {
-                    if(!testbit(WSettings, alarm_on)) {     // Not found the next alarm yet
-                        setbit(WSettings, alarm_on);        // Just copy new alarm
+                    if(!testbit(MStatus, alarm_on)) {     // Not found the next alarm yet
+                        setbit(MStatus, alarm_on);        // Just copy new alarm
                         AlarmHour   = NewAlarmHour;
                         AlarmMinute = NewAlarmMinute;
-                        AlarmTune = Alarms[i].tune;
+                        T.TIME.AlarmTune = Alarms[i].tune;
                     } else {                                // There was a previous alarm, copy if new alarm occurs sooner
                         if(((NowHour ==AlarmHour) && (NowMinute>AlarmMinute)) ||    // Current alarm will occur tomorrow, copy this new alarm
                         (NowHour > AlarmHour)) {
                             AlarmHour   = NewAlarmHour;
                             AlarmMinute = NewAlarmMinute;
-                            AlarmTune = Alarms[i].tune;
+                            T.TIME.AlarmTune = Alarms[i].tune;
                         } else {                                                    // Otherwise, compare and use soonest alarm
                             if(((AlarmHour ==NewAlarmHour) && (AlarmMinute>NewAlarmMinute)) ||
                                 (AlarmHour > NewAlarmHour)) {
                                 AlarmHour   = NewAlarmHour;
                                 AlarmMinute = NewAlarmMinute;
-                                AlarmTune = Alarms[i].tune;
+                                T.TIME.AlarmTune = Alarms[i].tune;
                             }
                         }
                     }
@@ -922,7 +959,7 @@ void Calendar(void) {
     showdate.month = NowMonth;
     showdate.year = NowYear;
     showdate.wday = NowWeekDay;
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     setbit(Misc, redraw);
     do {
         if(testbit(Misc, redraw)) {
@@ -995,10 +1032,10 @@ void Calendar(void) {
                     showdate.year++;
                 }
             }
-            if(testbit(Buttons,KML)) setbit(WSettings, goback);
+            if(testbit(Buttons,KML)) setbit(MStatus, goback);
         }
         SLP();          // Sleep
-    } while(!testbit(WSettings, goback));
+    } while(!testbit(MStatus, goback));
 }
 
 // Returns the column number for the calendar display, 1944-01-01 was Saturday
@@ -1149,6 +1186,15 @@ uint8_t CompareDate(const Type_Time *timeptr1, const Type_Time *timeptr2) {
     return 0;
 }
 
+void PrintYear(uint8_t year) {
+    if(year<56) {
+        print5x8(PSTR("19")); printN5x8(44+year);
+    }
+    else {
+        print5x8(PSTR("20")); printN5x8(year-56);
+    }
+}
+
 void PrintDate(uint8_t row, uint8_t col, Type_Time *timeptr) {
     uint8_t day;
     uint8_t month;
@@ -1163,13 +1209,37 @@ void PrintDate(uint8_t row, uint8_t col, Type_Time *timeptr) {
         year = timeptr->year;
     }
     lcd_goto(row, col);
-    if(year<56) {
-        print5x8(PSTR("19")); printN5x8(44+year);
+    if(!testbit(WSettings, PostYear)) {
+        PrintYear(year);
+        putchar5x8('/');
     }
-    else {
-        print5x8(PSTR("20")); printN5x8(year-56);
-    }
-    putchar5x8('/');
-    printN5x8(month); putchar5x8('/');
+    if(!testbit(WSettings, PostMonth)) {
+        printN5x8(month);
+        putchar5x8('/');
+    }        
     printN5x8(day);
+    if(testbit(WSettings, PostMonth)) {
+        putchar5x8('/');
+        printN5x8(month);
+    }
+    if(testbit(WSettings, PostYear)) {
+        putchar5x8('/');
+        PrintYear(year);
+    }        
+}
+
+void PrintTime(uint8_t row, uint8_t col) {
+    uint8_t Hour=NowHour;
+    if(!testbit(WSettings, time24)) {
+        if(Hour>=12) Hour-=12;
+        if(Hour==0) Hour=12;
+    }
+    lcd_goto(row,col);
+    printN_5x8(Hour); putchar5x8(':');
+    printN5x8(NowMinute); putchar5x8(':');
+    printN5x8(NowSecond);
+    if(!testbit(WSettings, time24)) {
+        if(testbit(SREG, CPU_T_bp)) print5x8(STR_pm);
+        else print5x8(STR_am);
+    }        
 }

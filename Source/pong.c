@@ -37,7 +37,7 @@ void NewPoint(void) {
 void Pong(void) {
     uint8_t p1=HUMAN_PLAYER1, p2=HUMAN_PLAYER2;
     setbit(MStatus,update);
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     clr_display();
     do {
         if(testbit(MStatus, update)) {
@@ -53,7 +53,7 @@ void Pong(void) {
                     T.PONG.Player2.state = p2;
                     PongEngine();
                 }                    
-                if(testbit(Buttons, KML)) setbit(WSettings, goback);
+                if(testbit(Buttons, KML)) setbit(MStatus, goback);
             }
             lcd_goto(55,0); print5x8(PSTR("Pong"));
             lcd_goto(0,2); print5x8(STR_Player); print5x8(STR_P1);
@@ -67,7 +67,7 @@ void Pong(void) {
         dma_display();
         WaitDisplay();
         SLP();          // Sleep
-    } while(!testbit(WSettings, goback));
+    } while(!testbit(MStatus, goback));
     setbit(MStatus, update);
 }
 
@@ -125,11 +125,11 @@ void PongBoard(void) {
 void PongEngine(void) {
     InitPong();
     NewPoint();
-    clrbit(WSettings, goback);
+    clrbit(MStatus, goback);
     setbit(MStatus,update);
     do {
         uint8_t in = PORTF.IN;              // Read buttons
-        if(testbit(in, KML)) setbit(WSettings, goback);
+        if(testbit(in, KML)) setbit(MStatus, goback);
         if(testbit(in, KBL)) {
             if(T.PONG.Player1.x1) {
                 T.PONG.Player1.x1--;
@@ -170,18 +170,18 @@ void PongEngine(void) {
         PongBoard();
         lcd_goto(27,13);
         if(T.PONG.Player1.points>=10) {
-            setbit(WSettings, goback);
+            setbit(MStatus, goback);
             print5x8(PSTR("Player 1 Wins"));
         }
         if(T.PONG.Player2.points>=10) {
-            setbit(WSettings, goback);
+            setbit(MStatus, goback);
             print5x8(PSTR("Player 2 Wins"));
         }
         WaitDisplay();
         dma_display();
         SwitchBuffers();
-    } while(!testbit(WSettings, goback));
-    clrbit(WSettings, goback);
+    } while(!testbit(MStatus, goback));
+    clrbit(MStatus, goback);
     SwitchBuffers();    // Keep last buffer used
     clrbit(Misc, userinput);
     setbit(MStatus, update);
