@@ -78,7 +78,7 @@
 #define grid0       0       // Grid settings (2 bits)
 #define grid1       1
 #define elastic     2       // Average on successive traces
-#define screenshot  3       // Invert display
+#define screenshot  3       // Take a screenshot
 #define flip        4       // Flip display
 #define persistent  5       // Persistent Display
 #define line        6       // Continuous Drawing
@@ -184,8 +184,8 @@
 #define time24      2       // 24 Hour format
 #define analog_face 3       // Display analog watch
 #define style       4       // Two styles on each face
-//#define             5       //
-//#define             6       //
+#define ShowMoon    5       // Show Moon icon
+#define ShowSun     6       // Show Sunrise and Sunset
 #define hourbeep    7       // On the hour beep
 
 // Key              (GPIOF) // Key input
@@ -203,12 +203,12 @@ void CPU_Slow(void);
 void MSO(void);
 void CalibrateOffset(void);
 uint8_t ReadCalibrationByte(uint8_t location);	// Read out calibration byte
+void delay_ms(uint8_t n);
+void wait_ms(uint8_t n);
 void CCPWrite( volatile uint8_t * address, uint8_t value );
 int16_t MeasureVin(uint8_t scale);
 int16_t MeasureVRef(void);
 int16_t MeasureVCC(void);
-void delay_ms(uint8_t n);
-void wait_ms(uint8_t n);
 
 extern uint8_t EEMEM EESleepTime;     // Sleep timeout in minutes
 

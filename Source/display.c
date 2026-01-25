@@ -47,6 +47,20 @@ void clr_display(void) {
     lcd_goto(0,0);
 }
 
+// Clear active display buffer
+void displayBlack(void) {
+    uint8_t *p=Disp_send.SPI_Address+2;  // Locate pointer at start of active buffer;
+    for(uint8_t i=128; i; i--) { // Erase all 2048 bytes in the buffer
+        // Unroll inner loop for speed - Clear 16 lines
+        *p++=0; *p++=0; *p++=0; *p++=0;
+        *p++=0; *p++=0; *p++=0; *p++=0;
+        *p++=0; *p++=0; *p++=0; *p++=0;
+        *p++=0; *p++=0; *p++=0; *p++=0;
+        p+=2;   // Skip line LCD setup
+    }
+    lcd_goto(0,0);
+}
+
 // Clear display buffers 1 and 2
 void clr_display_all(void) {
     uint8_t *p;
@@ -68,11 +82,12 @@ void clr_display_all(void) {
 
 // Sprites, each byte pair represents next pixel relative position
 void sprite(uint8_t x, uint8_t y, const int8_t *ptr) {
+    int8_t a=0, b=0;
     do {
-        int8_t a=pgm_read_byte(ptr++);  // Get next x
-        int8_t b=pgm_read_byte(ptr++);  // Get next y
-        if((uint8_t)a==255) return;     // 255 marks the end of the sprite
         set_pixel(x+a,y+b);
+        a=pgm_read_byte(ptr++);  // Get next x
+        b=pgm_read_byte(ptr++);  // Get next y
+        if((uint8_t)a==255) return;     // 255 marks the end of the sprite
     } while(1);
 }
 

@@ -3,7 +3,7 @@
 
 #include "time.h"
 
-uint8_t MoonPhase(Type_Time *date);
+uint8_t CalculateMoonPhase(Type_Time *date);
 void Moon(void);
 
 #endif

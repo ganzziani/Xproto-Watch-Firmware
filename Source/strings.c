@@ -3,7 +3,7 @@
 
 //#define SPANISH
 
-const char VERSION[]    PROGMEM = "FW 2.79";
+const char VERSION[]    PROGMEM = "FW 2.80";
 
 // Strings with special characters:
 // 0x1F = delta
@@ -117,6 +117,8 @@ const char STRS_Settings[][18] PROGMEM = {
     " 24 Hour Format  ",
     " Year at the end ",
     " Month after day ",
+    " Show Moon icon  ",
+    " Sunrise &Sunset ",
 };
 
 const char STR_ON[] PROGMEM = " ON";

@@ -208,6 +208,7 @@ int main(void) {
     eeprom_read_block(NOW, &EE_saved_time, sizeof(Type_Time));  // Load latest known time
     WSettings = eeprom_read_byte(&EE_WSettings);                // Load Watch settings
     SetTimeTimer();                 // Validate time variables, update TCF0, enable interrupts
+    MoonPhase = CalculateMoonPhase(NOW);  // Phase: [0, 236]
     PMIC.CTRL = 0x07;               // Enable High, Medium and Low level interrupts
 
     Randomize(TCF0.CNT);            // Randomize random number generator with current time

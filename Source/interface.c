@@ -9,6 +9,7 @@
 #include "awg.h"
 #include "interface.h"
 #include "usb\usb_xmega.h"
+#include "config.h"
 
 #define SOH     0x01    // start of heading
 #define STX     0x02    // start of text
@@ -237,9 +238,7 @@ uint8_t ProcessCommand(uint8_t Command, uint8_t usb) {
             setbit(MStatus,update);
 		break;
         case 'k':   // Restore factory settings
-        ////////////////////////////////////////
-           //////////////////////////// Restore();
-           ////////////////////////////////////////////////////
+            LoadProfile(0);
             setbit(MStatus,update);
             setbit(MStatus, updatemso);     // Apply settings
             setbit(MStatus, updateawg);     // Generate wave                       

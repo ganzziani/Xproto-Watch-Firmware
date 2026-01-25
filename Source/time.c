@@ -24,6 +24,7 @@
 #include "time.h"
 #include "asmutil.h"
 #include "build.h"
+#include "moon.h"
 
 void DigitalFace(void);
 void AnalogFace(void);
@@ -38,6 +39,7 @@ void BigPrintMonth(void);
 void BigPrintYear(void);
 
 const uint8_t monthDays[] PROGMEM = { 31,28,31,30,31,30,31,31,30,31,30,31 };		// Days in a month
+volatile uint8_t MoonPhase;
 
 Type_Time EEMEM EE_saved_time = {   // Last known time
     BUILD_SECOND,               // sec      Seconds      [0-59]
@@ -100,6 +102,7 @@ ISR(TCF0_CCA_vect) {
         FindNextAlarm();                    // Find next alarm
         if(NowHour>=24) {
             setbit(WatchBits, dateChanged);
+            MoonPhase = CalculateMoonPhase(NOW);  // Phase: [0, 236]
             NowHour=0;
             NowWeekDay++;                   // Update weekday
             if(NowWeekDay>=7) NowWeekDay=0;
@@ -213,7 +216,7 @@ void Watch(void) {
                 if(testbit(Buttons, KUR)) {
                     if(!testbit(WSettings, analog_face)) togglebit(WSettings, style);
                     clrbit(WSettings, analog_face);
-                    clr_display_all();   // Change in settings -> clear screen
+                    clr_display();   // Change in settings -> clear screen
                 }
                 if(testbit(Buttons, KBR)) {
                     if(testbit(WSettings, analog_face)) togglebit(WSettings, style);
@@ -225,7 +228,7 @@ void Watch(void) {
                     if(testbit(WatchBits,keyrep)) {     // Check if this is a long press
                         Menu=SET_SECOND;                // User can change the time now
                         clrbit(WatchBits,keyrep);       // Prevent repeat key
-                        if(testbit(WSettings, style)) clr_display_all();   // Clear screen
+                        if(testbit(WSettings, style)) clr_display();   // Clear screen
                         Buttons = 0;
                     }
                 }
@@ -238,10 +241,11 @@ void Watch(void) {
                 }
                 if(OldMenu!=Menu) {
                     if(testbit(WSettings, style)) {
-                        clr_display_all();  // Clear screen
+                        clr_display();  // Clear screen
                     }
                     FindNextAlarm();        // Update next alarm
                 }
+                if(Menu==0) setbit(WatchBits, dateChanged); // Make sure to clear the cursor
                 cli();  // Prevent the RTC interrupt from changing the time in this block
                 switch(Menu) {
                     case SET_SECOND:
@@ -306,13 +310,6 @@ void Watch(void) {
             else DigitalFace();
             WaitDisplay();                  // Finish previous transmission
             dma_display();
-            // Don't use double buffer when user is changing
-            // the time or when refreshing the screen every minute
-            if(SecTimeout && !Menu) {
-                setbit(WatchBits, dateChanged);
-                setbit(WatchBits, hourChanged);
-                SwitchBuffers();
-            }
             if(Menu) {
                 if(SecTimeout==0) { // Timeout expired
                     Menu=0;
@@ -463,6 +460,21 @@ void DigitalFace(void) {
                 bitmap(u8CursorX,5,Dash_6x8);      // Date dash
                 u8CursorX += 8;
                 BigPrintYear();
+            }
+            if(testbit(WSettings, ShowMoon)) {
+                uint8_t index, Phase;
+                Phase = MoonPhase;
+                if(Phase < 7) index = 0;            // New Moon: 0-6 (0-3%)
+                else if(Phase < 52) index = 8;      // Waxing Crescent: 7-51 (3-22%)
+                else if(Phase < 66) index = 16;      // First Quarter: 52-65 (22-28%)
+                else if(Phase < 111) index = 24;     // Waxing Gibbous: 66-110 (28-47%)
+                else if(Phase < 125) index = 32;     // Full Moon: 111-124 (47-53%)
+                else if(Phase < 170) index = 40;     // Waning Gibbous: 125-169 (53-72%)
+                else if(Phase < 184) index = 48;     // Last Quarter: 170-183 (72-78%)
+                else if(Phase < 229) index = 56;     // Waning Crescent: 184-228 (78-97%)
+                else index = 0;                     // Back to New Moon: 229-236
+                lcd_goto(16, 2);
+                putData(&MoonPhaseBMP[index], 8);
             }                
         }
     }
@@ -750,7 +762,7 @@ void Stopwatch(void) {
     TCC0.CTRLA = 0;
     TCC1.CTRLA = 0;
     PR.PRPC  |= 0b00000011;         // Disable TCC0 TCC1 clocks
-    clr_display_all();
+    clr_display();
 }
 
 void EditAlarms(void) {

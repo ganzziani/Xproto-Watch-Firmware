@@ -11,7 +11,7 @@
 // 29.530588853 * 65536 = 1935316
 #define MOON_CYCLE_LENGTH 1935316UL
 
-uint8_t MoonPhase(Type_Time *date) {
+uint8_t CalculateMoonPhase(Type_Time *date) {
     // Calculate moon phase by counting moon cycles from known date
     Type_Time KnownNewMoon;     // Known new moon: January 25th 1944
     KnownNewMoon.day = 25;
@@ -36,7 +36,7 @@ void Moon(void) {
 	clrbit(MStatus, goback);
     do {
         if(testbit(Misc,userinput)) {
-            uint8_t Phase = MoonPhase(&date);
+            uint8_t Phase = CalculateMoonPhase(&date);
             timeout=255;
             clrbit(Misc, userinput);
             if(testbit(Buttons,KML)) setbit(MStatus, goback);
@@ -48,7 +48,7 @@ void Moon(void) {
                 do {
                     Phase1 = Phase;
                     SubDay(&date);
-                    Phase = MoonPhase(&date);
+                    Phase = CalculateMoonPhase(&date);
                 } while(!(Phase1>118 && Phase<=118)); // While not Full moon
                 newday = 0; //redraw moon
             }
@@ -63,15 +63,18 @@ void Moon(void) {
                 do {
                     Phase1 = Phase;
                     AddDay(&date);
-                    Phase = MoonPhase(&date);
+                    Phase = CalculateMoonPhase(&date);
                 } while(!(Phase1<118 && Phase>=118)); // While not Full moon
                 newday = 0; //redraw moon
             }
         }
         if(newday!=date.day) {
-            clr_display();
+            displayBlack();
+            #ifdef INVERT_DISPLAY
+            setbit(Misc,negative);
+            #endif
             newday=date.day;
-            uint8_t Phase = MoonPhase(&date);
+            uint8_t Phase = CalculateMoonPhase(&date);
 		    lcd_goto(34,0);
 		    print5x8(PSTR("Moon Phase"));
             PrintDate(34,1,&date);
@@ -159,11 +162,7 @@ void Moon(void) {
                             }
                         }
                     }
-                    #ifdef INVERT_DISPLAY
-                    *p++ = ~output;
-                    #else
                     *p++ = output;
-                    #endif
                 }
                 p += 18 - 8;   // Next line
                 if(!testbit(LCD_CTRL,LCD_CS)) dma_display();    // Send new data if previous transfer ended
@@ -175,5 +174,6 @@ void Moon(void) {
         SLP();
     } while(timeout-- && !testbit(MStatus, goback));
     clrbit(Misc, userinput);
+    clrbit(Misc,negative);
     setbit(MStatus, update);
 }

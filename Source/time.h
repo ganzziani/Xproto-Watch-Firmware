@@ -26,6 +26,7 @@ typedef struct {
 #define LEAP_YEAR(year) (!(year&0x03))   // Year divisible by 4? This check works for the year range of 2000 thru 2099
 
 extern volatile Type_Time now;
+extern volatile uint8_t MoonPhase;
 extern Type_Time EEMEM EE_saved_time;
 extern uint8_t EEMEM EE_WSettings;     // 24Hr format, Date Format, Hour Beep, Alarm On,
 
