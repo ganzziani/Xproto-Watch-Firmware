@@ -98,6 +98,43 @@ void putData(uint8_t *p, uint8_t n) {
     }
 }
 
+//-----------------------------------------------------------------------
+void lcd_line_c(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c) {
+    uint8_t dxabs,dyabs;
+    int8_t dx,dy,stepx,stepy;
+    dx=(int8_t)x2-x1;      // the horizontal distance of the line
+    dy=(int8_t)y2-y1;      // the vertical distance of the line
+    if(dy<0) { dyabs=-dy; stepy=-1; }
+    else { dyabs=dy; stepy=1; }
+    if(dx<0) { dxabs=-dx; stepx=-1; }
+    else {dxabs=dx; stepx=1; }
+    pixel(x1,y1,c);
+    if (dxabs>=dyabs) { // the line is more horizontal than vertical
+        uint8_t e=(uint8_t)(dxabs>>1);
+        for(uint8_t i=0;i<dxabs;i++) {
+            e+=dyabs;
+            if (e>=dxabs) {
+                e-=dxabs;
+                y1+=stepy;
+            }
+            x1+=stepx;
+            pixel(x1,y1, c);
+        }
+    }
+    else {  // the line is more vertical than horizontal
+        uint8_t e=(uint8_t)(dyabs>>1);
+        for(uint8_t i=0;i<dyabs;i++) {
+            e+=dxabs;
+            if (e>=dyabs) {
+                e-=dyabs;
+                x1+=stepx;
+            }
+            y1+=stepy;
+            pixel(x1,y1,c);
+        }
+    }
+}
+
 // Print a char on the display using the 3x6 font
 void putchar3x6(char u8Char) {
     uint16_t pointer;

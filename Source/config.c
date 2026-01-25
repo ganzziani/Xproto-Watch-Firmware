@@ -231,7 +231,7 @@ void OWSettings(void) {
     do {
         clr_display();
         lcd_goto(28,0); print5x8(&STRS_mainmenu[3][0]);    // STRS_mainmenu[3][0] contains the word Settings
-        for(uint8_t i=0; i<6; i++) {
+        for(uint8_t i=0; i<5; i++) {
             lcd_goto(2,i+2); 
             if(i==select) {
                 putchar5x8('-'); putchar5x8(0x81); // Print arrow
@@ -288,7 +288,7 @@ void OWSettings(void) {
                     case 5: togglebit(WSettings, ShowSun);   break;
                 }
             }
-            if(select>=6) select=0;
+            if(select>=5) select=0;
         }
         dma_display();
         WaitDisplay();

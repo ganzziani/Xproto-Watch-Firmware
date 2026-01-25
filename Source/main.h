@@ -254,7 +254,7 @@ typedef union {
         uint16_t baud;              // Baud rate
     } LOGIC;
 	struct {
-        uint8_t oldHour, oldMinute, oldBattery;
+        uint8_t oldHour, oldMinute, oldSecond, oldBattery;
         uint8_t AlarmTune;           // Alarm Tune
 	} TIME;
     struct {

@@ -47,6 +47,7 @@ void clr_display_all(void);
 void pixel(uint8_t x, uint8_t y, uint8_t c);
 void sprite(uint8_t x, uint8_t y, const int8_t *ptr);
 void putData(uint8_t *p, uint8_t n);
+void lcd_line_c(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c);
 void lcd_line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2);
 void lcd_hline(uint8_t x1, uint8_t x2, uint8_t y, uint8_t c);
 void Rectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c);

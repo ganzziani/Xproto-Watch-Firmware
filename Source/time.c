@@ -37,6 +37,8 @@ uint8_t firstdayofmonth(Type_Time *timeptr);
 uint8_t DaysInMonth(Type_Time *timeptr);
 void BigPrintMonth(void);
 void BigPrintYear(void);
+void ShowMoonIcon(uint8_t row, uint8_t col);
+void PrintHands(uint8_t h, uint8_t m, uint8_t s) ;
 
 const uint8_t monthDays[] PROGMEM = { 31,28,31,30,31,30,31,31,30,31,30,31 };		// Days in a month
 volatile uint8_t MoonPhase;
@@ -93,7 +95,7 @@ ISR(TCF0_CCA_vect) {
     NowMinute++;                            // Update minute
     if(BattLevel==0) {
         BattLevel = MeasureVin(0);          // Measure Vin if last voltage was high
-        SecTimeout = 90;                    // No need to worry about power, show seconds
+       // SecTimeout = 90;                    // No need to worry about power, show seconds
     }        
     if(NowMinute>=60) {
         NowMinute=0;
@@ -102,7 +104,6 @@ ISR(TCF0_CCA_vect) {
         FindNextAlarm();                    // Find next alarm
         if(NowHour>=24) {
             setbit(WatchBits, dateChanged);
-            MoonPhase = CalculateMoonPhase(NOW);  // Phase: [0, 236]
             NowHour=0;
             NowWeekDay++;                   // Update weekday
             if(NowWeekDay>=7) NowWeekDay=0;
@@ -195,7 +196,7 @@ void Watch(void) {
     CPU_Fast();
     findweekday();
     FindNextAlarm();
-    LCD_PrepareBuffers();   // Construct trailer data in case it was wiped, clear all display buffers
+    clr_display();
     clrbit(MStatus, goback);
     setbit(Misc, redraw);
     setbit(WatchBits, dateChanged);
@@ -216,22 +217,22 @@ void Watch(void) {
                 if(testbit(Buttons, KUR)) {
                     if(!testbit(WSettings, analog_face)) togglebit(WSettings, style);
                     clrbit(WSettings, analog_face);
-                    clr_display();   // Change in settings -> clear screen
                 }
                 if(testbit(Buttons, KBR)) {
                     if(testbit(WSettings, analog_face)) togglebit(WSettings, style);
                     setbit(WSettings, analog_face);
-                    
                 }                        
                 if(testbit(Buttons, KUL)) setbit(VPORT1.OUT, LEDWHITE); // Turn on backlight
                 if(testbit(Buttons, KBL)) {
                     if(testbit(WatchBits,keyrep)) {     // Check if this is a long press
                         Menu=SET_SECOND;                // User can change the time now
                         clrbit(WatchBits,keyrep);       // Prevent repeat key
-                        if(testbit(WSettings, style)) clr_display();   // Clear screen
                         Buttons = 0;
                     }
                 }
+                clr_display();
+                setbit(WatchBits, hourChanged);     // Re Print hour
+                setbit(WatchBits, dateChanged);     // Re Print date
             } else {   // Changing time
                 uint8_t OldMenu=Menu;
                 if(testbit(Buttons,KML)) Menu=0;
@@ -245,7 +246,9 @@ void Watch(void) {
                     }
                     FindNextAlarm();        // Update next alarm
                 }
-                if(Menu==0) setbit(WatchBits, dateChanged); // Make sure to clear the cursor
+                if(Menu==0) {               // No longer adjusting the time
+                    setbit(WatchBits, dateChanged); // Make sure to clear the cursor
+                }                    
                 cli();  // Prevent the RTC interrupt from changing the time in this block
                 switch(Menu) {
                     case SET_SECOND:
@@ -288,11 +291,19 @@ void Watch(void) {
         }
         // When to refresh the screen? ->
         if(Menu ||                          // When user is changing the time
-        testbit(Misc, redraw) ||         // Update requested (at least every minute)
-        (SECPULSE() && SecTimeout) ||    // Every second when displaying seconds
-        testbit(MStatus, sound_on)) {  // The alarm is active (to toggle bell)
+            testbit(Misc, redraw) ||        // Update requested (at least every minute)
+            (SECPULSE() && SecTimeout) ||   // Every second when displaying seconds
+            testbit(MStatus, sound_on)) {   // The alarm is active (to toggle bell)
             clrbit(Misc, redraw);
-            if(SecTimeout) SecTimeout--;
+            if(SecTimeout) {
+                SecTimeout--;
+                if(SecTimeout==0) {                     // Timeout expired
+                    Menu=0;                             // No longer adjusting time
+                    setbit(Misc, redraw);               // Clears the seconds display
+                    setbit(WatchBits, hourChanged);     // Re Print hour
+                    setbit(WatchBits, dateChanged);     // Re Print date
+                }
+            }                
             if(AlarmHour==NowHour && AlarmMinute==NowMinute && testbit(MStatus, alarm_on)) {
                 if(NowSecond<=1) setbit(MStatus, sound_on);   // Enable Alarm until user cancels
                 if(testbit(MStatus, sound_on) && TCD1.CTRLA==0) { // Sound on and no tune active
@@ -308,14 +319,11 @@ void Watch(void) {
             GetTimeTimer();                 // Update time variables before showing data on screen
             if(testbit(WSettings, analog_face)) AnalogFace();
             else DigitalFace();
-            WaitDisplay();                  // Finish previous transmission
             dma_display();
-            if(Menu) {
-                if(SecTimeout==0) { // Timeout expired
-                    Menu=0;
-                    setbit(Misc, redraw);   // Clears the seconds display
-                }
-            }
+            // Available CPU time while waiting to finish the DMA
+            // Use this time to do some work
+            MoonPhase = CalculateMoonPhase(NOW);  // Phase: [0, 236]
+            WaitDisplay();                  // Finish transmission
         }
         if(testbit(Misc,keyrep)) {  // Repeat key or long press
             setbit(Misc, userinput);
@@ -326,7 +334,6 @@ void Watch(void) {
             !testbit(Misc, redraw) &&   // Don't need to update the screen
             !testbit(Misc,userinput)    // No user input
             ) {
-            WaitDisplay();  // Wait until all LCD data has been sent
             SLEEP.CTRL = SLEEP_SMODE_PSAVE_gc | SLEEP_SEN_bm;
             SLP();
         } else if(TCD1.CTRLA) {         // Playing sounds -> go to idle to keep peripherals running
@@ -462,22 +469,26 @@ void DigitalFace(void) {
                 BigPrintYear();
             }
             if(testbit(WSettings, ShowMoon)) {
-                uint8_t index, Phase;
-                Phase = MoonPhase;
-                if(Phase < 7) index = 0;            // New Moon: 0-6 (0-3%)
-                else if(Phase < 52) index = 8;      // Waxing Crescent: 7-51 (3-22%)
-                else if(Phase < 66) index = 16;      // First Quarter: 52-65 (22-28%)
-                else if(Phase < 111) index = 24;     // Waxing Gibbous: 66-110 (28-47%)
-                else if(Phase < 125) index = 32;     // Full Moon: 111-124 (47-53%)
-                else if(Phase < 170) index = 40;     // Waning Gibbous: 125-169 (53-72%)
-                else if(Phase < 184) index = 48;     // Last Quarter: 170-183 (72-78%)
-                else if(Phase < 229) index = 56;     // Waning Crescent: 184-228 (78-97%)
-                else index = 0;                     // Back to New Moon: 229-236
-                lcd_goto(16, 2);
-                putData(&MoonPhaseBMP[index], 8);
+                ShowMoonIcon(17, 2);
             }                
         }
     }
+}
+
+void ShowMoonIcon(uint8_t row, uint8_t col) {
+    uint8_t index, Phase;
+    Phase = MoonPhase;
+    if(Phase < 7) index = 0;            // New Moon: 0-6 (0-3%)
+    else if(Phase < 52) index = 8;      // Waxing Crescent: 7-51 (3-22%)
+    else if(Phase < 66) index = 16;      // First Quarter: 52-65 (22-28%)
+    else if(Phase < 111) index = 24;     // Waxing Gibbous: 66-110 (28-47%)
+    else if(Phase < 125) index = 32;     // Full Moon: 111-124 (47-53%)
+    else if(Phase < 170) index = 40;     // Waning Gibbous: 125-169 (53-72%)
+    else if(Phase < 184) index = 48;     // Last Quarter: 170-183 (72-78%)
+    else if(Phase < 229) index = 56;     // Waning Crescent: 184-228 (78-97%)
+    else index = 0;                     // Back to New Moon: 229-236
+    lcd_goto(row, col);
+    putData(&MoonPhaseBMP[index], 8);
 }
 
 void BigPrintMonth(void) {
@@ -519,9 +530,7 @@ void BigPrintYear(void) {
 
 // Analog Watch Face
 void AnalogFace(void) {
-    uint8_t s,m,h;
-    if(Menu) WaitDisplay(); // Changing time
-    if(1/*testbit(WatchBits, dateChanged)*/) {       // Update these items every day
+    if(testbit(WatchBits, dateChanged)) {       // Update these items every day
         clr_display();
         clrbit(WatchBits, dateChanged);
         if(!testbit(WSettings, style)) {
@@ -552,44 +561,42 @@ void AnalogFace(void) {
             if(!testbit(WSettings, PostMonth)) {
                 putchar3x6(' ');
                 printN3x6(NowDay);
-            }                
+            }
+            if(testbit(WSettings, ShowMoon)) {
+                ShowMoonIcon(60, 3);
+            }
         }            
     } else {    // Erase previous
-        m=T.TIME.oldMinute;
-        h=T.TIME.oldHour;
-        // Hours
-        fillTriangle(63+Sine60(h-5+60,8),63-Cosine60(h-5+60,8),
-        63+Sine60(h+5,8),   63-Cosine60(h+5,8),
-        63+Sine60(h,36),    63-Cosine60(h,36), PIXEL_TGL);
-        // Minutes
-        fillTriangle(63+Sine60(m-4+60,8),63-Cosine60(m-4+60,8),
-        63+Sine60(m+4,8),63-Cosine60(m+4,8),
-        63+Sine60(m,50),  63-Cosine60(m,50), PIXEL_TGL);
+        PrintHands(T.TIME.oldHour, T.TIME.oldMinute, T.TIME.oldSecond);
     }
-    s=NowSecond;
-    m=T.TIME.oldMinute=NowMinute;
-    h=T.TIME.oldHour=NowHour;
-    if(h>=12) h-=12;
-    h=h*5+m/12; // Add minutes/12 to hour needle (5 transitions per hour)
-    // Copy the background image from buffer 3 into the current display buffer
+    uint8_t s,m,h;
+    s = T.TIME.oldSecond = NowSecond;
+    m = T.TIME.oldMinute = NowMinute;
+    h = T.TIME.oldHour   = NowHour;
     if(!testbit(WSettings, style)) {
         lcd_goto(60,11);
         if(testbit(MStatus,alarm_on) &&                                           // Show bell character
         (NowSecond&0x01 || !testbit(MStatus, sound_on))) putchar5x8(CHAR_BELL);   // Blink character at alarm time
         else putchar5x8(' ');
-        // Seconds           
-        if(SecTimeout) {    
-            lcd_line(63,63,63+Sine60(s,54),63-Cosine60(s,54));
-        }
     }
+    PrintHands(h, m, s);
+}
+
+void PrintHands(uint8_t h, uint8_t m, uint8_t s) {
+    if(h>=12) h-=12;
+    h=h*5+m/12; // Add minutes/12 to hour needle (5 transitions per hour)
     // Hours
     fillTriangle(63+Sine60(h-5+60, 8), 63-Cosine60(h-5+60, 8),    // Add 60 to keep angle positive
-                 63+Sine60(h+5,    8), 63-Cosine60(h+5,    8),
-                 63+Sine60(h,     36), 63-Cosine60(h,     36), PIXEL_TGL);
+    63+Sine60(h+5,    8), 63-Cosine60(h+5,    8),
+    63+Sine60(h,     36), 63-Cosine60(h,     36), PIXEL_TGL);
     // Minutes
     fillTriangle(63+Sine60(m-4+60, 8), 63-Cosine60(m-4+60, 8),
-                 63+Sine60(m+4,    8), 63-Cosine60(m+4,    8),
-                 63+Sine60(m,     50), 63-Cosine60(m,     50), PIXEL_TGL);
+    63+Sine60(m+4,    8), 63-Cosine60(m+4,    8),
+    63+Sine60(m,     50), 63-Cosine60(m,     50), PIXEL_TGL);    
+    // Seconds
+    if(!testbit(WSettings, style) && SecTimeout) {    
+        lcd_line_c(63,63,63+Sine60(s,54),63-Cosine60(s,54), PIXEL_TGL);
+    }
 }
 
 void ShowAlarmTime(uint8_t col, uint8_t row) {
@@ -682,7 +689,6 @@ void CountDown(void) {
         if(TCD1.CTRLA==0) SLP();        // Sleep
     } while(!testbit(MStatus, goback));
     clrbit(MStatus, goback);
-    clr_display();
 }
 
 void Stopwatch(void) {
@@ -762,7 +768,6 @@ void Stopwatch(void) {
     TCC0.CTRLA = 0;
     TCC1.CTRLA = 0;
     PR.PRPC  |= 0b00000011;         // Disable TCC0 TCC1 clocks
-    clr_display();
 }
 
 void EditAlarms(void) {
@@ -892,7 +897,6 @@ void EditAlarms(void) {
     FindNextAlarm();
     clrbit(MStatus, goback);
     SecTimeout = 60;
-    clr_display();
 }
 
 // Finds the next alarm within 24 hours
