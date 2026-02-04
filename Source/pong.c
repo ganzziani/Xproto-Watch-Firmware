@@ -5,11 +5,11 @@
 #include "utils.h"
 #include "games.h"
 
-void InitPong(void);
-void NewPoint(void);
-void MovePaddle(PaddleStruct *Player);
-void PongEngine(void);
-void PongBoard(void);
+static void InitPong(void);
+static void NewPoint(void);
+static void MovePaddle(PaddleStruct *Player);
+static void PongEngine(void);
+static void PongBoard(void);
 
 void InitPong(void) {
     T.PONG.Player1.x1=34;

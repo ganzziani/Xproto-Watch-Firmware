@@ -21,7 +21,6 @@
         If no sleeptime, check if menu timeout works
 		USB Frame counter
         Channel math in meter mode
-		Channel AC/DC control
         Vertical zoom
         Filter mode (Audio in -> Filter -> Audio Out)
         Pulse width and Period vmeasurements
@@ -151,7 +150,6 @@ uint8_t EEMEM EECalibrated = 0xFF;  // Offset calibration done
 
 //static void CalibrateDAC(void);
 void SimpleADC(void);
-void CalibrateOffset(void);
 void CalibrateGain(void);
 void AnalogOn(void);
 void LowPower(void);
@@ -208,7 +206,6 @@ int main(void) {
     eeprom_read_block(NOW, &EE_saved_time, sizeof(Type_Time));  // Load latest known time
     WSettings = eeprom_read_byte(&EE_WSettings);                // Load Watch settings
     SetTimeTimer();                 // Validate time variables, update TCF0, enable interrupts
-    MoonPhase = CalculateMoonPhase(NOW);  // Phase: [0, 236]
     PMIC.CTRL = 0x07;               // Enable High, Medium and Low level interrupts
 
     Randomize(TCF0.CNT);            // Randomize random number generator with current time
@@ -565,7 +562,7 @@ void CalibrateOffset(void) {
         int16_t avrg1, avrg2;
         clr_display();
         TCF0.INTCTRLB = 0x00;               // Disable 1 minute interrupt to prevent writing GPIO0
-	    for(Srate=0; Srate<8; Srate++) {	// Cycle thru first 8 srates
+	    for(Srate=0; Srate<8; Srate++) {	// Cycle thru first 8 SamplingRates
             i=6; do {                       // Cycle thru all the gains
                 int8_t  *q1, *q2;  // temp pointers to signed 8 bits
                 s++;

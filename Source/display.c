@@ -91,13 +91,6 @@ void sprite(uint8_t x, uint8_t y, const int8_t *ptr) {
     } while(1);
 }
 
-// Send n bytes of data to the display
-void putData(uint8_t *p, uint8_t n) {
-    for(uint8_t i=0; i<n; i++) {
-        display_or(pgm_read_byte(p++));
-    }
-}
-
 //-----------------------------------------------------------------------
 void lcd_line_c(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c) {
     uint8_t dxabs,dyabs;
@@ -595,7 +588,7 @@ void putchar5x8(char u8Char) {
         u8CursorX = 0; u8CursorY++;
         return;
     }
-    uint16_t FontPointer = (unsigned int)(Font5x8)+(u8Char-0x20)*(5);
+    uint16_t FontPointer = (unsigned int)(Font5x8)+(u8Char)*(5);
 	uint8_t data;
     uint8_t *DisplayPointer = Disp_send.DataAddress -(u8CursorX)*18 + (u8CursorY);
     // Draw a char: 5 bytes

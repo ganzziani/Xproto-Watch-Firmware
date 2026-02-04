@@ -91,8 +91,8 @@ void Diagnose(void) {
 void About(void) {
     Sound(TuneIntro);
     clr_display();
-    lcd_goto(30, 1);
-    putData(Logo, 69);
+    uint8_t *DisplayPointer = Disp_send.DataAddress -(30)*18 + (1);
+    SendBitsPData(DisplayPointer,Logo, 69);
     lcd_goto(10,3);
     print5x8(&STRS_mainmenu[1][0]);    // STRS_mainmenu[1][0] contains the word Oscilloscope
     print5x8(&STRS_mainmenu[0][3]);    // STRS_mainmenu[0][2] contains the word Watch

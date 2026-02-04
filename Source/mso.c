@@ -11,16 +11,15 @@
 #include "config.h"
 
 // Function prototypes
-void Reduce(void);
-void RestorefromMeter(void);		        // Restores srate and gains
-void GoingtoMeter(void);			        // Saves srate and gains
-uint8_t fft_stuff(uint8_t *p);
-void AutoCursorV(void);                     // Automatically set vertical the cursors
+static void Reduce(void);
+static void RestorefromMeter(void);		        // Restores srate and gains
+static void GoingtoMeter(void);			        // Saves srate and gains
+static uint8_t fft_stuff(uint8_t *p);
+static void AutoCursorV(void);                     // Automatically set vertical the cursors
 static inline void Measurements(void);      // Measurements for Meter Mode
 static inline void ShowCursorV(void);       // Display Vertical Cursor
 static inline void ShowCursorH(void);       // Display Horizontal Cursor
-void CheckMax(void);                        // Check variables
-void CheckPost(void);                       // Check Post Trigger
+static void CheckMax(void);                        // Check variables
 static inline void LoadEE(void);            // Load settings from EEPROM
 
 // Global variables
@@ -468,7 +467,10 @@ void MSO(void) {
             Apply();    // Recover settings, particularly PORTC.PIN7CTRL
         }
         if(testbit(Misc,keyrep)) {  // Repeat key or long press
-            if(testbit(Buttons,K1) && testbit(MStatus,stop)) AutoSet();       // Long press KA -> Autoset
+            if(testbit(Buttons,K1) && testbit(MStatus,stop)) AutoSet();     // Long press KA -> Autoset
+            if (testbit(Buttons,KUR) || testbit(Buttons,KUL)) {            // Waveform navigation
+                setbit(Misc, userinput);
+            }
             if ((Menu>=MPOSTT) && (testbit(Buttons,K2) || testbit(Buttons,K3))) {    // Repeat key
                 setbit(Misc, userinput);
             }
@@ -1214,6 +1216,12 @@ checknext:
             if(testbit(Buttons,KUR) && testbit(Buttons,KUL)) {
                 setbit(Display,screenshot);
             }
+            if(testbit(Buttons,KUL)) {  // Navigate waveform left
+                if(M.HPos) M.HPos--;
+            }                
+            if(testbit(Buttons,KUR)) {  // Navigate waveform right
+                M.HPos++;
+            }            
             // Check key inputs depending on the menu
             if(testbit(Buttons,KBR)) {  // Next menu item
                 if(Menu==MSNIFFER) setbit(MStatus, gosniffer);
@@ -2221,12 +2229,12 @@ checknext:
             switch(Menu) {
                 case MSPI:  // SPI Configuration
                     if(testbit(Sniffer,CPOL)) {   // Pulse icon
-                        lcd_goto(33,15);
-                        putData(PulseNegIcon, 8);
+                        uint8_t *DisplayPointer = Disp_send.DataAddress -(33)*18 + (15);
+                        SendBitsPData(DisplayPointer,PulseNegIcon, 8);
                     }
                     else {   // Pulse icon
-                        lcd_goto(33,15);
-                        putData(PulsePosIcon, 8);
+                        uint8_t *DisplayPointer = Disp_send.DataAddress -(33)*18 + (15);
+                        SendBitsPData(DisplayPointer,PulsePosIcon, 8);
                     }
                     if(testbit(Sniffer,CPHA))   set_pixel(38,DISPLAY_MAX_Y-6);
                     else                        set_pixel(35,DISPLAY_MAX_Y-6);

@@ -5,6 +5,7 @@
 #include <avr/eeprom.h>
 
 #define EPOCH_YEAR      1944
+#define TOTAL_ALARMS    5
 
 typedef struct {
     uint8_t sec;                 // Seconds         [0-59]
@@ -17,10 +18,10 @@ typedef struct {
 } Type_Time;
 
 typedef struct {
-    uint8_t hour;
-    uint8_t minute;
-    uint8_t active;
-    uint8_t tune;
+    uint8_t hour;               // Alarm Hour
+    uint8_t minute;             // Alarm Minute
+    uint8_t active;             // Days the alarm is active
+    uint8_t tune;               // Alarm Tune
 } Type_Alarm;
 
 #define LEAP_YEAR(year) (!(year&0x03))   // Year divisible by 4? This check works for the year range of 2000 thru 2099

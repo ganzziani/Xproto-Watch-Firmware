@@ -26,19 +26,20 @@
 #include "build.h"
 #include "moon.h"
 
-void DigitalFace(void);
-void AnalogFace(void);
-void ShowAlarmTime(uint8_t col, uint8_t row);
-void Stopwatch(void);
-void CountDown(void);
-void EditAlarms(void);
-void FindNextAlarm(void);
+static void DigitalFace(void);
+static void AnalogFace(void);
+static void ShowAlarmTime(uint8_t col, uint8_t row);
+static void Stopwatch(void);
+static void CountDown(void);
+static void EditAlarms(void);
+static void FindNextAlarm(void);
+static void LoadAlarm(uint8_t i);
 uint8_t firstdayofmonth(Type_Time *timeptr);
 uint8_t DaysInMonth(Type_Time *timeptr);
 void BigPrintMonth(void);
 void BigPrintYear(void);
 void ShowMoonIcon(uint8_t row, uint8_t col);
-void PrintHands(uint8_t h, uint8_t m, uint8_t s) ;
+void PrintHands(uint8_t h, uint8_t m, uint8_t s);
 
 const uint8_t monthDays[] PROGMEM = { 31,28,31,30,31,30,31,31,30,31,30,31 };		// Days in a month
 volatile uint8_t MoonPhase;
@@ -58,6 +59,7 @@ Type_Alarm EEMEM EE_Alarms[] = {
     {  7, 45, 0b00111110, 1 },  // 07:45am Weekdays
     { 14, 30, 0b00111110, 4 },  // 02:00pm Weekdays
     { 21,  0, 0b00111111, 9 },  // 09:00pm Monday thru Saturday
+    {  0,  0, 0b00000000, 0 },  // Last alarm slot used for the Countdown timer
 };
 
 uint8_t EEMEM EE_WSettings = 0; // 24Hr format, Date Format, Hour Beep, Alarm On,
@@ -305,24 +307,31 @@ void Watch(void) {
                 }
             }                
             if(AlarmHour==NowHour && AlarmMinute==NowMinute && testbit(MStatus, alarm_on)) {
-                if(NowSecond<=1) setbit(MStatus, sound_on);   // Enable Alarm until user cancels
-                if(testbit(MStatus, sound_on) && TCD1.CTRLA==0) { // Sound on and no tune active
+                if(NowSecond<=1) setbit(MStatus, sound_on);   // Make sound until user cancels
+                if(testbit(MStatus, sound_on) && TCD1.CTRLA==0) { // Sound enabled and no tune active
                     Sound((uint8_t *)pgm_read_word(TuneAlarms+T.TIME.AlarmTune));
                 }
                 SecTimeout = 60;    // Show seconds during alarm
             } else {
                 if(testbit(MStatus, sound_on)) {
+                    uint8_t index = T.TIME.AlarmIndex;
+                    if((EE_Alarms[index].active & 0b01111111) == 0) {   // Check if this was a one-time only alarm (all active days are disabled)
+                        eeprom_write_byte(&EE_Alarms[index].active, 0); // Clear active bit
+                    }                        
                     FindNextAlarm();                // An alarm just finished, find next alarm
                     clrbit(MStatus, sound_on);
                 }
-            }                
+            }
+            if(testbit(WatchBits, dateChanged) && testbit(WSettings, ShowMoon)) {
+                MoonPhase = CalculateMoonPhase(NOW);
+            }
             GetTimeTimer();                 // Update time variables before showing data on screen
             if(testbit(WSettings, analog_face)) AnalogFace();
             else DigitalFace();
             dma_display();
-            // Available CPU time while waiting to finish the DMA
-            // Use this time to do some work
-            MoonPhase = CalculateMoonPhase(NOW);  // Phase: [0, 236]
+            // Stop the CPU until the DMA is complete to save power
+            SLEEP.CTRL = SLEEP_SMODE_IDLE_gc | SLEEP_SEN_bm;
+            SLP();
             WaitDisplay();                  // Finish transmission
         }
         if(testbit(Misc,keyrep)) {  // Repeat key or long press
@@ -478,17 +487,17 @@ void DigitalFace(void) {
 void ShowMoonIcon(uint8_t row, uint8_t col) {
     uint8_t index, Phase;
     Phase = MoonPhase;
-    if(Phase < 7) index = 0;            // New Moon: 0-6 (0-3%)
-    else if(Phase < 52) index = 8;      // Waxing Crescent: 7-51 (3-22%)
-    else if(Phase < 66) index = 16;      // First Quarter: 52-65 (22-28%)
-    else if(Phase < 111) index = 24;     // Waxing Gibbous: 66-110 (28-47%)
-    else if(Phase < 125) index = 32;     // Full Moon: 111-124 (47-53%)
-    else if(Phase < 170) index = 40;     // Waning Gibbous: 125-169 (53-72%)
-    else if(Phase < 184) index = 48;     // Last Quarter: 170-183 (72-78%)
-    else if(Phase < 229) index = 56;     // Waning Crescent: 184-228 (78-97%)
-    else index = 0;                     // Back to New Moon: 229-236
-    lcd_goto(row, col);
-    putData(&MoonPhaseBMP[index], 8);
+    if(Phase < 7) index = 0;            //   0-  6 ( 0- 3%) New Moon
+    else if(Phase < 52) index = 8;      //   7- 51 ( 3-22%) Waxing Crescent
+    else if(Phase < 66) index = 16;     //  52- 65 (22-28%) First Quarter
+    else if(Phase < 111) index = 24;    //  66-110 (28-47%) Waxing Gibbous
+    else if(Phase < 125) index = 32;    // 111-124 (47-53%) Full Moon
+    else if(Phase < 170) index = 40;    // 125-169 (53-72%) Waning Gibbous
+    else if(Phase < 184) index = 48;    // 170-183 (72-78%) Last Quarter
+    else if(Phase < 229) index = 56;    // 184-228 (78-97%) Waning Crescent: 
+    else index = 0;                     // 229-236:         Back to New Moon
+    uint8_t *DisplayPointer = Disp_send.DataAddress -(row)*18 + (col);
+    SetPData(DisplayPointer, &MoonPhaseBMP[index], 8);
 }
 
 void BigPrintMonth(void) {
@@ -681,9 +690,10 @@ void CountDown(void) {
         }
         lcd_goto(51,1); if(!start || SECPULSE()) putchar5x8(':'); else putchar5x8(' ');
         lcd_goto(81,1); if(!start || SECPULSE()) putchar5x8(':'); else putchar5x8(' ');
-        printN11x21(86, 0, second, 2);
+        printN11x21(13, 0, hour,   3);  // 3 digits for the hour
         printN11x21(56, 0, minute, 2);
-        printN11x21(13, 0, hour,   3);
+        printN11x21(86, 0, second, 2);
+        
         dma_display();
         WaitDisplay();                  // Double buffering not needed in countdown (slow refresh rate)
         if(TCD1.CTRLA==0) SLP();        // Sleep
@@ -771,8 +781,8 @@ void Stopwatch(void) {
 }
 
 void EditAlarms(void) {
-    Type_Alarm Alarms[4];
-    eeprom_read_block(&Alarms, &EE_Alarms, 4*sizeof(Type_Alarm));
+    Type_Alarm Alarms[TOTAL_ALARMS-1];      // The last alarm slot is used for the Countdown timer
+    eeprom_read_block(&Alarms, &EE_Alarms, (TOTAL_ALARMS-1)*sizeof(Type_Alarm));
     uint8_t oldWSettings = MStatus;
     clrbit(MStatus, goback);
     setbit(Misc, redraw);
@@ -837,7 +847,7 @@ void EditAlarms(void) {
             clrbit(Misc, redraw);
             clr_display();
             lcd_goto(4,15); print5x8(PSTR("<-      Next      ->"));
-            for(uint8_t i=0, j=0; i<4; i++, j+=4) {    // Print 4 alarms
+            for(uint8_t i=0, j=0; i<TOTAL_ALARMS-1; i++, j+=4) {    // Print all alarms
                 lcd_goto(4,j); print5x8(PSTR("Alarm ")); putchar5x8('1'+i); putchar5x8(':');
                 if(Alarms[i].active & 0x80) fillRectangle(2, i*32, 45,6+(i)*32,PIXEL_TGL);
                 setbit(MStatus, alarm_on);
@@ -901,8 +911,6 @@ void EditAlarms(void) {
 
 // Finds the next alarm within 24 hours
 void FindNextAlarm(void) {
-    Type_Alarm Alarms[4];
-    eeprom_read_block(&Alarms, &EE_Alarms, 4*sizeof(Type_Alarm));
     uint8_t Tomorrow = NowWeekDay+1;
     if(Tomorrow>=7) Tomorrow=0;
     uint8_t Todaybit=0x40;
@@ -911,62 +919,59 @@ void FindNextAlarm(void) {
     Tomorrowbit = Tomorrowbit >> Tomorrow;
     clrbit(MStatus, alarm_on);
 	setbit(WatchBits, hourChanged);
-    for(uint8_t i=0; i<4; i++) {        // Search the 4 alarms
-        if(Alarms[i].active & 0x80) {   // This alarm is active
-            uint8_t NewAlarmHour   = Alarms[i].hour;
-            uint8_t NewAlarmMinute = Alarms[i].minute;
+    for(uint8_t i=0; i<TOTAL_ALARMS; i++) {     // Search all alarms
+        if(EE_Alarms[i].active & 0x80) {           // This alarm is active
+            uint8_t NewAlarmHour   = EE_Alarms[i].hour;
+            uint8_t NewAlarmMinute = EE_Alarms[i].minute;
             // Check if there is an alarm for tomorrow
-            if(Alarms[i].active & Tomorrowbit) {
+            if(EE_Alarms[i].active & Tomorrowbit) {
                 // Compare only if this alarm occurs before NOW (it is within 24 hours)
                 if(((NowHour ==NewAlarmHour) && (NowMinute>NewAlarmMinute)) ||
                     (NowHour > NewAlarmHour)) {
                     if(!testbit(MStatus, alarm_on)) {     // Not found the next alarm yet
                         setbit(MStatus, alarm_on);        // Just copy new alarm
-                        AlarmHour   = NewAlarmHour;
-                        AlarmMinute = NewAlarmMinute;
-                        T.TIME.AlarmTune = Alarms[i].tune;
+                        LoadAlarm(i);
                     } else {                                // There was a previous alarm, copy if new alarm occurs sooner
                         if(((NowHour ==AlarmHour) && (NowMinute>AlarmMinute)) ||    // Current alarm will occur tomorrow
                         (NowHour > AlarmHour)) {                    
                             if(((AlarmHour ==NewAlarmHour) && (AlarmMinute>NewAlarmMinute)) ||  // Compare and use soonest alarm
                             (AlarmHour > NewAlarmHour)) {
-                                AlarmHour   = NewAlarmHour;
-                                AlarmMinute = NewAlarmMinute;
-                                T.TIME.AlarmTune = Alarms[i].tune;
+                                LoadAlarm(i);
                             }                                                       // Keep existing alarm if it occurs today
                         }                        
                     }
                 }
             }
             // Check if there is an alarm for today
-            if(Alarms[i].active & Todaybit) {
+            if(EE_Alarms[i].active & Todaybit) {
                 // Compare only if this alarm occurs now or after NOW
                 if(((NowHour ==NewAlarmHour) && (NowMinute<=NewAlarmMinute)) ||
                     (NowHour < NewAlarmHour)) {
                     if(!testbit(MStatus, alarm_on)) {     // Not found the next alarm yet
                         setbit(MStatus, alarm_on);        // Just copy new alarm
-                        AlarmHour   = NewAlarmHour;
-                        AlarmMinute = NewAlarmMinute;
-                        T.TIME.AlarmTune = Alarms[i].tune;
+                        LoadAlarm(i);
                     } else {                                // There was a previous alarm, copy if new alarm occurs sooner
                         if(((NowHour ==AlarmHour) && (NowMinute>AlarmMinute)) ||    // Current alarm will occur tomorrow, copy this new alarm
                         (NowHour > AlarmHour)) {
-                            AlarmHour   = NewAlarmHour;
-                            AlarmMinute = NewAlarmMinute;
-                            T.TIME.AlarmTune = Alarms[i].tune;
+                            LoadAlarm(i);
                         } else {                                                    // Otherwise, compare and use soonest alarm
                             if(((AlarmHour ==NewAlarmHour) && (AlarmMinute>NewAlarmMinute)) ||
                                 (AlarmHour > NewAlarmHour)) {
-                                AlarmHour   = NewAlarmHour;
-                                AlarmMinute = NewAlarmMinute;
-                                T.TIME.AlarmTune = Alarms[i].tune;
+                                    LoadAlarm(i);
                             }
                         }
                     }
                 }
             }                
         }
-    }    
+    }
+}
+
+void LoadAlarm(uint8_t i) {
+    AlarmHour   = EE_Alarms[i].hour;
+    AlarmMinute = EE_Alarms[i].minute;
+    T.TIME.AlarmTune = EE_Alarms[i].tune;
+    T.TIME.AlarmIndex = i;
 }
 
 void Calendar(void) {

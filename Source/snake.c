@@ -5,10 +5,10 @@
 #include "utils.h"
 #include "games.h"
 
-void InitSnake(void);
-void NewFruit(void);
-void MoveSnake(SnakeStruct *Player);
-void SnakeEngine(void);
+static void InitSnake(void);
+static void NewFruit(void);
+static void MoveSnake(SnakeStruct *Player);
+static void SnakeEngine(void);
 
 void InitSnake(void) {
     uint16_t k=0;

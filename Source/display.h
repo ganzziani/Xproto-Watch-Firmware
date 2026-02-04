@@ -46,7 +46,6 @@ void displayBlack(void);
 void clr_display_all(void);
 void pixel(uint8_t x, uint8_t y, uint8_t c);
 void sprite(uint8_t x, uint8_t y, const int8_t *ptr);
-void putData(uint8_t *p, uint8_t n);
 void lcd_line_c(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c);
 void lcd_line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2);
 void lcd_hline(uint8_t x1, uint8_t x2, uint8_t y, uint8_t c);
@@ -66,5 +65,88 @@ void GLCD_LcdInit(void);
 void LCD_PrepareBuffers(void);
 void dma_display(void);
 void WaitDisplay(void);
+
+// Copy data from program memory to data memory with stride of 18
+// src: pointer to program memory (PROGMEM)
+// dest: pointer to data memory
+// count: number of bytes to copy
+#define SetPData(dest, src, count)                  \
+do {                                                \
+    const uint8_t *_src = (const uint8_t *)(src);   \
+    uint8_t *_dest = (uint8_t *)(dest);             \
+    uint8_t _count = (uint8_t)(count);              \
+    asm volatile (                                  \
+        "1:"                        "\n\t"          \
+        "lpm   r0, Z+"              "\n\t"          \
+        "st    X, r0"               "\n\t"          \
+        "sbiw  r26, 18"             "\n\t"          \
+        "dec   %[c]"                "\n\t"          \
+        "brne  1b"                  "\n\t"          \
+        : [c] "+r" (_count),                        \
+          [d] "+x" (_dest),                         \
+          [s] "+z" (_src)                           \
+        :                                           \
+        : "r0", "memory"                            \
+    );                                              \
+} while(0)
+
+#ifdef INVERT_DISPLAY
+
+// Send data from program memory to data memory with stride of 18, CLEAR the bits
+// src: pointer to program memory (PROGMEM)
+// dest: pointer to data memory
+// count: number of bytes to copy
+#define SendBitsPData(dest, src, count)             \
+do {                                                \
+    const uint8_t *_src = (const uint8_t *)(src);   \
+    uint8_t *_dest = (uint8_t *)(dest);             \
+    uint8_t _count = (uint8_t)(count);              \
+    asm volatile (                                  \
+        "1:"                        "\n\t"          \
+        "lpm   r0, Z+"              "\n\t"          \
+        "com   r0"                  "\n\t"          \
+        "ld    r18, X"              "\n\t"          \
+        "and   r18, r0"             "\n\t"          \
+        "st    X, r18"              "\n\t"          \
+        "sbiw  r26, 18"             "\n\t"          \
+        "dec   %[c]"                "\n\t"          \
+        "brne  1b"                  "\n\t"          \
+        : [c] "+r" (_count),                        \
+          [d] "+x" (_dest),                         \
+          [s] "+z" (_src)                           \
+        :                                           \
+        : "r0", "r18", "memory"                     \
+    );                                              \
+} while(0)
+
+#else
+
+// Send data from program memory to data memory with stride of 18, OR the bits
+// src: pointer to program memory (PROGMEM)
+// dest: pointer to data memory
+// count: number of bytes to copy
+#define SendBitsPData(dest, src, count)             \
+do {                                                \
+    const uint8_t *_src = (const uint8_t *)(src);   \
+    uint8_t *_dest = (uint8_t *)(dest);             \
+    uint8_t _count = (uint8_t)(count);              \
+    asm volatile (                                  \
+        "1:"                        "\n\t"          \
+        "lpm   r0, Z+"              "\n\t"          \
+        "ld    r18, X"              "\n\t"          \
+        "or    r18, r0"             "\n\t"          \
+        "st    X, r18"              "\n\t"          \
+        "sbiw  r26, 18"             "\n\t"          \
+        "dec   %[c]"                "\n\t"          \
+        "brne  1b"                  "\n\t"          \
+        : [c] "+r" (_count),                        \
+          [d] "+x" (_dest),                         \
+          [s] "+z" (_src)                           \
+        :                                           \
+        : "r0", "r18", "memory"                     \
+    );                                              \
+} while(0)
+
+#endif
 
 #endif

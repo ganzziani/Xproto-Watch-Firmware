@@ -79,7 +79,7 @@
 #define grid1       1
 #define elastic     2       // Average on successive traces
 #define screenshot  3       // Take a screenshot
-#define flip        4       // Flip display
+#define trgcount    4       // Show Trigger Count
 #define persistent  5       // Persistent Display
 #define line        6       // Continuous Drawing
 #define showset     7       // Show scope settings (time/div volts/div)
@@ -255,7 +255,8 @@ typedef union {
     } LOGIC;
 	struct {
         uint8_t oldHour, oldMinute, oldSecond, oldBattery;
-        uint8_t AlarmTune;           // Alarm Tune
+        uint8_t AlarmTune;          // Alarm Tune
+        uint8_t AlarmIndex;         // Index of next alarm
 	} TIME;
     struct {
         uint8_t level;            // Level (Sets thinking time)
