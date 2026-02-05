@@ -42,7 +42,7 @@ void HEXSerial(void) {
         index+=increment;
         if(CHDmask&mask) {					// Is this channel on?
             for(uint8_t i=1; i<=32; i++) {	// Scan buffer
-                data = DC.CHDdata[hibyte(index)];
+                data = T.SCOPE.DC.CHDdata[hibyte(index)];
                 if(!(i&0x03)) {				// Time to check bits when i is multiple of 4
                     result<<=1;
                     if(bit) result+=1;
@@ -158,7 +158,7 @@ void Sniff(void) {
                     // 8 bytes in this format: "FF+ "
     WaitDisplay();      // Finish last transmission
     clr_display();
-    uint8_t *p=T.LOGIC.data.All.decoded;
+    uint8_t *p=T.LOGIC.data.decoded;
     for(; i<BUFFER_SERIAL*2+2; i++) *p++=0;   // Erase buffers and index
     T.LOGIC.indrx=0; T.LOGIC.indtx=0;
     if(testbit(Trigger, round)) page=0x0F;  // Go to last page
@@ -238,11 +238,11 @@ void Sniff(void) {
 		if((endpoints[1].in.STATUS & USB_EP_TRNCOMPL0_bm)) {
     		endpoints[1].in.AUXDATA = 0;				// New transfer must clear AUXDATA
             if(!testbit(Misc,sacquired)) {
-               	endpoints[1].in.DATAPTR = (uint16_t)T.LOGIC.data.All.decoded;
+               	endpoints[1].in.DATAPTR = (uint16_t)T.LOGIC.data.decoded;
         		endpoints[1].in.CNT = 640;	    // Send first half
             }
             else {
-               	endpoints[1].in.DATAPTR = (uint16_t)T.LOGIC.data.All.decoded+640;
+               	endpoints[1].in.DATAPTR = (uint16_t)T.LOGIC.data.decoded+640;
         		endpoints[1].in.CNT = 649;	    // Send second half
             }
     		endpoints[1].in.STATUS &= ~(USB_EP_TRNCOMPL0_bm | USB_EP_BUSNACK0_bm | USB_EP_OVF_bm);
@@ -364,7 +364,7 @@ void Sniff(void) {
     } while (testbit(MStatus,gosniffer));
 exitSniffer:
     Buttons=0;
-   	endpoints[1].in.DATAPTR = (uint16_t)DC.CH1data;
+   	endpoints[1].in.DATAPTR = (uint16_t)T.SCOPE.DC.CH1data;
 	endpoints[1].in.STATUS = USB_EP_BUSNACK0_bm | USB_EP_TRNCOMPL0_bm;
     clrbit(Misc,sacquired);
     USARTC0.CTRLA = 0x00;   // Disable receive interrupt

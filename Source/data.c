@@ -142,7 +142,7 @@ const NVMVAR MAXM PROGMEM = {   // Flash Copy
     5,      //  AWGtype;        // 5 waveform type
     255,    //  AWGduty;        //
     255,    //  AWGoffset;      //
-    0x00BEFFFF,  //  AWGdesiredF;    // 12517375
+    0x00BEFFFF,  //  AWGdesiredF;    // Max set to 125.17375kHz
 };
 
 // Hamming window = 0.53836-0.46164*COS(2*PI*n/(FFT_N-1))

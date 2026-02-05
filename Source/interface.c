@@ -179,7 +179,7 @@ uint8_t ProcessCommand(uint8_t Command, uint8_t usb) {
             if(index<=5 || index==35 || index==38 || index==12 || index==13 ||
             (index>=24 && index<=28))  setbit(MStatus, update);      // Changing trigger
             if(index<=13) {
-                T.IN.METER.Freq = 0;			// Prevent sending outdated data
+                T.SCOPE.MeterFreq = 0;			    // Prevent sending outdated data
                 setbit(MStatus, updatemso);		// Settings are changing
             }
             if(index>=36) setbit(MStatus, updateawg);
@@ -244,7 +244,7 @@ uint8_t ProcessCommand(uint8_t Command, uint8_t usb) {
             setbit(MStatus, updateawg);     // Generate wave                       
         break;        
         case 'm':   // Send METER measurement
-            p = (uint8_t *)(&T.IN.METER.Freq);
+            p = (uint8_t *)(&T.SCOPE.MeterFreq);
             for(uint8_t i=0; i<4; i++) ep0_buf_in[i]=*p++;
             n=4;
         break;            

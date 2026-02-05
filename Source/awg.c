@@ -51,7 +51,7 @@ void BuildWave(void) {
     }
     // Construct 256 bytes waveform
     
-    int8_t *p=(int8_t *)T.DATA.AWGTemp1;
+    int8_t *p=(int8_t *)T.AWGDATA.AWGTemp1;
     uint16_t Seed;
     uint8_t i=0;
     switch(M.AWGtype) {
@@ -78,7 +78,7 @@ void BuildWave(void) {
             do { *p++ = pgm_read_byte_near(Exp-128+i); } while(++i);
         break;
         case 5: // Custom wave from EEPROM
-            eeprom_read_block(T.DATA.AWGTemp1, EEwave, BUFFER_AWG);
+            eeprom_read_block(T.AWGDATA.AWGTemp1, EEwave, BUFFER_AWG);
         break;
     }
     // Prepare output buffer:
@@ -86,16 +86,16 @@ void BuildWave(void) {
     uint16_t step=0;
 	uint16_t inc;
     i=0; inc=(256-M.AWGduty)<<1;
-    p=(int8_t *)T.DATA.AWGTemp1;
+    p=(int8_t *)T.AWGDATA.AWGTemp1;
     do {
         uint8_t j=hibyte(step);
-        T.DATA.AWGTemp2[j] = *p;
+        T.AWGDATA.AWGTemp2[j] = *p;
         int8_t awgpoint;
         if(!testbit(Misc,bigfont)) {  // Interpolation
             int8_t k=*p++;
             awgpoint = (k+(*p))/2;
         } else awgpoint = *p++;         // No Interpolation
-        if(j<255) T.DATA.AWGTemp2[j+1] = awgpoint;
+        if(j<255) T.AWGDATA.AWGTemp2[j+1] = awgpoint;
         step+=inc;
         if(i==127) inc=M.AWGduty<<1;
     } while(++i);
@@ -117,7 +117,7 @@ void BuildWave(void) {
     i=0;
     do {
     // ******** Multiply by Gain ********
-        uint8_t j=FMULS8(M.AWGamp,T.DATA.AWGTemp2[(uint8_t)(i*cycles)]); // Keep index < 256
+        uint8_t j=FMULS8(M.AWGamp,T.AWGDATA.AWGTemp2[(uint8_t)(i*cycles)]); // Keep index < 256
     // ******** Add Offset ********
         AWGBuffer[i]=saddwsat(j,M.AWGoffset);
     } while(++i);

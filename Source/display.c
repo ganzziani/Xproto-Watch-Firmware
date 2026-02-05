@@ -133,14 +133,12 @@ void putchar3x6(char u8Char) {
     uint16_t pointer;
 	uint8_t data;
 	pointer = (unsigned int)(Font3x6)+(u8Char-20)*(3);
-    if(u8Char!='\n') {
-        // Draw a char: 3 bytes
-        for(uint8_t i=3; i; i--) {
-            data = pgm_read_byte_near(pointer++);
-		    if(testbit(Misc,negative)) data = ~(data|128);
-		    display_or(data);
-	    }
-    }
+    // Draw a char: 3 bytes
+    for(uint8_t i=3; i; i--) {
+        data = pgm_read_byte_near(pointer++);
+		if(testbit(Misc,negative)) data = ~(data|128);
+		display_or(data);
+	}
     // Special characters
     if(u8Char==0x1C) {       // Begin long 'd' character
         display_or(FONT3x6_d1);
@@ -584,10 +582,6 @@ Print a char on the LCD
 		u8Char = char to display
 -------------------------------------------------------------------------------*/
 void putchar5x8(char u8Char) {
-    if(u8Char=='\n') {    // Next line
-        u8CursorX = 0; u8CursorY++;
-        return;
-    }
     uint16_t FontPointer = (unsigned int)(Font5x8)+(u8Char)*(5);
 	uint8_t data;
     uint8_t *DisplayPointer = Disp_send.DataAddress -(u8CursorX)*18 + (u8CursorY);
@@ -603,7 +597,7 @@ void putchar5x8(char u8Char) {
         DisplayPointer -=18;    // Go to next column
     }
     u8CursorX += 5;
-    if(u8CursorX < 128) {  // Insert a space before next letter
+    if(u8CursorX < 128) {  // Clear vertical line before next character
         #ifdef INVERT_DISPLAY
         data = 0xFF;
         if(testbit(Misc,negative)) data = 0;

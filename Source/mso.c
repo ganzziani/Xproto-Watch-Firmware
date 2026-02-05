@@ -22,14 +22,6 @@ static inline void ShowCursorH(void);       // Display Horizontal Cursor
 static void CheckMax(void);                        // Check variables
 static inline void LoadEE(void);            // Load settings from EEPROM
 
-// Global variables
-uint8_t  adjusting = 0;             // Auto setup adjusting step
-uint16_t slowval;                   // Slow sampling rate time value
-uint8_t old_s, old_g1, old_g2;      // sampling, gains before entering meter mode
-uint8_t shortcuti  = 0;             // shortcut index
-
-ACHANNEL CH1,CH2;                   // Analog Channel 1, Channel 2
-DATA DC;                            // Data samples
 uint8_t EEMEM EECHREF1[256] = {0};  // Reference waveform CH1
 uint8_t EEMEM EECHREF2[256] = {0};  // Reference waveform CH2
 int8_t  EEMEM EECH1Pos = 0;         // Position for EE CH1
@@ -409,6 +401,9 @@ static inline uint8_t average (uint8_t a, uint8_t b) {
 
 // Main MSO Application
 void MSO(void) {
+    T.SCOPE.adjusting = 0;      // Auto setup adjusting step
+    T.SCOPE.shortcuti = 0;      // shortcut index
+        
     uint16_t Tpost;
     int16_t AWGsweepi;          // AWG sweep counter
     uint8_t AWGspeed;           // AWG sweep increment
@@ -448,7 +443,9 @@ void MSO(void) {
     DMA.CH3.CTRLA     = 0b10100100;     // Enable CH3, repeat mode, 1 byte burst, single
     DMA.CTRL          = 0x80;           // Enable DMA, single buffer, round robin
 
-    old_s=Srate; old_g1=M.CH1gain; old_g2=M.CH2gain;
+    T.SCOPE.old_s=Srate;
+    T.SCOPE.old_g1=M.CH1gain;
+    T.SCOPE.old_g2=M.CH2gain;
     Menu = Mdefault;                // Set default menu
     setbit(MStatus, update);        // Force second layer to update
     setbit(MStatus, updatemso);     // Apply settings
@@ -515,7 +512,7 @@ void MSO(void) {
                 CCPWrite(&WDT.CTRL, WDT_PER_8KCLK_gc | WDT_CEN_bm);
                 uint8_t tlevelo;
 				if(M.Tsource==0) { // // CH1 is trigger source
-                    tlevelo=addwsat(M.Tlevel, -CH1.offset);
+                    tlevelo=addwsat(M.Tlevel, -T.SCOPE.CH1.offset);
                     if(testbit(Trigger, window)) windowCH1(M.Window1,M.Window2);
                     else if(testbit(Trigger, slope)) {
                         tlevelo=M.Tlevel-0x80;
@@ -536,7 +533,7 @@ void MSO(void) {
 				}
 				else if(M.Tsource==1) {   // CH2 is trigger source
                     // Apply CH1 offset to trigger level
-                    tlevelo=addwsat(M.Tlevel, -CH2.offset);
+                    tlevelo=addwsat(M.Tlevel, -T.SCOPE.CH2.offset);
                     if(testbit(Trigger, window)) windowCH2(M.Window1,M.Window2);
                     else if(testbit(Trigger, slope)) {
                         tlevelo=M.Tlevel-0x80;
@@ -576,7 +573,7 @@ void MSO(void) {
                 ADCA.CTRLB = 0x14;          // signed mode, no free run, 8 bit
                 ADCB.CTRLB = 0x14;          // signed mode, no free run, 8 bit
                 // capture one last sample set
-                DC.frame++;                 // Increase frame counter
+                T.SCOPE.DC.frame++;                 // Increase frame counter
                 _delay_us(80);              // Wait to process ADC pipeline
                 clrbit(MStatus, triggered);
                 TCC1.CTRLA = 0;             // Stop post trigger counter
@@ -591,10 +588,10 @@ void MSO(void) {
                     circular+=256;
                     if(circular>=512) circular=circular-512;
                 }
-                p1=DC.CH1data; p2=DC.CH2data; p3=DC.CHDdata;
-                q1=(int8_t *)T.IN.CH1+circular;
-                q2=(int8_t *)T.IN.CH2+circular;
-                q3=(int8_t *)T.IN.CHD+circular;
+                p1=T.SCOPE.DC.CH1data; p2=T.SCOPE.DC.CH2data; p3=T.SCOPE.DC.CHDdata;
+                q1=(int8_t *)T.SCOPE.TempCH1+circular;
+                q2=(int8_t *)T.SCOPE.TempCH2+circular;
+                q3=(int8_t *)T.SCOPE.TempCHD+circular;
                 uint8_t i=0;
                 do {
                     uint8_t ch1raw, ch2raw, ch1end,ch2end;
@@ -604,9 +601,9 @@ void MSO(void) {
                     circular++;
                     if(circular>=512) {  // Circular buffer
                         circular=0;
-                        q1=(int8_t *)T.IN.CH1;
-                        q2=(int8_t *)T.IN.CH2;
-                        q3=(int8_t *)T.IN.CHD;
+                        q1=(int8_t *)T.SCOPE.TempCH1;
+                        q2=(int8_t *)T.SCOPE.TempCH2;
+                        q3=(int8_t *)T.SCOPE.TempCHD;
                     }
                     if(Srate) {   // Srate 0 only has 256 data points, all others have 512
                         if(testbit(CH1ctrl,chaverage)) {
@@ -619,9 +616,9 @@ void MSO(void) {
                     }
                     if(circular>=512) {  // Circular buffer
                         circular=0;
-                        q1=(int8_t *)T.IN.CH1;
-                        q2=(int8_t *)T.IN.CH2;
-                        q3=(int8_t *)T.IN.CHD;
+                        q1=(int8_t *)T.SCOPE.TempCH1;
+                        q2=(int8_t *)T.SCOPE.TempCH2;
+                        q3=(int8_t *)T.SCOPE.TempCHD;
                     }
                     if(testbit(CH1ctrl,derivative) && i) {
                         ch1raw=(*q1)-ch1raw;
@@ -629,9 +626,9 @@ void MSO(void) {
                     if(testbit(CH2ctrl,derivative) && i) {
                         ch2raw=(*q2)-ch2raw;
                     }
-                    ch1end = saddwsat(ch1raw, CH1.offset);
+                    ch1end = saddwsat(ch1raw, T.SCOPE.CH1.offset);
                     if(testbit(CH1ctrl,chinvert)) ch1end = 255-ch1end;
-                    ch2end = saddwsat(ch2raw, CH2.offset);
+                    ch2end = saddwsat(ch2raw, T.SCOPE.CH2.offset);
                     if(testbit(CH2ctrl,chinvert)) ch2end = 255-ch2end;
                     uint8_t tempch1, tempch2, chMult;
                     tempch1 = (int8_t)(ch1end-128);
@@ -656,7 +653,7 @@ void MSO(void) {
                     }
                 } while (++i);
 /*				if(testbit(Misc,autosend)) {
-                    p1=DC.CH1data;
+                    p1=T.SCOPE.DC.CH1data;
                     send(0x0D);
                     send(0x0A);
                     send('F');
@@ -671,14 +668,14 @@ void MSO(void) {
                     }
                     if(testbit(CH2ctrl,chon)) {
                         onChannels +=2;
-                        p1=DC.CH2data;
+                        p1=T.SCOPE.DC.CH2data;
                         do {
                             send(*p1++);
                         } while(++i);
                     }
                     if(testbit(CHDctrl,chon)) {
                         onChannels +=4;
-                        p1=DC.CHDdata;
+                        p1=T.SCOPE.DC.CHDdata;
                         do {
                             send(*p1++);
                         } while(++i);
@@ -708,7 +705,7 @@ void MSO(void) {
                 else {    // Acquired complete buffer
                     clrbit(Misc, sacquired);
                     clrbit(MStatus, triggered);
-                    DC.frame++;                  // Increase frame counter
+                    T.SCOPE.DC.frame++;                  // Increase frame counter
                 }
             }
 			cli();
@@ -801,22 +798,22 @@ void MSO(void) {
 // Calculate min, max, peak to peak
             sei();
             uint8_t ch1max, ch1min, ch2max, ch2min;
-            ch1min = ch1max = DC.CH1data[0];
-            ch2min = ch2max = DC.CH2data[0];
+            ch1min = ch1max = T.SCOPE.DC.CH1data[0];
+            ch2min = ch2max = T.SCOPE.DC.CH2data[0];
             uint8_t i=0; do {
                 uint8_t curCH1,curCH2;
-                curCH1=DC.CH1data[i]; curCH2=DC.CH2data[i];
+                curCH1=T.SCOPE.DC.CH1data[i]; curCH2=T.SCOPE.DC.CH2data[i];
                 if(curCH1>ch1max) ch1max=curCH1;
                 if(curCH1<ch1min) ch1min=curCH1;
                 if(curCH2>ch2max) ch2max=curCH2;
                 if(curCH2<ch2min) ch2min=curCH2;
             } while (++i);
-            CH1.vpp = ch1max-ch1min;   // Peak to peak CH1
-            CH2.vpp = ch2max-ch2min;   // Peak to peak CH2
-            CH1.max=ch1max;
-            CH1.min=ch1min;
-            CH2.max=ch2max;
-            CH2.min=ch2min;
+            T.SCOPE.CH1.vpp = ch1max-ch1min;   // Peak to peak CH1
+            T.SCOPE.CH2.vpp = ch2max-ch2min;   // Peak to peak CH2
+            T.SCOPE.CH1.max=ch1max;
+            T.SCOPE.CH1.min=ch1min;
+            T.SCOPE.CH2.max=ch2max;
+            T.SCOPE.CH2.min=ch2min;
             // Automatic cursors
             if(testbit(Mcursors,autocur) && testbit(MFFT, scopemode)) {
                 AutoCursorV();
@@ -876,7 +873,7 @@ void MSO(void) {
                 for(uint8_t i=0; i<128; i++, k++, j++) {
                     uint8_t chdpos, chddata;
                     if(Srate>=11 && testbit(Mcursors,roll)) i=k>>1;
-                    chddata = DC.CHDdata[j];
+                    chddata = T.SCOPE.DC.CHDdata[j];
                     // Show Digital Data
                     chdpos = M.CHDpos;
                     if(testbit(CHDctrl,chon)) {
@@ -914,8 +911,8 @@ void MSO(void) {
                     uint8_t och1,och2;
                     och1=adjustedCH1; och2=adjustedCH2;
                     // Apply position
-                    adjustedCH1=addwsat(DC.CH1data[j],M.CH1pos);
-                    adjustedCH2=addwsat(DC.CH2data[j],M.CH2pos);
+                    adjustedCH1=addwsat(T.SCOPE.DC.CH1data[j],M.CH1pos);
+                    adjustedCH2=addwsat(T.SCOPE.DC.CH2data[j],M.CH2pos);
                     adjustedCH1=adjustedCH1>>1; // Scale to LCD
                     adjustedCH2=adjustedCH2>>1; // Scale to LCD
                     // if(temp1>DISPLAY_MAX_Y) temp1=DISPLAY_MAX_Y;  // Commented out, temp1 is always between 0 and 127
@@ -942,8 +939,8 @@ void MSO(void) {
         if(testbit(MFFT, xymode)) {
             uint8_t *p1,*p2;
             if(testbit(Display,showset)) tiny_printp(0,0,menustxt[31]+25); // "XY MODE"
-            p1=DC.CH1data;
-            p2=DC.CH2data;
+            p1=T.SCOPE.DC.CH1data;
+            p2=T.SCOPE.DC.CH2data;
             uint8_t i=0; do {
                 if(Srate>=11 && !testbit(Mcursors,roll)) {
                     if(i==Index) break; // Don't display old data in slow sampling rate
@@ -995,7 +992,7 @@ void MSO(void) {
 			        }
                     fft_stuff(NULL);
                     for(uint8_t i=0; i<FFT_N/2; i++) {
-				        uint8_t fftdata=T.FFT.magn[(uint8_t)(i-M.HPos)]>>2;
+				        uint8_t fftdata=T.SCOPE.FFT.magn[(uint8_t)(i-M.HPos)]>>2;
 						if(fftdata>(DISPLAY_MAX_Y-8)) fftdata=(DISPLAY_MAX_Y-8);
                         if(testbit(Display, line)) lcd_line(i, (DISPLAY_MAX_Y-8)-fftdata, i, (DISPLAY_MAX_Y-8));
                         else set_pixel(i, (DISPLAY_MAX_Y-8)-fftdata);
@@ -1003,19 +1000,19 @@ void MSO(void) {
                 }
                 else {
                     if(testbit(CH1ctrl,chon)) {     // Display new FFT data
-                        CH1.f=fft_stuff(DC.CH1data);
+                        T.SCOPE.CH1.f=fft_stuff(T.SCOPE.DC.CH1data);
                         for(uint8_t i=0,j=0; j<FFT_N/2; i++,j++) {
-    				        uint8_t fftdata=T.FFT.magn[j]>>divide;
+    				        uint8_t fftdata=T.SCOPE.FFT.magn[j]>>divide;
 							if(fftdata>fft1pos) fftdata=fft1pos;    // Clip
                             if(testbit(Display, line)) lcd_line(i, fft1pos-fftdata, i, fft1pos);
                             else set_pixel(i, fft1pos-fftdata);
                         }
                     }
                     if(testbit(CH2ctrl,chon)) {
-                        CH2.f=fft_stuff(DC.CH2data);
+                        T.SCOPE.CH2.f=fft_stuff(T.SCOPE.DC.CH2data);
                         // Display new FFT data
                         for(uint8_t i=0,j=0; j<FFT_N/2; i++,j++) {
-							uint8_t fftdata=T.FFT.magn[j]>>divide;
+							uint8_t fftdata=T.SCOPE.FFT.magn[j]>>divide;
 							if(fftdata>fft1pos) fftdata=fft1pos;    // Clip
                             if(testbit(Display, line)) lcd_line(i, fft2pos-fftdata, i, fft2pos);
                             else set_pixel(i, fft2pos-fftdata);
@@ -1032,8 +1029,8 @@ void MSO(void) {
 // Display Multimeter
         if(MFFT<0x20) {     // Meter Mode
             if(!testbit(MStatus, triggered) || (testbit(MStatus,vdc) &&  testbit(MStatus,vp_p))) {  // Data ready or in Counter mode
-                if(adjusting==0) {              // Done adjusting, now show data
-                    adjusting = 4;              // Re-init autosetup
+                if(T.SCOPE.adjusting==0) {              // Done adjusting, now show data
+                    T.SCOPE.adjusting = 4;              // Re-init autosetup
                     clr_display();
                     if(!(testbit(MStatus,vdc) &&  testbit(MStatus,vp_p))) {
                         tiny_printp(12,0, menustxt[12]+1);   // CH1 text
@@ -1046,8 +1043,8 @@ void MSO(void) {
                         tiny_printp(49,0,STR_V);    // Display V units
                         tiny_printp(113,0,STR_V);   // Display V units
                         // Display traces
-                        p1=DC.CH1data;
-                        p2=DC.CH2data;
+                        p1=T.SCOPE.DC.CH1data;
+                        p2=T.SCOPE.DC.CH2data;
                         for (uint8_t i=0; i<64; i++) {
                             set_pixel(   i,28+((*p1++)>>3));
                             set_pixel(64+i,28+((*p2++)>>3));
@@ -1065,7 +1062,7 @@ void MSO(void) {
                             putchar3x6('0'-2+M.Tsource);          // ASCII number
                         }
                         if(testbit(MStatus,vdc)) {      // Counter mode
-                            adjusting = 0;              // No need to autosetup
+                            T.SCOPE.adjusting = 0;              // No need to autosetup
                             tiny_printp(98,3, STR_KCNT);
                             if(testbit(MStatus, stop)) Source = 0;
                         }
@@ -1090,7 +1087,7 @@ void MSO(void) {
 			// USB - Send new data if previous transfer complete
 			if((endpoints[1].in.STATUS & USB_EP_TRNCOMPL0_bm)) {
                 //RTC.CNT = 0;    // Prevent going to sleep if connected to USB
-                DC.index = Index;
+                T.SCOPE.DC.index = Index;
 				endpoints[1].in.AUXDATA = 0;				// New transfer must clear AUXDATA
 				endpoints[1].in.CNT = 770 | USB_EP_ZLP_bm;	// Send 256*3 bytes + frame, enable Auto Zero Length Packet
 				endpoints[1].in.STATUS &= ~(USB_EP_TRNCOMPL0_bm | USB_EP_BUSNACK0_bm | USB_EP_OVF_bm);
@@ -1098,7 +1095,7 @@ void MSO(void) {
         }
 ///////////////////////////////////////////////////////////////////////////////
 // Auto setup
-        if(adjusting) {
+        if(T.SCOPE.adjusting) {
             uint8_t tempmfft, tempsrate, tempch1gain,tempch2gain;
             tempch1gain=M.CH1gain; tempch2gain=M.CH2gain;
             tempsrate= Srate;
@@ -1106,8 +1103,8 @@ void MSO(void) {
 			clrbit(MFFT,uselog);
             clrbit(CH1ctrl,chmath);
             clrbit(CH2ctrl,chmath);
-            CH1.f=fft_stuff(DC.CH1data);
-            CH2.f=fft_stuff(DC.CH2data);
+            T.SCOPE.CH1.f=fft_stuff(T.SCOPE.DC.CH1data);
+            T.SCOPE.CH2.f=fft_stuff(T.SCOPE.DC.CH2data);
 			MFFT=tempmfft;
             uint8_t MaxGain=5;
             if(MFFT<0x20) { // Meter Mode
@@ -1118,7 +1115,7 @@ checknext:
             if(M.CH2gain>MaxGain) M.CH2gain=MaxGain;  // Check maximum gain on CH2
             // Check sampling rate
             if(Srate>10) Srate=10;
-            switch(adjusting) {
+            switch(T.SCOPE.adjusting) {
                 case 0: // Done adjusting
                     if(MFFT>=0x20) { // Not in meter mode
                         uint8_t center1, center2;
@@ -1127,8 +1124,8 @@ checknext:
                         setbit(Trigger, edge);
                         setbit(CH1ctrl,chon);
                         setbit(CH2ctrl,chon);
-                        if(CH1.vpp<16) clrbit(CH1ctrl,chon);	// no signal at CH1, turn it off
-                        if(CH2.vpp<16) clrbit(CH2ctrl,chon);	// no signal at CH2, turn it off
+                        if(T.SCOPE.CH1.vpp<16) clrbit(CH1ctrl,chon);	// no signal at CH1, turn it off
+                        if(T.SCOPE.CH2.vpp<16) clrbit(CH2ctrl,chon);	// no signal at CH2, turn it off
                         // If both channels are off, turn them on again
                         if(!testbit(CH1ctrl,chon) && !testbit(CH2ctrl,chon)) {
                             setbit(CH1ctrl,chon);
@@ -1138,15 +1135,15 @@ checknext:
                         M.HPos = 64;
                         M.Tpost=128;
                         // Determine trigger source
-                        center1 = CH1.min + (CH1.vpp/2);
-                        center2 = CH2.min + (CH2.vpp/2);
-                        if(testbit(CH1ctrl,chon) && CH1.f>1 && (CH1.f>=CH2.f)) {
+                        center1 = T.SCOPE.CH1.min + (T.SCOPE.CH1.vpp/2);
+                        center2 = T.SCOPE.CH2.min + (T.SCOPE.CH2.vpp/2);
+                        if(testbit(CH1ctrl,chon) && T.SCOPE.CH1.f>1 && (T.SCOPE.CH1.f>=T.SCOPE.CH2.f)) {
                             setbit(Trigger, autotrg);
                             M.Tsource = 0;
                             M.Tlevel = center1;
                             if(testbit(CH1ctrl,chinvert)) M.Tlevel=255-M.Tlevel;
                         }
-                        else if(testbit(CH2ctrl,chon) && CH2.f>1) {
+                        else if(testbit(CH2ctrl,chon) && T.SCOPE.CH2.f>1) {
                             setbit(Trigger, autotrg);
                             M.Tsource = 1;
                             M.Tlevel = center2;
@@ -1167,8 +1164,8 @@ checknext:
                     }
                     if(MFFT>=0x20 || (testbit(MStatus, vdc) || testbit(MStatus, vp_p))) {
                         uint8_t autosrate;
-                        if(CH1.f<CH2.f) autosrate=CH2.f;
-                        else autosrate=CH1.f;
+                        if(T.SCOPE.CH1.f<T.SCOPE.CH2.f) autosrate=T.SCOPE.CH2.f;
+                        else autosrate=T.SCOPE.CH1.f;
                         autosrate=autosrate/16;
                         if(Srate>autosrate) Srate-=autosrate;
                         else Srate=1;
@@ -1176,19 +1173,19 @@ checknext:
                 break;
                 case 1: // Increase gain
                 case 5:
-                    if((CH1.max<188 && CH1.min>73) && M.CH1gain<MaxGain)    M.CH1gain++;
-                    if((CH2.max<188 && CH2.min>73) && M.CH2gain<MaxGain)    M.CH2gain++;
+                    if((T.SCOPE.CH1.max<188 && T.SCOPE.CH1.min>73) && M.CH1gain<MaxGain)    M.CH1gain++;
+                    if((T.SCOPE.CH2.max<188 && T.SCOPE.CH2.min>73) && M.CH2gain<MaxGain)    M.CH2gain++;
                 break;
                 case 2: // Decrease gain
                 case 6:
-                    if ((CH1.max>=250 || CH1.min <18) && M.CH1gain>0)   M.CH1gain--;
-                    if ((CH2.max>=250 || CH2.min <18) && M.CH2gain>0)   M.CH2gain--;
+                    if ((T.SCOPE.CH1.max>=250 || T.SCOPE.CH1.min <18) && M.CH1gain>0)   M.CH1gain--;
+                    if ((T.SCOPE.CH2.max>=250 || T.SCOPE.CH2.min <18) && M.CH2gain>0)   M.CH2gain--;
                 break;
                 case 3: // Increase sampling rate
-                    if((CH1.f>124 || CH2.f>124) && Srate>1) Srate--;
+                    if((T.SCOPE.CH1.f>124 || T.SCOPE.CH2.f>124) && Srate>1) Srate--;
                 break;
                 case 4: // Decrease sampling rate
-                    if(CH1.f<50 && CH2.f<50 && Srate<10) Srate++;
+                    if(T.SCOPE.CH1.f<50 && T.SCOPE.CH2.f<50 && Srate<10) Srate++;
                 break;
                 case 7: // Start with fastest sampling rate;
                     Srate=0;
@@ -1198,7 +1195,7 @@ checknext:
             if(tempch1gain!=M.CH1gain || tempch2gain!=M.CH2gain || tempsrate!=Srate) {
                 setbit(MStatus, updatemso);    // Apply changes
             }
-            else if(adjusting) { adjusting--; goto checknext; }
+            else if(T.SCOPE.adjusting) { T.SCOPE.adjusting--; goto checknext; }
         }
 ///////////////////////////////////////////////////////////////////////////////
 // Check User Input
@@ -1234,8 +1231,8 @@ checknext:
             if(Menu>=MSWSPEED && Menu<=MCH2POS && testbit(Buttons,K1)) {
                 uint8_t *pmove;                 // pointer for move- move+ menus                
                 pmove = (uint8_t *)pgm_read_word(movetable+Menu-MSWSPEED);
-                *pmove=pgm_read_byte_near((&shortcuts[0][0])+(shortcuti++)+5*(Menu-MSWSPEED));
-                if(shortcuti>4) shortcuti=0;
+                *pmove=pgm_read_byte_near((&shortcuts[0][0])+(T.SCOPE.shortcuti++)+5*(Menu-MSWSPEED));
+                if(T.SCOPE.shortcuti>4) T.SCOPE.shortcuti=0;
             }
             switch(Menu) {
                 case Mdefault:     // default menu
@@ -1268,9 +1265,9 @@ checknext:
                             if(SR!=Srate) {
                                 Srate = SR;
                                 uint8_t i=0; do {
-                                    DC.CH1data[i]=128;
-                                    DC.CH2data[i]=128;
-                                    DC.CHDdata[i]=0;
+                                    T.SCOPE.DC.CH1data[i]=128;
+                                    T.SCOPE.DC.CH2data[i]=128;
+                                    T.SCOPE.DC.CHDdata[i]=0;
                                 } while (++i);
                                 setbit(Misc, redraw);
                                 Index=0;
@@ -1288,7 +1285,7 @@ checknext:
                         if(M.CH1gain) {
                             M.CH1gain--;
                             uint8_t i=0; do {   // resize
-                                DC.CH1data[i] = half(DC.CH1data[i]);
+                                T.SCOPE.DC.CH1data[i] = half(T.SCOPE.DC.CH1data[i]);
                             } while (++i);
                         }
                     }
@@ -1296,7 +1293,7 @@ checknext:
                         if(M.CH1gain<6) {
                             M.CH1gain++;
                             uint8_t i=0; do {   // resize
-                                DC.CH1data[i] = twice(DC.CH1data[i]);
+                                T.SCOPE.DC.CH1data[i] = twice(T.SCOPE.DC.CH1data[i]);
                             } while (++i);
                         }
                     }
@@ -1308,7 +1305,7 @@ checknext:
                         if(M.CH2gain) {
                             M.CH2gain--;
                             uint8_t i=0; do {   // resize
-                                DC.CH2data[i] = half(DC.CH2data[i]);
+                                T.SCOPE.DC.CH2data[i] = half(T.SCOPE.DC.CH2data[i]);
                             } while (++i);
                         }
                     }
@@ -1316,7 +1313,7 @@ checknext:
                         if(M.CH2gain<6) {
                             M.CH2gain++;
                             uint8_t i=0; do {   // resize
-                                DC.CH2data[i] = twice(DC.CH2data[i]);
+                                T.SCOPE.DC.CH2data[i] = twice(T.SCOPE.DC.CH2data[i]);
                             } while (++i);
                         }
                     }
@@ -1628,8 +1625,8 @@ checknext:
                             eeprom_write_byte(&EECH2Pos, M.CH2pos);     // Save CH2 position
                             eeprom_write_byte(&EEHPos, M.HPos);         // Save Horizontal position
                             eeprom_busy_wait();
-                            eeprom_write_block(DC.CH1data, EECHREF1, 256);
-                            eeprom_write_block(DC.CH2data, EECHREF2, 256);
+                            eeprom_write_block(T.SCOPE.DC.CH1data, EECHREF1, 256);
+                            eeprom_write_block(T.SCOPE.DC.CH2data, EECHREF2, 256);
                         }
                     }
                 break;
@@ -1845,11 +1842,11 @@ checknext:
                     if(testbit(Buttons,K1)) {   // Shortcut to 0V or average
                         if(M.Tlevel==128) {
                             if(M.Tsource==0) {
-                                M.Tlevel = CH1.min + (CH1.vpp/2);
+                                M.Tlevel = T.SCOPE.CH1.min + (T.SCOPE.CH1.vpp/2);
                                 if(testbit(CH1ctrl,chinvert)) M.Tlevel=255-M.Tlevel;
                             }
                             else if(M.Tsource==1) {
-                                M.Tlevel = CH2.min + (CH2.vpp/2);
+                                M.Tlevel = T.SCOPE.CH2.min + (T.SCOPE.CH2.vpp/2);
                                 if(testbit(CH2ctrl,chinvert)) M.Tlevel=255-M.Tlevel;
                             }
                         }
@@ -2538,8 +2535,24 @@ checknext:
         dma_display();      // Send new data
         if(testbit(USB.STATUS,USB_SUSPEND_bp) && USB.ADDR) USB_ResetInterface();
         if(!testbit(MStatus,stop) && (Srate<11 || Index==0)) {
-            if(!(Srate>=11 && testbit(Mcursors,roll))) ONGRN();
+            if(!(Srate>=11 && testbit(Mcursors,roll))) {
+                if(testbit(Display, trgtimeout)) {
+                    ONGRN();
+                }  
+                else {  // Triggered icons
+                    lcd_goto(0,0);
+                    uint8_t index=T.SCOPE.DC.frame&0x0F;
+                    uint8_t *DisplayPointer = Disp_send.DataAddress;
+                    if(!(testbit(Trigger, normal) || testbit(Trigger, autotrg))) {  // Free trigger?
+                        SendBitsPData(DisplayPointer, &Font5x8[(index+16)*5], 5);   // Free trigger icons
+                    } else {
+                        SendBitsPData(DisplayPointer, &Font5x8[index*5], 5);        // Triggered icons
+                    }                        
+                }                        
+            }                    
         }
+
+        clrbit(Display, trgtimeout);         
         if(Srate<11 && MFFT>=0x20) {    // Use display double buffer with fast sample rates and not in Meter Mode
             SwitchBuffers();            // Switch buffers
         }
@@ -2557,41 +2570,41 @@ void AutoSet(void) {
     clrbit(Trigger, normal);    // Clear Normal trigger
     clrbit(Trigger, single);    // Clear Single trigger
     clrbit(Trigger, autotrg);   // Clear Auto trigger
-    adjusting=7;                // First adjusting step
+    T.SCOPE.adjusting=7;                // First adjusting step
     Menu=Mdefault;
     Buttons=0;
 }
 
 // Reduce gain in Auto setup
 void Reduce(void) {
-    if(M.CH1gain && CH1.vpp>32) {
+    if(M.CH1gain && T.SCOPE.CH1.vpp>32) {
         M.CH1gain--;
         if(M.Tsource==0) M.Tlevel=half(M.Tlevel);
-        CH1.vpp=CH1.vpp/2;
+        T.SCOPE.CH1.vpp=T.SCOPE.CH1.vpp/2;
     }
-    if(M.CH2gain && CH2.vpp>32) {
+    if(M.CH2gain && T.SCOPE.CH2.vpp>32) {
         M.CH2gain--;
         if(M.Tsource==1) M.Tlevel=half(M.Tlevel);
-        CH2.vpp=CH2.vpp/2;
+        T.SCOPE.CH2.vpp=T.SCOPE.CH2.vpp/2;
     }
 }
 
 // Exit Meter mode, restore settings
 void RestorefromMeter(void) {
-    adjusting=0;            // Prevent autosetup when restoring from meter
-    Srate = old_s;          // restore sampling and gains
-    M.CH1gain = old_g1;
-    M.CH2gain = old_g2;
+    T.SCOPE.adjusting=0;            // Prevent autosetup when restoring from meter
+    Srate = T.SCOPE.old_s;          // restore sampling and gains
+    M.CH1gain = T.SCOPE.old_g1;
+    M.CH2gain = T.SCOPE.old_g2;
 }
 
 // Set Meter mode, save settings
 void GoingtoMeter(void) {
-    old_s = Srate;          // save sampling and gains
-    old_g1 = M.CH1gain;
-    old_g2 = M.CH2gain;
+    T.SCOPE.old_s = Srate;          // save sampling and gains
+    T.SCOPE.old_g1 = M.CH1gain;
+    T.SCOPE.old_g2 = M.CH2gain;
     M.CH1gain=0;
     M.CH2gain=0;
-    adjusting=7;            // First adjusting step
+    T.SCOPE.adjusting=7;            // First adjusting step
 }
 
 uint8_t fft_stuff(uint8_t *p) {
@@ -2601,8 +2614,8 @@ uint8_t fft_stuff(uint8_t *p) {
     else if(testbit(MFFT, blackman)) windowp=Blackman;  // Apply Blackman window
 	else setbit(Misc, bigfont);		// Temporally use this bit for "no window"
 	if(testbit(MFFT,iqfft)) {
-        const uint8_t *p1 = DC.CH1data;             // Pointer to ch1 data
-        const uint8_t *p2 = DC.CH2data;		        // Pointer to ch2 data
+        const uint8_t *p1 = T.SCOPE.DC.CH1data;             // Pointer to ch1 data
+        const uint8_t *p2 = T.SCOPE.DC.CH2data;		        // Pointer to ch2 data
         uint8_t i=0;
         do {
             uint8_t ch1,ch2;
@@ -2612,8 +2625,8 @@ uint8_t fft_stuff(uint8_t *p) {
 		    if(i>127) windowp--;                    // (only stored half of window)
             ch1=(int8_t)((*p1++)-128);              // Convert to signed char
             ch2=(int8_t)((*p2++)-128);              // Convert to signed char
-            T.FFT.bfly[i].r=FMULS(ch1, w);
-		    T.FFT.bfly[i].i=FMULS(ch2, w);
+            T.SCOPE.FFT.bfly[i].r=FMULS(ch1, w);
+		    T.SCOPE.FFT.bfly[i].i=FMULS(ch2, w);
         } while (++i);
 	}
 	else {
@@ -2625,24 +2638,24 @@ uint8_t fft_stuff(uint8_t *p) {
 		    if(i<127) windowp++;                    // Window symmetry
 		    if(i>127) windowp--;                    // (only stored half of window)
             ch=(int8_t)((*p++)-128);                // Convert to signed char
-            T.FFT.bfly[i].r=T.FFT.bfly[i].i=(signed int)(FMULS8(ch, w)*256);
+            T.SCOPE.FFT.bfly[i].r=T.SCOPE.FFT.bfly[i].i=(signed int)(FMULS8(ch, w)*256);
         } while (++i);
 	}
 	clrbit(Misc,bigfont);
-    fft_execute(T.FFT.bfly);
-    fft_output(T.FFT.bfly, T.FFT.magn);
+    fft_execute(T.SCOPE.FFT.bfly);
+    fft_output(T.SCOPE.FFT.bfly, T.SCOPE.FFT.magn);
     // Find maximum frequency
     uint8_t max=3;
     uint8_t i=1;                            // Ignore DC
-    if(T.FFT.magn[0]>T.FFT.magn[1]) i=2;    // Ignore big DC
+    if(T.SCOPE.FFT.magn[0]>T.SCOPE.FFT.magn[1]) i=2;    // Ignore big DC
     uint8_t f=0;
     for(; i<FFT_N/2; i++) {
-        uint8_t current=T.FFT.magn[i];
+        uint8_t current=T.SCOPE.FFT.magn[i];
         if(current>max) {
             max=current; f=i;
         }
     }
-    if(T.FFT.magn[f]>7) return f;
+    if(T.SCOPE.FFT.magn[f]>7) return f;
     else return 0;      // Signal too small
 }
 
@@ -2654,8 +2667,8 @@ void AutoCursorV(void) {
     }
     else samples = 127;
     if(testbit(MFFT, fftmode)) {
-        M.VcursorA = CH1.f;
-        M.VcursorB = CH2.f;
+        M.VcursorA = T.SCOPE.CH1.f;
+        M.VcursorB = T.SCOPE.CH2.f;
         return;
     }
     else {  // Scan data
@@ -2664,15 +2677,15 @@ void AutoCursorV(void) {
         M.VcursorB=samples;
         // Decide which channel to use for vertical cursors
         if((testbit(CH1ctrl,chon) && !testbit(CH2ctrl,chon)) ||               // CH2 off, use CH1
-        (testbit(CH1ctrl,chon) && (CH1.vpp > CH2.vpp)) ) { // CH1 has more amplitude
-            p = DC.CH1data+M.HPos;
-            mid = CH1.min + CH1.vpp/2;
-            if(CH1.vpp<8) goto end_scan;    // Signal too small
+        (testbit(CH1ctrl,chon) && (T.SCOPE.CH1.vpp > T.SCOPE.CH2.vpp)) ) { // CH1 has more amplitude
+            p = T.SCOPE.DC.CH1data+M.HPos;
+            mid = T.SCOPE.CH1.min + T.SCOPE.CH1.vpp/2;
+            if(T.SCOPE.CH1.vpp<8) goto end_scan;    // Signal too small
         }
         else {                              // Use CH2
-            p = DC.CH2data+M.HPos;
-            mid = CH2.min + CH2.vpp/2;
-            if(CH2.vpp<8) goto end_scan;    // Signal too small
+            p = T.SCOPE.DC.CH2data+M.HPos;
+            mid = T.SCOPE.CH2.min + T.SCOPE.CH2.vpp/2;
+            if(T.SCOPE.CH2.vpp<8) goto end_scan;    // Signal too small
         }
         uint8_t i=0;
         if(p[0]<mid) {
@@ -2742,8 +2755,8 @@ static inline void Measurements(void) {
         avrg2+=calibrate;
 		//calibrate=(int8_t)eeprom_read_byte((int8_t *)&gain8CH2);            // CH2 Gain Calibration
 		//avrg2=avrg2*(2048+calibrate)/2048;                                  // +/- 6.25% gain variation
-        T.IN.METER.Vdc[0]= avrg1>>5; // Exp. average: ((avrg1>>5)+Temp.IN.METER.Vdc[0])/2;
-        T.IN.METER.Vdc[1]= avrg2>>5; // Exp. average: ((avrg2>>5)+Temp.IN.METER.Vdc[1])/2;
+        T.SCOPE.MeterVDC1= avrg1>>5; // Exp. average: ((avrg1>>5)+Temp.IN.METER.VDC1)/2;
+        T.SCOPE.MeterVDC2= avrg2>>5; // Exp. average: ((avrg2>>5)+Temp.IN.METER.VDC2)/2;
         ADCB.CH0.CTRL = oldch1;
         ADCA.CH0.CTRL = oldch0;
         ADCA.PRESCALER = oldprescalea;
@@ -2751,13 +2764,13 @@ static inline void Measurements(void) {
         ADCB.PRESCALER = oldprescaleb;
         ADCB.CTRLB = oldctrlbb;
 cancelvdc:
-        printV(T.IN.METER.Vdc[0],0, CH1ctrl);
+        printV(T.SCOPE.MeterVDC1,0, CH1ctrl);
         lcd_goto(64,2);
-        printV(T.IN.METER.Vdc[1],0, CH2ctrl);
+        printV(T.SCOPE.MeterVDC2,0, CH2ctrl);
     }
     else if(testbit(MStatus,vp_p) && !testbit(MStatus,vdc)) {   // Display VPP
-                        printV((int16_t)CH1.vpp*128, M.CH1gain, CH1ctrl);
-        lcd_goto(64,2); printV((int16_t)CH2.vpp*128, M.CH2gain, CH2ctrl);
+                        printV((int16_t)T.SCOPE.CH1.vpp*128, M.CH1gain, CH1ctrl);
+        lcd_goto(64,2); printV((int16_t)T.SCOPE.CH2.vpp*128, M.CH2gain, CH2ctrl);
     }
     else {                          // Measure frequency
         // TCE0:Lo16 TCE1:Hi16 RTC:Timer
@@ -2819,8 +2832,8 @@ cancelvdc:
         if(!testbit(MStatus,vdc)) { // Display CH1 and CH2 frequencies
             uint32_t f;
             f=pgm_read_dword_near(freqval+Srate)/256;
-            printF( 0,2,(int32_t)(CH1.f)*f);
-            printF(64,2,(int32_t)(CH2.f)*f);
+            printF( 0,2,(int32_t)(T.SCOPE.CH1.f)*f);
+            printF(64,2,(int32_t)(T.SCOPE.CH2.f)*f);
         } else {                   // Display time 
             lcd_goto(48,1);
             printN3x6(hour); putchar3x6(':');
@@ -2829,12 +2842,12 @@ cancelvdc:
         }
         setbit(Misc,negative);
         printF(8,5,freqv);          // Print count
-        T.IN.METER.Freq = freqv;
+        T.SCOPE.MeterFreq = freqv;
         clrbit(Misc,negative);
 cancelfreq:
         // End
         if(!testbit(MStatus,vdc)) {
-            adjusting=7;                // First adjusting step
+            T.SCOPE.adjusting=7;                // First adjusting step
             setbit(MStatus, updatemso); // Frequency measure mode, reset MSO
         }
     }
@@ -2903,7 +2916,7 @@ static inline void ShowCursorH(void) {
 		    HcursorA=M.Hcursor1A;
 		    HcursorB=M.Hcursor1B;
 		    CHPos=M.CH1pos;
-		    CH=&CH1; data=DC.CH1data;
+		    CH=&T.SCOPE.CH1; data=T.SCOPE.DC.CH1data;
 	    }
 	    else {
     		gain=M.CH2gain;
@@ -2911,7 +2924,7 @@ static inline void ShowCursorH(void) {
 		    HcursorA=M.Hcursor2A;
 		    HcursorB=M.Hcursor2B;
 		    CHPos=M.CH2pos;
-		    CH=&CH2; data=DC.CH2data;
+		    CH=&T.SCOPE.CH2; data=T.SCOPE.DC.CH2data;
 	    }
 		HcursorA<<=1;
 		HcursorB<<=1;
@@ -3056,7 +3069,7 @@ void Apply(void) {
         TCE1.CTRLA = 0x03;  // DIV4
         if(Srate==11) TCE1.PER = 4999;      // 1600 Hz
         else TCE1.PER = 6249;               // 1280 Hz
-        slowval = (uint16_t)pgm_read_word_near(slowcnt-11+Srate);
+        T.SCOPE.slowval = (uint16_t)pgm_read_word_near(slowcnt-11+Srate);
     }
     else {  // Fast sampling
         Index = 0;
@@ -3098,8 +3111,8 @@ void Apply(void) {
 	uint8_t srateoff;
 	srateoff=Srate;
 	if(Srate>7) srateoff=7;
-    CH1.offset=-(eeprom_read_byte((uint8_t *)&offset8CH1[srateoff][M.CH1gain]));
-    CH2.offset=-(eeprom_read_byte((uint8_t *)&offset8CH2[srateoff][M.CH2gain]));
+    T.SCOPE.CH1.offset=-(eeprom_read_byte((uint8_t *)&offset8CH1[srateoff][M.CH1gain]));
+    T.SCOPE.CH2.offset=-(eeprom_read_byte((uint8_t *)&offset8CH2[srateoff][M.CH2gain]));
     // AC Coupling
     if(testbit(CH1ctrl, acdc)) CH1_AC_CPL();
     else CH1_DC_CPL();
@@ -3129,8 +3142,8 @@ ISR(TCE1_OVF_vect) {
     ou8CursorX = u8CursorX;
     ou8CursorY = u8CursorY;
     // Get and apply offset
-    ch1 = ADCA.CH0.RESL; ch1 = saddwsat(ch1,CH1.offset);
-    ch2 = ADCB.CH0.RESL; ch2 = saddwsat(ch2,CH2.offset);
+    ch1 = ADCA.CH0.RESL; ch1 = saddwsat(ch1,T.SCOPE.CH1.offset);
+    ch2 = ADCB.CH0.RESL; ch2 = saddwsat(ch2,T.SCOPE.CH2.offset);
     // Invert
     if(testbit(CH1ctrl,chinvert)) ch1 = 255-ch1;
     if(testbit(CH2ctrl,chinvert)) ch2 = 255-ch2;
@@ -3151,19 +3164,19 @@ ISR(TCE1_OVF_vect) {
 
     count++;
     setbit(Misc,slowacq);
-    if(count>=slowval) {
+    if(count>=T.SCOPE.slowval) {
         count=0;
         // Average
-        if(testbit(CH1ctrl,chaverage)) ch1=sum1/slowval;
-        if(testbit(CH2ctrl,chaverage)) ch2=sum2/slowval;
+        if(testbit(CH1ctrl,chaverage)) ch1=sum1/T.SCOPE.slowval;
+        if(testbit(CH2ctrl,chaverage)) ch2=sum2/T.SCOPE.slowval;
         sum1=0; sum2=0;
         if(testbit(Display,elastic)) {
-            ch1=average(DC.CH1data[Index],ch1);
-            ch2=average(DC.CH2data[Index],ch2);
+            ch1=average(T.SCOPE.DC.CH1data[Index],ch1);
+            ch2=average(T.SCOPE.DC.CH2data[Index],ch2);
         }
-        DC.CH1data[Index] = ch1;
-        DC.CH2data[Index] = ch2;
-        DC.CHDdata[Index] = VPORT2.IN;
+        T.SCOPE.DC.CH1data[Index] = ch1;
+        T.SCOPE.DC.CH2data[Index] = ch2;
+        T.SCOPE.DC.CHDdata[Index] = VPORT2.IN;
 /*        if(testbit(Misc,autosend)) {    // Send to PC
             if(Index==0) {
                 send(0x0D);
@@ -3183,7 +3196,7 @@ ISR(TCE1_OVF_vect) {
             ch1=addwsat(ch1,M.CH1pos);
             ch1=ch1>>1; // Scale to LCD (128x64)
             if(ch1>DISPLAY_MAX_Y) ch1=DISPLAY_MAX_Y;
-            oldch1=addwsat(DC.CH1data[Index-1],M.CH1pos);
+            oldch1=addwsat(T.SCOPE.DC.CH1data[Index-1],M.CH1pos);
             oldch1=oldch1>>1; // Scale to LCD (128x64)
             if(oldch1>DISPLAY_MAX_Y) oldch1=DISPLAY_MAX_Y;
             // Draw data
@@ -3203,7 +3216,7 @@ ISR(TCE1_OVF_vect) {
             ch2=addwsat(ch2,M.CH2pos);
             ch2=ch2>>1; // Scale to LCD (128x128)
             if(ch2>DISPLAY_MAX_Y) ch2=DISPLAY_MAX_Y;
-            oldch2=addwsat(DC.CH2data[Index-1],M.CH2pos);
+            oldch2=addwsat(T.SCOPE.DC.CH2data[Index-1],M.CH2pos);
             oldch2=oldch2>>1; // Scale to LCD (128x128)
             if(oldch2>DISPLAY_MAX_Y) oldch2=DISPLAY_MAX_Y;
             // Draw data
@@ -3291,6 +3304,7 @@ ISR(TCC2_LUNF_vect) {
     TCC0.INTCTRLA &= ~TC2_LUNFINTLVL_LO_gc;         // Disable Trigger timeout interrupt
     setbit(MStatus, update);
     setbit(MStatus, triggered);
+    setbit(Display, trgtimeout);
 }
 
 void StartDMAs(void) {
@@ -3300,8 +3314,8 @@ void StartDMAs(void) {
     DMA.CH0.ADDRCTRL  = 0b00000101;         // Source fixed, incr dest, reload dest @ end block
     DMA.CH0.TRIGSRC   = 0x10;               // ADCA CH0 is trigger source
     DMA.CH0.TRFCNT    = 512;                // buffer size
-    DMA.CH0.DESTADDR0 = (((uint16_t) T.IN.CH1)>>0*8) & 0xFF;
-    DMA.CH0.DESTADDR1 = (((uint16_t) T.IN.CH1)>>1*8) & 0xFF;
+    DMA.CH0.DESTADDR0 = (((uint16_t) T.SCOPE.TempCH1)>>0*8) & 0xFF;
+    DMA.CH0.DESTADDR1 = (((uint16_t) T.SCOPE.TempCH1)>>1*8) & 0xFF;
 //  DMA.CH0.DESTADDR2 = 0;
     DMA.CH0.SRCADDR0  = (((uint16_t)(&ADCA.CH0.RESL))>>0*8) & 0xFF;
     DMA.CH0.SRCADDR1  = (((uint16_t)(&ADCA.CH0.RESL))>>1*8) & 0xFF;
@@ -3314,8 +3328,8 @@ void StartDMAs(void) {
         DMA.CH2.ADDRCTRL  = 0b00000101;         // Source fixed, incr dest, reload dest @ end block
         DMA.CH2.TRIGSRC   = 0x10;               // ADCA CH0 is trigger source
         DMA.CH2.TRFCNT    = 512;                // buffer size
-        DMA.CH2.DESTADDR0 = (((uint16_t) T.IN.CHD)>>0*8) & 0xFF;
-        DMA.CH2.DESTADDR1 = (((uint16_t) T.IN.CHD)>>1*8) & 0xFF;
+        DMA.CH2.DESTADDR0 = (((uint16_t) T.SCOPE.TempCHD)>>0*8) & 0xFF;
+        DMA.CH2.DESTADDR1 = (((uint16_t) T.SCOPE.TempCHD)>>1*8) & 0xFF;
     //  DMA.CH2.DESTADDR2 = 0;
         DMA.CH2.SRCADDR0  = (((uint16_t)(&VPORT2.IN))>>0*8) & 0xFF;
         DMA.CH2.SRCADDR1  = (((uint16_t)(&VPORT2.IN))>>1*8) & 0xFF;
@@ -3326,8 +3340,8 @@ void StartDMAs(void) {
     DMA.CH1.ADDRCTRL  = 0b00000101;         // Source fixed, incr dest, reload dest @ end block
     DMA.CH1.TRIGSRC   = 0x10;               // ADCA CH0 is trigger source (Using ADCB CH0 as source produces a bug..)
     DMA.CH1.TRFCNT    = 512;                // buffer size
-    DMA.CH1.DESTADDR0 = (((uint16_t) T.IN.CH2)>>0*8) & 0xFF;
-    DMA.CH1.DESTADDR1 = (((uint16_t) T.IN.CH2)>>1*8) & 0xFF;
+    DMA.CH1.DESTADDR0 = (((uint16_t) T.SCOPE.TempCH2)>>0*8) & 0xFF;
+    DMA.CH1.DESTADDR1 = (((uint16_t) T.SCOPE.TempCH2)>>1*8) & 0xFF;
 //  DMA.CH1.DESTADDR2 = 0;
     DMA.CH1.SRCADDR0  = (((uint16_t)(&ADCB.CH0.RESL))>>0*8) & 0xFF;
     DMA.CH1.SRCADDR1  = (((uint16_t)(&ADCB.CH0.RESL))>>1*8) & 0xFF;
@@ -3368,12 +3382,14 @@ static inline void LoadEE(void) {
 void SaveEE(void) {
     //if(!testbit(Misc,lowbatt)) {
         if(MFFT<0x20) { // Don't save Meter mode settings
-            Srate=old_s;
-            M.CH1gain=old_g1;
-            M.CH2gain=old_g2;
+            Srate=T.SCOPE.old_s;
+            M.CH1gain=T.SCOPE.old_g1;
+            M.CH2gain=T.SCOPE.old_g2;
         }
         eeprom_write_block(0, &EEGPIO, 12);
         eeprom_write_block(&M, &EEM, sizeof(NVMVAR));
-        old_s=Srate; old_g1=M.CH1gain; old_g2=M.CH2gain;
+        T.SCOPE.old_s=Srate;
+        T.SCOPE.old_g1=M.CH1gain;
+        T.SCOPE.old_g2=M.CH2gain;
     //}
 }

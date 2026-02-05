@@ -569,8 +569,8 @@ void CalibrateOffset(void) {
                 M.CH1gain=i;
                 M.CH2gain=i;
                 SimpleADC();
-                q1=T.IN.CH1;
-                q2=T.IN.CH2;
+                q1=T.SCOPE.TempCH1;
+                q2=T.SCOPE.TempCH2;
                 // Calculate offset for CH1
                 avrg1=0;
                 avrg2=0;

@@ -79,7 +79,7 @@
 #define grid1       1
 #define elastic     2       // Average on successive traces
 #define screenshot  3       // Take a screenshot
-#define trgcount    4       // Show Trigger Count
+#define trgtimeout  4       // Trigger timed out
 #define persistent  5       // Persistent Display
 #define line        6       // Continuous Drawing
 #define showset     7       // Show scope settings (time/div volts/div)
@@ -212,25 +212,52 @@ int16_t MeasureVCC(void);
 
 extern uint8_t EEMEM EESleepTime;     // Sleep timeout in minutes
 
+typedef struct {
+    int8_t  offset;             // Channel offset
+    uint8_t max;                // Maximum value
+    uint8_t min;                // Minimum value
+    uint8_t vpp;                // Peak to peak
+    uint8_t f;                  // Maximum frequency
+} ACHANNEL;
+
+typedef struct {
+    uint8_t CH1data[256];       // CH1 Samples
+    uint8_t CH2data[256];       // CH2 Samples
+    uint8_t CHDdata[256];       // CHD Samples
+    uint8_t frame;              // Frame number
+    uint8_t index;              // Index number
+} DATA;
+
 // Big buffer to store large but temporary data
 typedef union {
     struct {
-        complex_t   bfly[FFT_N];	// FFT buffer: (re16,im16)*256 = 1024 bytes
-        uint8_t     magn[FFT_N];	// Magnitude output: 128 bytes, IQ: 256 bytes
-    } FFT;
-    struct {
-        int8_t      CH1[2048];		// CH1 Temp data
-        int8_t      CH2[2048];		// CH2 Temp data
-        uint8_t     CHD[2048];      // CHD Temp data
         union {
-            int16_t Vdc[2];         // Channel 1 and Channel 2 DC
-            uint32_t Freq;
-        } METER;
-    } IN;
+            struct {
+                complex_t   bfly[FFT_N];	// FFT buffer: (re16,im16)*256 = 1024 bytes
+                uint8_t     magn[FFT_N];	// Magnitude output: 128 bytes, IQ: 256 bytes
+            } FFT;
+            struct {
+                int8_t      TempCH1[2048];		// CH1 Temp data
+                int8_t      TempCH2[2048];		// CH2 Temp data
+                uint8_t     TempCHD[2048];      // CHD Temp data
+                union {
+                    int16_t MeterVDC1;          // Channel 1 VDC
+                    int16_t MeterVDC2;          // Channel 2 VDC
+                    uint32_t MeterFreq;
+                };
+            };
+        };
+        uint8_t  adjusting;                 // Auto setup adjusting step
+        uint16_t slowval;                   // Slow sampling rate time value
+        uint8_t old_s, old_g1, old_g2;      // sampling, gains before entering meter mode
+        uint8_t shortcuti;                  // shortcut index
+        ACHANNEL CH1,CH2;                   // Analog Channel 1, Channel 2
+        DATA DC;                            // Data samples
+    } SCOPE;
     struct {
         int8_t AWGTemp1[BUFFER_AWG];
         int8_t AWGTemp2[BUFFER_AWG];
-    } DATA;
+    } AWGDATA;
     struct {
         union {
             struct {
@@ -243,7 +270,7 @@ typedef union {
             } I2C;
             struct {
                 uint8_t decoded[BUFFER_SERIAL*2];
-            } All;
+            };
         } data;
         volatile uint16_t indrx;    // RX index
         volatile uint16_t indtx;    // TX index
