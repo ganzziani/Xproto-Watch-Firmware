@@ -25,7 +25,6 @@ void SwitchBuffers(void) {
     }
     Disp_send.DataAddress=NewDataAddress;
     Disp_send.SPI_Address=NewSPIAddress;
-
 }
 
 // Clear active display buffer
@@ -80,6 +79,22 @@ void clr_display_all(void) {
     }
 }
 
+// Or the BufferIn into the active display buffer
+void OR_display(uint8_t *BufferIn) {
+    uint8_t *p=Disp_send.SPI_Address+2;  // Locate pointer at start of active buffer;
+    for(uint16_t i=0; i<DISPLAY_DATA_SIZE; i++) {
+        *p++ |= *BufferIn++;
+    }
+}
+
+// Or the BufferIn into display buffer 1
+void OR_display1(uint8_t *BufferIn) {
+    uint8_t *p=Disp_send.display_data1;  // Locate pointer at start of active buffer;
+    for(uint16_t i=0; i<DISPLAY_DATA_SIZE; i++) {
+        *p++ |= *BufferIn++;
+    }
+}
+
 // Sprites, each byte pair represents next pixel relative position
 void sprite(uint8_t x, uint8_t y, const int8_t *ptr) {
     int8_t a=0, b=0;
@@ -92,7 +107,7 @@ void sprite(uint8_t x, uint8_t y, const int8_t *ptr) {
 }
 
 //-----------------------------------------------------------------------
-void lcd_line_c(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c) {
+void set_line_c(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c) {
     uint8_t dxabs,dyabs;
     int8_t dx,dy,stepx,stepy;
     dx=(int8_t)x2-x1;      // the horizontal distance of the line
@@ -538,7 +553,7 @@ void fillTriangleslope(uint8_t x0, uint8_t y0,uint8_t x1, uint8_t y1, uint8_t x2
         //          b = x0 + (x2 - x0) * (y - y0) / (y2 - y0)
         lcd_hline(a, b, y);
     }
-}
+}*/
 
 
 // Draws a circle with center at x,y with given radius.
@@ -575,7 +590,7 @@ void circle_fill(uint8_t x,uint8_t y, uint8_t radius, uint8_t c) {
         else p += ((xc++ - yc--)<<2) + 10;
     }
 }
-*/
+
 /*-------------------------------------------------------------------------------
 Print a char on the LCD
 	GLCD_Putchar (uint8_t u8Char)
@@ -711,7 +726,7 @@ Send a run length encoded image from program memory to the LCD
     BMP[0] contains width/8
     BMP[1] contains height
 ----------------------------------------------------------------------------*/
-void bitmap(uint8_t x, uint8_t y, uint8_t *BMP) {
+void bitmap(uint8_t x, uint8_t y, const uint8_t *BMP) {
     uint8_t *p;
 	uint8_t data=0,count=0;
 	uint8_t width,height;
@@ -761,7 +776,7 @@ Send a run length encoded image from program memory to the LCD
     BMP[0] contains width/8
     BMP[1] contains height
 ----------------------------------------------------------------------------*/
-void bitmap_safe(int8_t x, int8_t y, uint8_t *BMP, uint8_t c) {
+void bitmap_safe(int8_t x, int8_t y, const uint8_t *BMP, uint8_t c) {
     if(BMP==0) return;
     uint8_t *p;
 	uint8_t data=0,count=0;

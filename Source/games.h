@@ -2,7 +2,6 @@
 #define _GAMES_H
 
 // Snake definitions
-
 #define GO_UP     1
 #define GO_DOWN   2
 #define GO_LEFT   4
@@ -33,7 +32,7 @@ typedef struct {
     uint8_t y;
     uint8_t state;
 } PaddleStruct;
-        
+
 void Snake(void);
 void Pong(void);
 void Chess(void);

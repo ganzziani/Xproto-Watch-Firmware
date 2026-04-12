@@ -55,11 +55,11 @@ Type_Time EEMEM EE_saved_time = {   // Last known time
 };
 
 Type_Alarm EEMEM EE_Alarms[] = {
-    {  8,  0, 0b01111111, 0 },  // 08:00am Everyday
-    {  7, 45, 0b00111110, 1 },  // 07:45am Weekdays
-    { 14, 30, 0b00111110, 4 },  // 02:00pm Weekdays
-    { 21,  0, 0b00111111, 9 },  // 09:00pm Monday thru Saturday
-    {  0,  0, 0b00000000, 0 },  // Last alarm slot used for the Countdown timer
+    {  8,  0, 0, 0b01111111, 0 },  // 08:00am Everyday
+    {  7, 45, 0, 0b00111110, 1 },  // 07:45am Weekdays
+    { 14, 30, 0, 0b00111110, 4 },  // 02:00pm Weekdays
+    { 21,  0, 0, 0b00111111, 9 },  // 09:00pm Monday thru Saturday
+    {  0,  0, 0, 0b00000000, 0 },  // Last alarm slot used for the Countdown timer
 };
 
 uint8_t EEMEM EE_WSettings = 0; // 24Hr format, Date Format, Hour Beep, Alarm On,
@@ -97,7 +97,7 @@ ISR(TCF0_CCA_vect) {
     NowMinute++;                            // Update minute
     if(BattLevel==0) {
         BattLevel = MeasureVin(0);          // Measure Vin if last voltage was high
-       // SecTimeout = 90;                    // No need to worry about power, show seconds
+        SecTimeout = 90;                    // No need to worry about power, show seconds
     }        
     if(NowMinute>=60) {
         NowMinute=0;
@@ -305,7 +305,7 @@ void Watch(void) {
                     setbit(WatchBits, hourChanged);     // Re Print hour
                     setbit(WatchBits, dateChanged);     // Re Print date
                 }
-            }                
+            }
             if(AlarmHour==NowHour && AlarmMinute==NowMinute && testbit(MStatus, alarm_on)) {
                 if(NowSecond<=1) setbit(MStatus, sound_on);   // Make sound until user cancels
                 if(testbit(MStatus, sound_on) && TCD1.CTRLA==0) { // Sound enabled and no tune active
@@ -317,7 +317,7 @@ void Watch(void) {
                     uint8_t index = T.TIME.AlarmIndex;
                     if((EE_Alarms[index].active & 0b01111111) == 0) {   // Check if this was a one-time only alarm (all active days are disabled)
                         eeprom_write_byte(&EE_Alarms[index].active, 0); // Clear active bit
-                    }                        
+                    }
                     FindNextAlarm();                // An alarm just finished, find next alarm
                     clrbit(MStatus, sound_on);
                 }
@@ -535,7 +535,7 @@ void BigPrintYear(void) {
         fillRectangle(x+42,53,x+53,55,PIXEL_TGL);
     }
     u8CursorX += 57;
-}    
+}
 
 // Analog Watch Face
 void AnalogFace(void) {
@@ -556,7 +556,7 @@ void AnalogFace(void) {
             lcd_goto( 14,  5); printN_5x8(10);
             lcd_goto( 30,  2); printN_5x8(11);
             for(uint8_t i=0; i<60; i++) {       // Circumference markers
-                lcd_line(63+Sine60(i,60),63-Cosine60(i,60),
+                set_line(63+Sine60(i,60),63-Cosine60(i,60),
                 63+Sine60(i,63),63-Cosine60(i,63));
             }
             ShowAlarmTime(42, 10);
@@ -604,7 +604,7 @@ void PrintHands(uint8_t h, uint8_t m, uint8_t s) {
     63+Sine60(m,     50), 63-Cosine60(m,     50), PIXEL_TGL);    
     // Seconds
     if(!testbit(WSettings, style) && SecTimeout) {    
-        lcd_line_c(63,63,63+Sine60(s,54),63-Cosine60(s,54), PIXEL_TGL);
+        set_line_c(63,63,63+Sine60(s,54),63-Cosine60(s,54), PIXEL_TGL);
     }
 }
 
@@ -639,7 +639,9 @@ void CountDown(void) {
             if(testbit(Buttons,KUR)) {          // START / STOP
                 start = !start;
             }
-            if(testbit(Buttons,K1)) hour++;
+            if(testbit(Buttons,K1)) {
+                if(hour<23) hour++;             // 
+            }                
             if(testbit(Buttons,K2)) minute++;
             if(minute>=60) minute=0;
             if(testbit(Buttons,K3)) second++;
@@ -647,7 +649,7 @@ void CountDown(void) {
             if(testbit(Buttons,KBR)) {
                 if(start) {    // LAP
                     lap++;
-                    lapl++; if(lapl>=16) lapl=3;
+                    lapl++; if(lapl>=15) lapl=3;
                     lcd_goto(1,lapl); print5x8(PSTR("  Lap ")); printN5x8(lap); putchar5x8(':');
                     if(hour<100) putchar5x8(' ');
                     printN5x8(hour); putchar5x8(':');
@@ -688,12 +690,11 @@ void CountDown(void) {
             clr_display();
             lcd_goto(4,15); print5x8(PSTR("+H       +M       +S"));
         }
-        lcd_goto(51,1); if(!start || SECPULSE()) putchar5x8(':'); else putchar5x8(' ');
-        lcd_goto(81,1); if(!start || SECPULSE()) putchar5x8(':'); else putchar5x8(' ');
-        printN11x21(13, 0, hour,   3);  // 3 digits for the hour
-        printN11x21(56, 0, minute, 2);
-        printN11x21(86, 0, second, 2);
-        
+        lcd_goto(47,1); if(!start || SECPULSE()) putchar5x8(':'); else putchar5x8(' ');
+        lcd_goto(77,1); if(!start || SECPULSE()) putchar5x8(':'); else putchar5x8(' ');
+        printN11x21(22, 0, hour,   2);
+        printN11x21(52, 0, minute, 2);
+        printN11x21(82, 0, second, 2);
         dma_display();
         WaitDisplay();                  // Double buffering not needed in countdown (slow refresh rate)
         if(TCD1.CTRLA==0) SLP();        // Sleep
@@ -914,7 +915,7 @@ void FindNextAlarm(void) {
     uint8_t Tomorrow = NowWeekDay+1;
     if(Tomorrow>=7) Tomorrow=0;
     uint8_t Todaybit=0x40;
-    Todaybit = Todaybit >> NowWeekDay; 
+    Todaybit = Todaybit >> NowWeekDay;
     uint8_t Tomorrowbit=0x40;
     Tomorrowbit = Tomorrowbit >> Tomorrow;
     clrbit(MStatus, alarm_on);
@@ -970,6 +971,7 @@ void FindNextAlarm(void) {
 void LoadAlarm(uint8_t i) {
     AlarmHour   = EE_Alarms[i].hour;
     AlarmMinute = EE_Alarms[i].minute;
+    T.TIME.AlarmSecond = EE_Alarms[i].second;
     T.TIME.AlarmTune = EE_Alarms[i].tune;
     T.TIME.AlarmIndex = i;
 }
@@ -1000,7 +1002,7 @@ void Calendar(void) {
                 lcd_hline(1,126,i,PIXEL_SET);
             }
             for(uint8_t i=1; i<128; i+=18) {
-                lcd_line(i,27,i,123);
+                set_line(i,27,i,123);
             }
             wday=firstdayofmonth(&showdate);
             mdays=pgm_read_byte_near(monthDays+showdate.month-1);

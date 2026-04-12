@@ -15,7 +15,7 @@
     <AssemblyName>Xprotokey</AssemblyName>
     <Name>Xprotokey7</Name>
     <RootNamespace>Xprotokey</RootNamespace>
-    <ToolchainFlavour>4.0.0</ToolchainFlavour>
+    <ToolchainFlavour>GCC 15.2.0</ToolchainFlavour>
     <AsfVersion>3.0.1</AsfVersion>
     <KeepTimersRunning>true</KeepTimersRunning>
     <CacheFlash>true</CacheFlash>
@@ -114,6 +114,9 @@
     </com_atmel_avrdbg_tool_atmelice>
     <ResetRule>0</ResetRule>
     <EraseKey />
+    <UseGdb>False</UseGdb>
+    <UseGdbCustomPath>False</UseGdbCustomPath>
+    <GdbCustomPath>C:\Program Files (x86)\Atmel\Studio\7.0\toolchain\avr8\avr-gcc-15.2.0-x64-windows\bin\avr-gdb.exe</GdbCustomPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <ToolchainSettings>
@@ -172,16 +175,17 @@
           </ListValues>
         </avrgcc.compiler.directories.IncludePaths>
         <avrgcc.compiler.optimization.level>Optimize for size (-Os)</avrgcc.compiler.optimization.level>
+        <avrgcc.compiler.optimization.OtherFlags>-fno-tree-dominator-opts</avrgcc.compiler.optimization.OtherFlags>
         <avrgcc.compiler.optimization.PackStructureMembers>True</avrgcc.compiler.optimization.PackStructureMembers>
         <avrgcc.compiler.optimization.AllocateBytesNeededForEnum>True</avrgcc.compiler.optimization.AllocateBytesNeededForEnum>
         <avrgcc.compiler.optimization.DebugLevel>Default (-g2)</avrgcc.compiler.optimization.DebugLevel>
-        <avrgcc.compiler.optimization.OtherDebuggingFlags>-gdwarf-2</avrgcc.compiler.optimization.OtherDebuggingFlags>
         <avrgcc.compiler.warnings.AllWarnings>True</avrgcc.compiler.warnings.AllWarnings>
         <avrgcc.linker.memorysettings.Flash>
           <ListValues>
             <Value>.progmem_far = 0x8000</Value>
           </ListValues>
         </avrgcc.linker.memorysettings.Flash>
+        <avrgcc.linker.miscellaneous.LinkerFlags>-mrelax -mrmw</avrgcc.linker.miscellaneous.LinkerFlags>
         <avrgcc.assembler.general.IncludePaths>
           <ListValues>
             <Value>%24(PackRepoDir)\atmel\XMEGAA_DFP\1.3.146\include\</Value>
@@ -210,6 +214,10 @@
     <Compile Include="Source\bitmaps.c">
       <SubType>compile</SubType>
       <Link>bitmaps.c</Link>
+    </Compile>
+    <Compile Include="Source\chess.c">
+      <SubType>compile</SubType>
+      <Link>chess.c</Link>
     </Compile>
     <Compile Include="Source\config.c">
       <SubType>compile</SubType>
@@ -251,9 +259,9 @@
       <SubType>compile</SubType>
       <Link>mso.c</Link>
     </Compile>
-    <Compile Include="Source\pong.c">
+    <Compile Include="Source\qix.c">
       <SubType>compile</SubType>
-      <Link>pong.c</Link>
+      <Link>qix.c</Link>
     </Compile>
     <Compile Include="Source\snake.c">
       <SubType>compile</SubType>

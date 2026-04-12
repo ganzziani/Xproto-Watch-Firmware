@@ -13,6 +13,7 @@
 #include "display.h"
 #include "bitmaps.h"
 #include "games.h"
+#include "qix.h"
 
 // Oscilloscope Global variables, using GPIO for optimized access
 #define Srate       GPIO0   // Sampling rate
@@ -160,7 +161,7 @@
 
 // MStatus          (GPIOB) - Status and Miscellaneous bits
 #define update      0       // Update
-//#define           1       // 
+#define counntdwn   1       // Count Down is active
 #define alarm_on    2       // Alarm on
 //#define           3       // 
 //#define           4       // 
@@ -209,6 +210,8 @@ void CCPWrite( volatile uint8_t * address, uint8_t value );
 int16_t MeasureVin(uint8_t scale);
 int16_t MeasureVRef(void);
 int16_t MeasureVCC(void);
+
+#define Cos(a)  Sin((a)+64)
 
 extern uint8_t EEMEM EESleepTime;     // Sleep timeout in minutes
 
@@ -280,11 +283,12 @@ typedef union {
         uint8_t addr_ack_pos;       // counter for keeping track of all bits / location for DMA
         uint16_t baud;              // Baud rate
     } LOGIC;
-	struct {
+    struct {
         uint8_t oldHour, oldMinute, oldSecond, oldBattery;
+        uint8_t AlarmSecond;
         uint8_t AlarmTune;          // Alarm Tune
         uint8_t AlarmIndex;         // Index of next alarm
-	} TIME;
+    } TIME;
     struct {
         uint8_t level;            // Level (Sets thinking time)
         uint8_t Player1, Player2;
@@ -308,8 +312,8 @@ typedef union {
         } _, SA[U],*MP;          /* _=working set, SA=stack array, SP=stack pointer   */
     } CHESS;
     struct {
-		uint8_t display_setup[2];
-		uint8_t buffer2[DISPLAY_DATA_SIZE];
+        uint8_t display_setup[2];
+        uint8_t buffer2[DISPLAY_DATA_SIZE];
         uint8_t board[32][32];
         SnakeStruct Player1, Player2;
         uint8_t Fruitx,Fruity;
@@ -322,6 +326,7 @@ typedef union {
         fixed   speedx, speedy;
         PaddleStruct Player1, Player2;
     } PONG;
+    structQIX QIX;
 } TempData;
 
 // Variables that need to be stored in NVM

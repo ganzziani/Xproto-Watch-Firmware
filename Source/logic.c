@@ -310,13 +310,13 @@ void Sniff(void) {
                 }
             }
             if(testbit(MStatus, stop)) {
-                lcd_line(63,8,63,30);
+                set_line(63,8,63,30);
                 const char *c=STR_STOP;
                 for(uint8_t y=TEXT_LAST_LINE-3; y<=TEXT_LAST_LINE; y++) {   // Print STOP vertically
                     lcd_goto(62,y); putchar3x6(pgm_read_byte(c++));
                 }
             }
-            else lcd_line(63,8,63,DISPLAY_MAX_Y);
+            else set_line(63,8,63,DISPLAY_MAX_Y);
             uint8_t printpage=page;
             if(testbit(CHDctrl,ascii)) printpage&=0xFE;     // Only display even pages
             lcd_goto(62,0); putchar3x6(NibbleToChar(printpage));

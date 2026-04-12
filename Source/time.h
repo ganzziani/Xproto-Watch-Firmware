@@ -20,7 +20,8 @@ typedef struct {
 typedef struct {
     uint8_t hour;               // Alarm Hour
     uint8_t minute;             // Alarm Minute
-    uint8_t active;             // Days the alarm is active
+    uint8_t second;             // Alarm Second
+    uint8_t active;             // MSB: Alarm is active, remaining bits: Days of the week the alarm is active, if all active days are disabled, then it is a one-time only alarm
     uint8_t tune;               // Alarm Tune
 } Type_Alarm;
 

@@ -289,7 +289,7 @@ int main(void) {
                 break;
                 case 3:     // Games Menu
                     if(testbit(Buttons,K1)) Snake();
-                    if(testbit(Buttons,K2)) Pong();
+                    if(testbit(Buttons,K2)) Qix();
                     if(testbit(Buttons,K3)) { CPU_Fast(); Chess(); }
                     Menu=3;
                 break;
@@ -583,12 +583,12 @@ void CalibrateOffset(void) {
                 ONGRN();
                 eeprom_write_byte((uint8_t *)&offset8CH1[Srate][i], avrg8);
                 j = 32+avrg8; // add 32 to center on screen
-                if(j<64) lcd_line(s,96,s,j+64);
+                if(j<64) set_line(s,96,s,j+64);
                 else ONRED();
                 avrg8=avrg2>>8;
                 eeprom_write_byte((uint8_t *)&offset8CH2[Srate][i], avrg8);
                 j = 32+avrg8; // add 32 to center on screen
-                if(j<64) lcd_line(s+64,96,s+64,j+64);
+                if(j<64) set_line(s+64,96,s+64,j+64);
                 else ONRED();
                 dma_display(); WaitDisplay();
             } while(i--);
@@ -742,7 +742,7 @@ static void CalibrateDAC(void) {
                     if(bestoffset>=0x40) printN(0x40-bestoffset);
                     else printN(bestoffset);
                 }
-                lcd_line(0,bestmeasure1>>1,127,bestmeasure1>>1);
+                set_line(0,bestmeasure1>>1,127,bestmeasure1>>1);
                 test++;
                 DACB.OFFSETCAL = test;
                 if(test>=128) {

@@ -31,7 +31,7 @@ const char STRS_mainmenu[][17] PROGMEM = {           // Menus:
 const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
     "Hora Calendario Astro",    // Watch
     "Perfil  Imagen  Start",    // Oscilloscope
-    "Culebra Pong  Ajedrez",    // Games
+    "Culebra  Qix  Ajedrez",    // Games
     "Ajuste Diagnos. Sobre",    // Settings
 };
 
@@ -71,7 +71,7 @@ const char STRS_mainmenu[][17] PROGMEM = {           // Menus:
 const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
     "Time  Calendar  Astro",    // Watch
     "Profile Image   Start",    // Oscilloscope
-    "Snake   Pong    Chess",    // Games
+    "Snake    Qix    Chess",    // Games
     "Config Diagnose About",    // Settings
 };
 

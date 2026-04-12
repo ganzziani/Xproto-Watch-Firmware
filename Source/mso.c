@@ -851,8 +851,8 @@ void MSO(void) {
                     }
                     if(testbit(Display, line)) {
                         if(i==0) continue;
-                        if(testbit(CH1ctrl,chon)) lcd_line(nx, ny1, ox, oy1);
-                        if(testbit(CH2ctrl,chon)) lcd_line(nx, ny2, ox, oy2);
+                        if(testbit(CH1ctrl,chon)) set_line(nx, ny1, ox, oy1);
+                        if(testbit(CH2ctrl,chon)) set_line(nx, ny2, ox, oy2);
                     }
                     else {
                         if(testbit(CH1ctrl,chon)) set_pixel(nx, ny1);
@@ -920,9 +920,9 @@ void MSO(void) {
                     if(testbit(Display, line)) {
                         if(i==0) continue;  // No previous sample
                         if((adjustedCH1!=och1) || (adjustedCH1 && och1<DISPLAY_MAX_Y))
-                            if(testbit(CH1ctrl,chon))          lcd_line(i, adjustedCH1, prev, och1);
+                            if(testbit(CH1ctrl,chon))          set_line(i, adjustedCH1, prev, och1);
                         if((adjustedCH2!=och2) || (adjustedCH2 && och2<DISPLAY_MAX_Y))
-                            if(testbit(CH2ctrl,chon)) lcd_line(i, adjustedCH2, prev, och2);
+                            if(testbit(CH2ctrl,chon)) set_line(i, adjustedCH2, prev, och2);
                     }
                     else {
                         // Don't draw when data==0 or data==DISPLAY_MAX_Y, signal could be clipping
@@ -994,7 +994,7 @@ void MSO(void) {
                     for(uint8_t i=0; i<FFT_N/2; i++) {
 				        uint8_t fftdata=T.SCOPE.FFT.magn[(uint8_t)(i-M.HPos)]>>2;
 						if(fftdata>(DISPLAY_MAX_Y-8)) fftdata=(DISPLAY_MAX_Y-8);
-                        if(testbit(Display, line)) lcd_line(i, (DISPLAY_MAX_Y-8)-fftdata, i, (DISPLAY_MAX_Y-8));
+                        if(testbit(Display, line)) set_line(i, (DISPLAY_MAX_Y-8)-fftdata, i, (DISPLAY_MAX_Y-8));
                         else set_pixel(i, (DISPLAY_MAX_Y-8)-fftdata);
                     }
                 }
@@ -1004,7 +1004,7 @@ void MSO(void) {
                         for(uint8_t i=0,j=0; j<FFT_N/2; i++,j++) {
     				        uint8_t fftdata=T.SCOPE.FFT.magn[j]>>divide;
 							if(fftdata>fft1pos) fftdata=fft1pos;    // Clip
-                            if(testbit(Display, line)) lcd_line(i, fft1pos-fftdata, i, fft1pos);
+                            if(testbit(Display, line)) set_line(i, fft1pos-fftdata, i, fft1pos);
                             else set_pixel(i, fft1pos-fftdata);
                         }
                     }
@@ -1014,7 +1014,7 @@ void MSO(void) {
                         for(uint8_t i=0,j=0; j<FFT_N/2; i++,j++) {
 							uint8_t fftdata=T.SCOPE.FFT.magn[j]>>divide;
 							if(fftdata>fft1pos) fftdata=fft1pos;    // Clip
-                            if(testbit(Display, line)) lcd_line(i, fft2pos-fftdata, i, fft2pos);
+                            if(testbit(Display, line)) set_line(i, fft2pos-fftdata, i, fft2pos);
                             else set_pixel(i, fft2pos-fftdata);
                         }
                     }
@@ -2505,9 +2505,9 @@ checknext:
                         else if(testbit(Trigger, slope)) {
                             uint8_t trigy;
                             trigy=M.Tlevel>>2;
-                            lcd_line(trigpos,trigy,trigpos+2,trigy);
+                            set_line(trigpos,trigy,trigpos+2,trigy);
                             trigy=(uint8_t)(-M.Tlevel)>>2;
-                            lcd_line(trigpos,trigy,trigpos+2,trigy);
+                            set_line(trigpos,trigy,trigpos+2,trigy);
                         }
                         else if(testbit(Trigger, edge)) {
                             if(trig1<=(DISPLAY_MAX_Y-3) && testbit(Misc, bigfont)) { // down
@@ -3202,7 +3202,7 @@ ISR(TCE1_OVF_vect) {
             // Draw data
             if(testbit(Display, line) && Index) {
                 if((ch1!=oldch1) || (ch1 && oldch1<DISPLAY_MAX_Y))
-                    if(testbit(CH1ctrl,chon)) lcd_line(Index>>1, ch1, (Index-1)>>1, oldch1);
+                    if(testbit(CH1ctrl,chon)) set_line(Index>>1, ch1, (Index-1)>>1, oldch1);
             }
             else {
                 // Don't draw when data==0 or data==63, signal could be clipping
@@ -3222,7 +3222,7 @@ ISR(TCE1_OVF_vect) {
             // Draw data
             if(testbit(Display, line) && Index) {
                 if((ch2!=oldch2) || (ch2 && oldch2<DISPLAY_MAX_Y))
-                    if(testbit(CH2ctrl,chon)) lcd_line(Index>>1, ch2, (Index-1)>>1, oldch2);
+                    if(testbit(CH2ctrl,chon)) set_line(Index>>1, ch2, (Index-1)>>1, oldch2);
             }
             else {
                 // Don't draw when data==0 or data==63, signal could be clipping

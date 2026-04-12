@@ -232,7 +232,7 @@ void SnakeBoard(void) {
 
 void SnakeEngine(void) {
     PR.PRPC  &= 0b11111110;         // Enable TCC0 clock
-    TCC0.PER = 15626;               // 1Hz
+    TCC0.PER = 14000;               // 
     TCC0.CTRLA = 5;                 // 31.25kHz clock
     InitSnake();
     NewFruit();

@@ -42,6 +42,7 @@
 #define NOTE_A8      34  // 7142.85  7040
 #define NOTE_A_8     33  // 7352.94  7458.62
 #define NOTE_B8      31  // 7812.5   7902.13
+#define NOTE_OFF      0  // Pause
 
 extern const uint8_t    TuneIntro[];
 extern const uint8_t    TuneBeep[];
