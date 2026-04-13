@@ -22,7 +22,7 @@ static void QixEngine(void);
 static void HandleInput(void);          // Checks Buttons
 static void MovePlayer(void);           // Updates Man
 static uint8_t PlayerInput(uint8_t motion, uint8_t x, uint8_t y);   // Find direction based on player's input
-static void Perimeter_Movement(uint8_t *direction, uint8_t x, uint8_t y); // Finds next direction along wall perimeter
+static void Perimeter_Movement(uint8_t *direction, uint8_t x, uint8_t y, uint8_t traversal); // Finds next direction along wall perimeter
 static void SpawnPlayer(void);          // Spawn animation and variable update
 static void KillPlayer(void);           // Death animation
 static void InitTraps(uint8_t level);   // Initialize Traps
@@ -47,22 +47,6 @@ static const uint8_t dir_left[5]  = {0, DIR_LEFT,  DIR_RIGHT, DIR_DOWN, DIR_UP};
 static const uint8_t dir_right[5] = {0, DIR_RIGHT, DIR_LEFT,  DIR_UP,   DIR_DOWN};
 static const uint8_t dir_back[5]  = {0, DIR_DOWN,  DIR_UP,    DIR_RIGHT,DIR_LEFT};
 
-static const int8_t neighbour_dx[5][3] = {
-    //   ahead  convex  filled
-    { 0,    0,      0    },  // [0] unused
-    { 0,   -1,      1    },  // [1] DIR_UP    filled=RIGHT
-    { 0,    1,     -1    },  // [2] DIR_DOWN  filled=LEFT
-    {-1,   -1,      0    },  // [3] DIR_LEFT  filled=ABOVE (dy-1)
-    { 1,    1,      0    },  // [4] DIR_RIGHT filled=BELOW (dy+1)
-};
-static const int8_t neighbour_dy[5][3] = {
-    //   ahead  convex  filled
-    { 0,    0,      0    },  // [0] unused
-    {-1,   -1,      0    },  // [1] DIR_UP    filled=RIGHT
-    { 1,    1,      0    },  // [2] DIR_DOWN  filled=LEFT
-    { 0,    1,     -1    },  // [3] DIR_LEFT  filled=ABOVE
-    { 0,   -1,      1    },  // [4] DIR_RIGHT filled=BELOW
-};
 
 // Buffer pointer offsets for display functions.
 // The display is rotated 90 degrees, so the lower-level pixel/line functions 
@@ -217,6 +201,7 @@ static void HandleInput(void) {
                 if (testbit(Buttons, KBL)) motion = DIR_CCW;
                 else if (testbit(Buttons, KBR)) motion = DIR_CW;
                 else return;
+                T.QIX.Man.lastDir = motion;
                 T.QIX.Man.direction = PlayerInput(motion, x, y);
             }                    
         }
@@ -317,7 +302,7 @@ static void MovePlayer(void) {
     } else { // Man walking, speed is fixed
         // Update position
         if(T.QIX.Man.direction != DIR_NONE) {
-            Perimeter_Movement(&T.QIX.Man.direction, x, y);
+            Perimeter_Movement(&T.QIX.Man.direction, x, y, T.QIX.Man.lastDir);
             uint8_t dir = T.QIX.Man.direction;
             x+=dx[dir];
             y+=dy[dir];
@@ -338,32 +323,36 @@ static void MovePlayer(void) {
 
 // Finds next direction when moving along wall perimeter
 // This function is used by the Man when not drawing, and by Traps
-// Neighbour column indices:
-#define NB_AHEAD   0
-#define NB_CONVEX  1
-#define NB_FILLED  2
-static void Perimeter_Movement(uint8_t *direction, uint8_t x, uint8_t y) {
+// traversal: DIR_CW or DIR_CCW determines which side the wall is on
+// Scan order: inner side -> ahead -> outer side -> back
+// The first direction that has a wall pixel is chosen
+static void Perimeter_Movement(uint8_t *direction, uint8_t x, uint8_t y, uint8_t traversal) {
     uint8_t dir = *direction;
-    uint8_t ahead_wall  = get_pixel_buffer(
-        x + neighbour_dx[dir][NB_AHEAD],
-        y + neighbour_dy[dir][NB_AHEAD], Layer_Wall);
+    if (dir < 1 || dir > 4) return;
 
-    uint8_t convex_wall = get_pixel_buffer(
-        x + neighbour_dx[dir][NB_CONVEX],
-        y + neighbour_dy[dir][NB_CONVEX], Layer_Wall);
-
-    // Priority: convex corner > straight > concave corner
-    // Straight case: direction is unchanged, no write needed
-    if (convex_wall) {
-        dir = dir_left[dir];
-    } else if (!ahead_wall) {
-        // Concave corner: filled side determines which way to turn
-        uint8_t filled = get_pixel_buffer(
-            x + neighbour_dx[dir][NB_FILLED],
-            y + neighbour_dy[dir][NB_FILLED], Layer_Filled);
-        dir = filled ? dir_left[dir] : dir_right[dir];
+    // Scan order depends on traversal direction:
+    // CW:  wall is on the left, scan: left -> ahead -> right -> back
+    // CCW: wall is on the right, scan: right -> ahead -> left -> back
+    uint8_t scan[4];
+    if (traversal == DIR_CW) {
+        scan[0] = dir_left[dir];
+        scan[1] = dir;
+        scan[2] = dir_right[dir];
+        scan[3] = dir_back[dir];
+    } else {
+        scan[0] = dir_right[dir];
+        scan[1] = dir;
+        scan[2] = dir_left[dir];
+        scan[3] = dir_back[dir];
     }
-    *direction=dir;
+
+    for (uint8_t i = 0; i < 4; i++) {
+        uint8_t d = scan[i];
+        if (get_pixel_buffer(x + dx[d], y + dy[d], Layer_Wall)) {
+            *direction = d;
+            return;
+        }
+    }
 }
 
 // Spawn player: animation and variables update
@@ -418,8 +407,13 @@ static void InitTraps(uint8_t level) {
     for(uint8_t i = 0; i < T.QIX.traps_active; i++) {
         T.QIX.Traps[i].length = (level/4)+1;
         uint8_t r = prandom();
-        if(testbit(r,7)) T.QIX.Traps[i].direction = DIR_CW;
-        else T.QIX.Traps[i].direction = DIR_CCW;
+        if(testbit(r,7)) {
+            T.QIX.Traps[i].head_idx = DIR_CW;
+            T.QIX.Traps[i].direction = DIR_RIGHT;
+        } else {
+            T.QIX.Traps[i].head_idx = DIR_CCW;
+            T.QIX.Traps[i].direction = DIR_LEFT;
+        }
         for(uint8_t j=0; j<T.QIX.Traps[i].length; j++) {
             T.QIX.Traps[i].x[j] = 32 + (r&0x3F);    // Random x location between 32 and 95
             T.QIX.Traps[i].y[j] = 8;                // y location: top wall
@@ -437,7 +431,7 @@ static void MoveTraps(void) {
         uint8_t old_y = T.QIX.Traps[i].y[0];
         
         // Move trap head along edges of filled areas using perimeter movement
-        Perimeter_Movement(&T.QIX.Traps[i].direction, old_x, old_y);
+        Perimeter_Movement(&T.QIX.Traps[i].direction, old_x, old_y, T.QIX.Traps[i].head_idx);
         
         // Get new head position after perimeter movement calculation
         uint8_t dir = T.QIX.Traps[i].direction;
