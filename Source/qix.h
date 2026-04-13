@@ -27,8 +27,10 @@
 // Styx movement constants
 #define STYX_RETRY_COUNT        3       // Number of retries to find valid line position
 #define STYX_BOUNDARY_MARGIN    3       // Minimum distance from screen edge for Styx
-#define STYX_MAX_DEFAULT        15      // Default maximum Styx line vector length (capped when not at max)
-#define STYX_SHRINK_THRESHOLD   50      // Threshold for shrinking line on collision
+#define STYX_MAX_DEFAULT        16      // Maximum Styx line vector length (multiplier; larger = longer lines)
+#define STYX_SPEED              30      // Velocity divisor base: dx = int2fix(Sin(dir))/(STYX_SPEED-rand)
+                                        // rand is 0-15, so actual divisor range is (STYX_SPEED-15)..STYX_SPEED
+                                        // Higher value = slower Styx movement
 
 // Trap growth constants  
 #define TRAP_INITIAL_GROWTH     8       // Initial trap length before random growth

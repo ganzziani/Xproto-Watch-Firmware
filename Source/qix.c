@@ -2,6 +2,7 @@
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
 #include <stdlib.h>
+#include <string.h>
 #include "main.h"
 #include "utils.h"
 #include "qix.h"
@@ -360,7 +361,7 @@ static void Perimeter_Movement(uint8_t *direction, uint8_t x, uint8_t y) {
         uint8_t filled = get_pixel_buffer(
             x + neighbour_dx[dir][NB_FILLED],
             y + neighbour_dy[dir][NB_FILLED], Layer_Filled);
-        dir = filled ? dir_right[dir] : dir_left[dir];
+        dir = filled ? dir_left[dir] : dir_right[dir];
     }
     *direction=dir;
 }
@@ -535,22 +536,24 @@ static void InitStyx(uint8_t level) {
 }
 
 static void NewStyxDirection(uint8_t n) {
-    T.QIX.Styx[n].max_vec_length = 3 + (prandom()&0x03);
-    if(T.QIX.styx_active>=2) { // Shorten Styx if 2 are active
-        T.QIX.Styx[n].max_vec_length +=5;
+    // Target line length: full STYX_MAX_DEFAULT for one Styx, 2/3 for two
+    // (original used a divisor of 3-5, which in the divisor model gave long lines;
+    //  here vect_length is a multiplier so we target STYX_MAX_DEFAULT directly)
+    if(T.QIX.styx_active >= 2) {
+        T.QIX.Styx[n].max_vec_length = STYX_MAX_DEFAULT * 2 / 3;
+    } else {
+        T.QIX.Styx[n].max_vec_length = STYX_MAX_DEFAULT;
     }
-    uint8_t level = T.QIX.level;
     uint8_t dir = qrandom();
     uint8_t rand15_1 = prandom();
     uint8_t rand15_2 = rand15_1 & 0x0F;
     rand15_1 >>= 4;
-    T.QIX.Styx[n].dx = int2fix(Sin(dir))/(25-rand15_1);
-    T.QIX.Styx[n].dy = int2fix(Cos(dir))/(25-rand15_2);
+    T.QIX.Styx[n].dx = int2fix(Sin(dir))/(STYX_SPEED-rand15_1);
+    T.QIX.Styx[n].dy = int2fix(Cos(dir))/(STYX_SPEED-rand15_2);
     uint8_t rand = prandom();
     int inc = (int8_t)(rand & 0x0F);
     if(testbit(rand, 7)) inc=-inc;
     T.QIX.Styx[n].vect_dirinc = inc;
-    
 }
 
 // Check if Styx line collides with walls or filled areas
@@ -590,46 +593,52 @@ static uint8_t CheckStyxCollision(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2
 // Updates Styx positions and draw lines into the LayerStyx buffer
 // Based on TA.C move_styx() - vector-based movement with rotation
 static void MoveStyx(void) {
+    // Rebuild Layer_Styx from scratch every frame. XOR-toggle erasing fails when
+    // all retries collide (no erase step runs), leaving ghost lines on screen.
+    // With clear+set_line_buffer the layer is always authoritative regardless of
+    // whether the Styx moved this frame or not.
+    memset(T.QIX.LayerStyx, 0, DISPLAY_DATA_SIZE);
+
     for (uint8_t i = 0; i < T.QIX.styx_active; i++) {
         if(!T.QIX.Styx[i].active) break;
-        
+
         uint8_t retries = 3;  // Allow 3 tries to find a good line location
-        
+
         while(retries > 0) {
             // Random direction change based on level (from TA.C: random(get_level()+30)>28)
             if(prandom() < (T.QIX.level + 30)) {
                 NewStyxDirection(i);
             }
-            
+
             // Increment vector rotation direction (wraps at 256 = full circle)
             T.QIX.Styx[i].vect_dir += T.QIX.Styx[i].vect_dirinc;
-            
+
             // Calculate line endpoint offsets using sine/cosine of vect_dir
             // vect_length controls the length of each "stick" in the bundle
             uint8_t vlen = T.QIX.Styx[i].vect_length;
             if(vlen < 1) vlen = 1;
-            
+
             // Get vector components (scaled by line length)
             int16_t x_offset = ((int32_t)Sin(T.QIX.Styx[i].vect_dir) * vlen) >> 1;
             int16_t y_offset = ((int32_t)Cos(T.QIX.Styx[i].vect_dir) * vlen) >> 1;
-            
+
             // Save old position in case we need to rollback
             fixed old_x = T.QIX.Styx[i].x;
             fixed old_y = T.QIX.Styx[i].y;
-            
+
             // Move base position
             T.QIX.Styx[i].x += T.QIX.Styx[i].dx;
             T.QIX.Styx[i].y += T.QIX.Styx[i].dy;
-            
+
             // Calculate line endpoints (centered on base position)
             uint8_t bx = fix2int(T.QIX.Styx[i].x);  // Base x
             uint8_t by = fix2int(T.QIX.Styx[i].y);  // Base y
-            
+
             int16_t x1 = bx - (x_offset >> 7);  // Line start
             int16_t y1 = by - (y_offset >> 7);
             int16_t x2 = bx + (x_offset >> 7);  // Line end
             int16_t y2 = by + (y_offset >> 7);
-            
+
             // Clamp to valid range
             if(x1 < 0) x1 = 0;
             if(x1 > DISPLAY_MAX_X) x1 = DISPLAY_MAX_X;
@@ -639,52 +648,35 @@ static void MoveStyx(void) {
             if(x2 > DISPLAY_MAX_X) x2 = DISPLAY_MAX_X;
             if(y2 < 0) y2 = 0;
             if(y2 > DISPLAY_MAX_Y) y2 = DISPLAY_MAX_Y;
-            
+
             // Check for collision with walls or filled areas
             uint8_t collision = CheckStyxCollision((uint8_t)x1, (uint8_t)y1, (uint8_t)x2, (uint8_t)y2);
-            
+
             // Also check boundary constraints (keep Styx away from edges by 3 pixels)
             if(bx < 3 || bx > DISPLAY_MAX_X-3 || by < 8+3 || by > DISPLAY_MAX_Y-3) {
                 collision = 1;
             }
-            
+
             if(collision) {
                 // Line hit something - rollback and try new direction
                 T.QIX.Styx[i].x = old_x;
                 T.QIX.Styx[i].y = old_y;
                 NewStyxDirection(i);
-                
-                // Shrink line for easier fit next try
-                if(T.QIX.Styx[i].vect_length < 50) {
-                    T.QIX.Styx[i].vect_length += T.QIX.Styx[i].vect_length;
-                }
                 retries--;
             } else {
-                // Line is OK - toggle old line (erase) and toggle new line (draw)
+                // Update the circular buffer slot with the new line position
                 uint8_t line_idx = T.QIX.Styx[i].line_idx;
-                
-                // Toggle oldest line segment to erase it (XOR operation)
-                toggle_line_buffer(T.QIX.Styx[i].line_x1[line_idx],
-                                   T.QIX.Styx[i].line_y1[line_idx],
-                                   T.QIX.Styx[i].line_x2[line_idx],
-                                   T.QIX.Styx[i].line_y2[line_idx],
-                                   Layer_Styx);
-                
-                // Store new line segment position
                 T.QIX.Styx[i].line_x1[line_idx] = (uint8_t)x1;
                 T.QIX.Styx[i].line_y1[line_idx] = (uint8_t)y1;
                 T.QIX.Styx[i].line_x2[line_idx] = (uint8_t)x2;
                 T.QIX.Styx[i].line_y2[line_idx] = (uint8_t)y2;
-                
-                // Toggle new line segment to draw it (XOR operation)
-                toggle_line_buffer((uint8_t)x1, (uint8_t)y1, (uint8_t)x2, (uint8_t)y2, Layer_Styx);
-                
+
                 // Advance to next line slot (circular buffer)
                 T.QIX.Styx[i].line_idx++;
                 if(T.QIX.Styx[i].line_idx >= STYX_LINES) {
                     T.QIX.Styx[i].line_idx = 0;
                 }
-                
+
                 // Adjust line length toward maximum
                 if(T.QIX.Styx[i].vect_length > STYX_MAX_DEFAULT) {
                     T.QIX.Styx[i].vect_length = STYX_MAX_DEFAULT;
@@ -694,18 +686,29 @@ static void MoveStyx(void) {
                 } else if(T.QIX.Styx[i].vect_length > T.QIX.Styx[i].max_vec_length) {
                     T.QIX.Styx[i].vect_length--;
                 }
-                
-                // Check collision with player's trail while drawing
-                if(T.QIX.Man.action == MAN_DRAWING) {
-                    for(uint8_t t = 0; t < T.QIX.Man.trail_len; t++) {
-                        if(get_pixel_buffer(T.QIX.Man.trailX[t], T.QIX.Man.trailY[t], Layer_Styx)) {
-                            T.QIX.gameState = STATE_DIED;
-                            break;
-                        }
-                    }
-                }
-                
+
                 retries = 0;  // Success, exit retry loop
+            }
+        }
+
+        // Redraw all STYX_LINES history slots for this creature into the now-clear layer.
+        // Because the layer was zeroed above, set_line_buffer (OR) is correct here.
+        // When the Styx is stuck (all retries failed), the buffer didn't advance so the
+        // same lines are redrawn — the Styx freezes in place with no ghost residue.
+        for(uint8_t j = 0; j < STYX_LINES; j++) {
+            set_line_buffer(T.QIX.Styx[i].line_x1[j], T.QIX.Styx[i].line_y1[j],
+                            T.QIX.Styx[i].line_x2[j], T.QIX.Styx[i].line_y2[j],
+                            Layer_Styx);
+        }
+    }
+
+    // Check player trail collision against the fully rebuilt Styx layer.
+    // Done once after all creatures are drawn so both Styx hit the trail correctly.
+    if(T.QIX.Man.action == MAN_DRAWING) {
+        for(uint8_t t = 0; t < T.QIX.Man.trail_len; t++) {
+            if(get_pixel_buffer(T.QIX.Man.trailX[t], T.QIX.Man.trailY[t], Layer_Styx)) {
+                T.QIX.gameState = STATE_DIED;
+                break;
             }
         }
     }
