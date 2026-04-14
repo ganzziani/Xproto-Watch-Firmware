@@ -67,14 +67,15 @@ void Qix(void) {
             clrbit(MStatus, update);
             if(testbit(Misc,userinput)) {
                 clrbit(Misc, userinput);
-                //if(testbit(Buttons, K1)) 
-                //if(testbit(Buttons, K2))
-                if(testbit(Buttons, K3)) QixEngine();
+                if(testbit(Buttons, K1)) T.QIX.StyxSpeed = 90;
+                if(testbit(Buttons, K2)) T.QIX.StyxSpeed = 60;
+                if(testbit(Buttons, K3)) T.QIX.StyxSpeed = 30;
+                if(testbit(Buttons, K1) || testbit(Buttons, K2) || testbit(Buttons, K3)) QixEngine();
                 if(testbit(Buttons, KML)) setbit(MStatus, goback);
             }
         	lcd_goto(0,0);
             lcd_goto(55,7); print5x8(PSTR("Qix"));
-            lcd_goto(95,15); print5x8(&STRS_optionmenu[1][16]);    // STRS_optionmenu[1][16] contains the word "Start"
+            lcd_goto(0,15); print5x8(STRS_optionmenu[4]);
         }
         dma_display();
         WaitDisplay();
@@ -545,8 +546,9 @@ static void NewStyxDirection(uint8_t n) {
     uint8_t rand15_1 = prandom();
     uint8_t rand15_2 = rand15_1 & 0x0F;
     rand15_1 >>= 4;
-    T.QIX.Styx[n].dx = int2fix(Sin(dir))/(STYX_SPEED-rand15_1);
-    T.QIX.Styx[n].dy = int2fix(Cos(dir))/(STYX_SPEED-rand15_2);
+    uint8_t speed = T.QIX.StyxSpeed;
+    T.QIX.Styx[n].dx = int2fix(Sin(dir))/(speed-rand15_1);
+    T.QIX.Styx[n].dy = int2fix(Cos(dir))/(speed-rand15_2);
     uint8_t rand = prandom();
     int inc = (int8_t)(rand & 0x0F);
     if(testbit(rand, 7)) inc=-inc;

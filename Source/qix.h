@@ -116,6 +116,7 @@ typedef struct {
     uint8_t capturedPercent;
     uint8_t score_multiplier;
     uint8_t multiplier_timer;
+    uint8_t StyxSpeed;
     ManStruct Man;
     StyxStruct Styx[STYX_MAX];
     TrapStruct Traps[TRAP_MAX];

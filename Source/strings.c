@@ -33,6 +33,7 @@ const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
     "Perfil  Imagen  Start",    // Oscilloscope
     "Culebra  Qix  Ajedrez",    // Games
     "Ajuste Diagnos. Sobre",    // Settings
+    "Facil   Normal  Peluo",    // Qyx Menu
 };
 
 const char STRS_Months[][11] PROGMEM = {             // Months
@@ -73,6 +74,7 @@ const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
     "Profile Image   Start",    // Oscilloscope
     "Snake    Qix    Chess",    // Games
     "Config Diagnose About",    // Settings
+    "Easy    Normal   Hard",    // Qyx Menu
 };
 
 const char STRS_Months[][11] PROGMEM = {             // Months
