@@ -66,13 +66,19 @@ void clr_display_all(void) {
     p=Disp_send.display_data1;
     for(uint8_t i=0; i<2; i++) {
         for(uint8_t j=0; j<128; j++) {
-            for(uint8_t k=0; k<16; k++) {
-                #ifdef INVERT_DISPLAY
-                *p++=255;
-                #else
-                *p++=0;
-                #endif
-            }
+            // Unroll inner loop for speed - Clear 16 lines
+            #ifdef INVERT_DISPLAY
+            *p++=255; *p++=255; *p++=255; *p++=255;
+            *p++=255; *p++=255; *p++=255; *p++=255;
+            *p++=255; *p++=255; *p++=255; *p++=255;
+            *p++=255; *p++=255; *p++=255; *p++=255;            
+            #else
+            // Unroll inner loop for speed - Clear 16 lines
+            *p++=0; *p++=0; *p++=0; *p++=0;
+            *p++=0; *p++=0; *p++=0; *p++=0;
+            *p++=0; *p++=0; *p++=0; *p++=0;
+            *p++=0; *p++=0; *p++=0; *p++=0;            
+            #endif
             p+=2;   // Skip line LCD setup
         }
         p=Disp_send.display_data2;
@@ -493,69 +499,6 @@ void fillTriangle(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2,uint8_t x3,uint8_t
 	}
 }
 
-/*
-// Fill a triangle - slope method
-void fillTriangleslope(uint8_t x0, uint8_t y0,uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t color) {
- 	uint8_t a, b, y, last;
-  	// Sort coordinates by Y order (y2 >= y1 >= y0)
-  	if (y0 > y1) { SWAP(y0, y1); SWAP(x0, x1); }
-  	if (y1 > y2) { SWAP(y2, y1); SWAP(x2, x1); }
-  	if (y0 > y1) { SWAP(y0, y1); SWAP(x0, x1); }
-  
-  	if(y0 == y2) { // All on same line case
-    	a = b = x0;
-    	if(x1 < a)      a = x1;
-    	else if(x1 > b) b = x1;
-    	if(x2 < a)      a = x2;
-    	else if(x2 > b) b = x2;
-        lcd_hline(a, b, y0);
-        return;
-    }
-
-    int8_t
-        dx01 = x1 - x0,
-        dy01 = y1 - y0,
-        dx02 = x2 - x0,
-        dy02 = y2 - y0,
-        dx12 = x2 - x1,
-        dy12 = y2 - y1;
-    int16_t sa = 0, sb = 0;
-
-    // For upper part of triangle, find scanline crossings for segment
-    // 0-1 and 0-2.  If y1=y2 (flat-bottomed triangle), the scanline y
-    // is included here (and second loop will be skipped, avoiding a /
-    // error there), otherwise scanline y1 is skipped here and handle
-    // in the second loop...which also avoids a /0 error here if y0=y
-    // (flat-topped triangle)
-    if(y1 == y2) last = y1;   // Include y1 scanline
-    else         last = y1-1; // Skip it
-
-    for(y=y0; y<=last; y++) {
-        a   = x0 + sa / dy01;
-        b   = x0 + sb / dy02;
-        sa += dx01;
-        sb += dx02;
-        // longhand a = x0 + (x1 - x0) * (y - y0) / (y1 - y0)
-        //          b = x0 + (x2 - x0) * (y - y0) / (y2 - y0)
-        lcd_hline(a, b, y);
-    }
-
-    // For lower part of triangle, find scanline crossings for segment
-    // 0-2 and 1-2.  This loop is skipped if y1=y2
-    sa = dx12 * (y - y1);
-    sb = dx02 * (y - y0);
-    for(; y<=y2; y++) {
-        a   = x1 + sa / dy12;
-        b   = x0 + sb / dy02;
-        sa += dx12;
-        sb += dx02;
-        // longhand a = x1 + (x2 - x1) * (y - y1) / (y2 - y1)
-        //          b = x0 + (x2 - x0) * (y - y0) / (y2 - y0)
-        lcd_hline(a, b, y);
-    }
-}*/
-
-
 // Draws a circle with center at x,y with given radius.
 // Set show to 1 to draw pixel, set to 0 to hide pixel.
 void lcd_circle(uint8_t x, uint8_t y, uint8_t radius, uint8_t c) {
@@ -597,6 +540,11 @@ Print a char on the LCD
 		u8Char = char to display
 -------------------------------------------------------------------------------*/
 void putchar5x8(char u8Char) {
+    if(u8Char=='\n') {
+        u8CursorY++;
+        u8CursorX=0;
+        return;
+    }
     uint16_t FontPointer = (unsigned int)(Font5x8)+(u8Char)*(5);
 	uint8_t data;
     uint8_t *DisplayPointer = Disp_send.DataAddress -(u8CursorX)*18 + (u8CursorY);

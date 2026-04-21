@@ -827,32 +827,46 @@ const uint16_t Batt_Levels[12] PROGMEM = {
     3400, 3500, 3570, 3640, 3710, 3780, 3850, 3920, 3990, 4060, 4130, 4200
 };
 
+static void AdcEnable(uint8_t ctrlb, uint8_t mux, uint8_t prescaler) {
+    PR.PRPA       &= 0b11111101;
+    ADCA.CTRLA     = 0x01;
+    ADCA.CTRLB     = ctrlb;
+    ADCA.REFCTRL   = 0x40;
+    ADCA.CH0.MUXCTRL = mux;
+    ADCA.INTFLAGS  = 0xFF;
+    ADCA.PRESCALER = prescaler;
+}
+
+static void AdcDisable(void) {
+    ADCA.REFCTRL = 0x00;
+    PR.PRPA     |= 0b00000010;
+}
+
+static int16_t AdcAccumulate16(uint8_t ctrl) {
+    int16_t sum = 0;
+    for(uint8_t i = 0; i < 16; i++) {
+        ADCA.CH0.CTRL = ctrl;
+        while(ADCA.INTFLAGS == 0);
+        ADCA.INTFLAGS = 0x01;
+        sum += (int16_t)ADCA.CH0RES;
+    }
+    return sum;
+}
+
 // Measure Vin with 40kOhm load, assuming that VCC is 3V
 // scale == 0, return value between 1 and 44, or 0 if charging
 // scale != 0, return ADC result
 int16_t MeasureVin(uint8_t scale) {
     BATT_TEST_ON();                 // Connect 40kOhm load
-    PR.PRPA  &= 0b11111101;         // Enable ADCA module
-    ADCA.CTRLA   = 0x01;            // Enable ADC
-    ADCA.CTRLB   = 0x70;            // Limit ADC current, signed mode, no free run, 12 bit right
-    ADCA.REFCTRL = 0x40;            // REF = VCC/2 (1.5V)
-	ADCA.CH0.MUXCTRL = 0b00110100;  // Channel 0 input: ADC6 pin - INTGND
-    ADCA.PRESCALER = 0x00;          // DIV4 (CPU is running at 2MHz)
-    int16_t adc_read=0;
-    for(uint8_t i=0; i<16; i++) {   // Add 16 measurements
-        ADCA.CH0.CTRL = 0x9F;       // Start conversion, Differential with gain (0.5x)
-        while(ADCA.INTFLAGS==0);
-        ADCA.INTFLAGS = 0x01;       // Clear interrupt flag
-        adc_read += (int16_t)ADCA.CH0RES;
-    }
+    AdcEnable(0x70, 0b00110100, 0x00); // 12-bit, ADC6-INTGND, DIV4
+    int16_t adc_read = AdcAccumulate16(0x9F); // Differential with gain 0.5x
     BATT_TEST_OFF();
 	// Vin = 2*V(ADC6)
 	// RES*Vref/2048 = V(AD6)/2 = Vin/4     // (The gain is 0.5)
 	// RES*4*1500/2048 = Vin
 	// Vin = (6000*RES)/2048 = (375*16*RES) / 2048
 	int16_t volt=((int32_t)(adc_read)*375)>>11;
-    ADCA.REFCTRL = 0x00;            // Bandgap off    
-    PR.PRPA  |= 0b00000010;         // Disable ADCA
+    AdcDisable();
     if(scale) return volt;
     if(volt>4350) return 0;
     if(volt>=4199) return 45;
@@ -877,65 +891,43 @@ int16_t MeasureVin(uint8_t scale) {
 
 // Measure External 2.048V reference assuming VCC/2 is 1.5V
 int16_t MeasureVRef(void) {
-	PR.PRPA  &= 0b11111101;         // Enable ADCA module
-	ADCA.CTRLA   = 0x01;            // Enable ADC
-	ADCA.CTRLB   = 0x70;            // Limit ADC current, signed mode, no free run, 12 bit right
-	ADCA.REFCTRL = 0x40;            // REF = VCC/2 (1.5V)
-    ADCA.INTFLAGS = 0xFF;           // Clear all interrupt flag
-	ADCA.CH0.MUXCTRL   = 0x38;      // Channel 0 input: ADC7 pin  (1.024V)
-	if(CLK.CTRL==0) {               // CPU is running at 2MHz
-		ADCA.PRESCALER = 0x00;      // DIV4
-	}
-	else {                          // CPU is running at 32MHz
-		ADCA.PRESCALER = 0x04;      // DIV64
-	}
-    int16_t adc_read=0;
-    for(uint8_t i=0; i<16; i++) {   // Add 16 measurements
-	    ADCA.CH0.CTRL = 0x81;       // Start conversion, Single-ended positive input signal
-	    while(ADCA.INTFLAGS==0);
-	    ADCA.INTFLAGS = 0x01;       // Clear interrupt flag
+    uint8_t prescaler = (CLK.CTRL == 0) ? 0x00 : 0x04; // DIV4 @ 2MHz, DIV64 @ 32MHz
+    AdcEnable(0x70, 0x38, prescaler);   // 12-bit, ADC7, prescaler
+    int16_t adc_read = 0;
+    for(uint8_t i = 0; i < 16; i++) {  // Add 16 measurements, also randomize seed
+        ADCA.CH0.CTRL = 0x81;
+        while(ADCA.INTFLAGS == 0);
+        ADCA.INTFLAGS = 0x01;
         adc_read += (int16_t)ADCA.CH0RES;
-        Randomize(ADCA.CH0RES);     // Also use the ADC measurement to further randomize the seed
+        Randomize(ADCA.CH0RES);
         delay_ms(1);
-    }        
+    }
 	// VRef = 2*V(ADC7)
 	// RES*Vref/2048 = V(ADC7) = VRef/2
 	// RES*2*1500/2048 = VRef
 	// Vin = (375 * RES) / 256 = (375 * 16*RES) / 4096
-	int16_t volt=((int32_t)(adc_read)*375) >> 12;
-	ADCA.REFCTRL = 0x00;            // Bandgap off
-	PR.PRPA  |= 0b00000010;         // Disable ADCA
+	int16_t volt = ((int32_t)adc_read * 375) >> 12;
+    AdcDisable();
 	return volt;
 }
 
 // Measure VCC (3V) assuming ADC7 is 1.024V
 int16_t MeasureVCC(void) {
-    PR.PRPA  &= 0b11111101;         // Enable ADCA module
-    ADCA.CTRLA   = 0x01;            // Enable ADC
-    ADCA.CTRLB   = 0x10;            // No limit ADC current, signed mode, no free run, 12 bit right
-    ADCA.REFCTRL = 0x40;            // REF = VCC/2 (1.5V)
-    ADCA.CH0.MUXCTRL    = 0x38;     // Channel 0 input: ADC7 pin (1.024V)
-	delay_ms(1);
-    ADCA.INTFLAGS = 0xFF;           // Clear all interrupt flag
-	if(CLK.CTRL==0) {               // CPU is running at 2MHz
-		ADCA.PRESCALER = 0x02;      // DIV16
-	}
-	else {                          // CPU is running at 32MHz
-		ADCA.PRESCALER = 0x07;      // DIV512
-	}
-    int16_t adc_read=0;
-    for(uint8_t i=0; i<16; i++) {   // Add 16 measurements
-        ADCA.CH0.CTRL = 0x81;       // Start conversion, Single-ended positive input signal
-    	while(ADCA.INTFLAGS==0);
-    	ADCA.INTFLAGS = 0x01;       // Clear interrupt flag
+    delay_ms(1);
+    uint8_t prescaler = (CLK.CTRL == 0) ? 0x02 : 0x07; // DIV16 @ 2MHz, DIV512 @ 32MHz
+    AdcEnable(0x10, 0x38, prescaler);   // no current limit, 12-bit, ADC7, prescaler
+    int16_t adc_read = 0;
+    for(uint8_t i = 0; i < 16; i++) {  // Add 16 measurements
+        ADCA.CH0.CTRL = 0x81;
+        while(ADCA.INTFLAGS == 0);
+        ADCA.INTFLAGS = 0x01;
         adc_read += (int16_t)ADCA.CH0RES;
         delay_ms(1);
     }
 	// RES*Vref/2048 = V(ADC7)
 	// RES*(VCC/2)/2048 = 1024
     // VCC = 1024*2048*2/RES = 16*1024*2048*2/16*RES
-	int16_t volt=67108864/(int32_t)adc_read;
-	ADCA.REFCTRL = 0x00;            // Bandgap off
-	PR.PRPA  |= 0b00000010;         // Disable ADCA
+	int16_t volt = 67108864 / (int32_t)adc_read;
+    AdcDisable();
 	return volt;
 }

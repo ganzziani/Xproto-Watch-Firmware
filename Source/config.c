@@ -33,22 +33,21 @@ void Diagnose(void) {
         lcd_goto(0,0);
         print5x8(VERSION); print5x8(PSTR(" Build: "));
         printhex5x8(BUILD_NUMBER>>8); printhex5x8(BUILD_NUMBER&0x00FF);
-        lcd_goto(0,1); print5x8(PSTR("TimerC: ")); printhex5x8(TCC1.CNTH); printhex5x8(TCC1.CNTL);
-        lcd_goto(0,2); print5x8(PSTR("TimerF: ")); printhex5x8(TCF0.CNTH); printhex5x8(TCF0.CNTL);
-        lcd_goto(0,3); print5x8(PSTR("XMEGA:  rev")); putchar5x8('A'+MCU.REVID);
-        lcd_goto(0,4); print5x8(PSTR("Logic:  ")); printhex5x8(VPORT2.IN);   // Shows the logic input data
-        lcd_goto(0,5); print5x8(PSTR("Reset:  ")); printhex5x8(RST.STATUS);    // Show reset cause
+        print5x8(STR_Reset); printhex5x8(RST.STATUS);     // Show reset cause
+        print5x8(PSTR("\nTimerC: ")); printhex5x8(TCC1.CNTH); printhex5x8(TCC1.CNTL);
+        print5x8(PSTR("\nTimerF: ")); printhex5x8(TCF0.CNTH); printhex5x8(TCF0.CNTL);
+        //lcd_goto(0,3); print5x8(PSTR("XMEGA:  rev")); putchar5x8('A'+MCU.REVID);
+        print5x8(PSTR("\nLogic:  ")); printhex5x8(VPORT2.IN);      // Shows the logic input data
         ANALOG_ON();
-        lcd_goto(0,6); print5x8(PSTR("Vin:    ")); print16_5x8(MeasureVin(1));
+        print5x8(PSTR("\nVin:    ")); print16_5x8(MeasureVin(1));
         cli();
         SecTimeout = SREG;  // MeasureVCC alters the T bit!
-        lcd_goto(0,7); print5x8(PSTR("VCC:    ")); print16_5x8(MeasureVCC());
+        print5x8(PSTR("\nVCC:    ")); print16_5x8(MeasureVCC());
         SREG = SecTimeout;
         sei();
-        lcd_goto(0,8); print5x8(PSTR("VRef:   ")); print16_5x8(MeasureVRef());
+        print5x8(PSTR("\nVRef:   ")); print16_5x8(MeasureVRef());
         ANALOG_OFF();
-        lcd_goto(0,9); print5x8(PSTR("Clock:  ")); printhex5x8(CLK.CTRL); printhex5x8(OSC.CTRL); printhex5x8(OSC.STATUS); printhex5x8(OSC.XOSCFAIL);
-        lcd_goto(1,15); print5x8(PSTR("OFFSET  LIGHT   SPEED"));
+        print5x8(PSTR("\nClock:  ")); printhex5x8(CLK.CTRL); printhex5x8(OSC.CTRL); printhex5x8(OSC.STATUS); printhex5x8(OSC.XOSCFAIL);
         OFFRED();
         OFFGRN();
         for(uint8_t i=0; i<16; i++) {           // Print GPIO registers
@@ -56,6 +55,7 @@ void Diagnose(void) {
             else lcd_goto((i-8)*16,11);
             printhex5x8(*((uint8_t *)i));
         }
+        lcd_goto(1,15); print5x8(PSTR("OFFSET  LIGHT   SPEED"));
         if(testbit(Misc,userinput)) {
             clrbit(Misc, userinput);
             if(testbit(Buttons,KML)) setbit(MStatus, goback);
@@ -102,7 +102,7 @@ void About(void) {
     lcd_goto(1,14); print5x8(PSTR("Build Date 20")); printN5x8(BUILD_YEAR);
     putchar5x8('/'); printN5x8(BUILD_MONTH);
     putchar5x8('/'); printN5x8(BUILD_DAY);
-    lcd_goto(1,15); print5x8(PSTR("RST:")); printhex5x8(RST.STATUS);    // Show reset cause
+    print5x8(STR_Reset); printhex5x8(RST.STATUS);    // Show reset cause
     uint8_t timeout=120;
     do {
         ANALOG_ON();        // Turn on analog circuits to be ready to read Vref
@@ -231,7 +231,7 @@ void OWSettings(void) {
     do {
         clr_display();
         lcd_goto(28,0); print5x8(&STRS_mainmenu[3][0]);    // STRS_mainmenu[3][0] contains the word Settings
-        for(uint8_t i=0; i<5; i++) {
+        for(uint8_t i=0; i<5; i++) {   // case 5 (Sunrise/Sunset) not yet implemented
             lcd_goto(2,i+2); 
             if(i==select) {
                 putchar5x8('-'); putchar5x8(0x81); // Print arrow
@@ -252,7 +252,7 @@ void OWSettings(void) {
                 case 4: // Show Moon icon
                     if(testbit(WSettings,ShowMoon)) setbit(Misc,negative);
                 break;
-                case 5: // Show Sunrise and Sunset times
+/*                case 5: // Show Sunrise and Sunset times
                     if(testbit(WSettings,ShowSun)) setbit(Misc,negative);
                 break;
                 case 6: // Language
@@ -260,7 +260,7 @@ void OWSettings(void) {
                 case 7: // Latitude
                 break;
                 case 8: // Longitude
-                break;
+                break;*/
             }
             print5x8(STRS_Settings[i]);
             clrbit(Misc,negative);
@@ -285,7 +285,7 @@ void OWSettings(void) {
                     case 2: togglebit(WSettings, PostYear);  break;
                     case 3: togglebit(WSettings, PostMonth); break;
                     case 4: togglebit(WSettings, ShowMoon);  break;
-                    case 5: togglebit(WSettings, ShowSun);   break;
+                    //case 5: togglebit(WSettings, ShowSun);   break;
                 }
             }
             if(select>=5) select=0;

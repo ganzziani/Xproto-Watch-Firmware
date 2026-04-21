@@ -521,7 +521,7 @@ set_pixel_body:
 .global clr_pixel_buffer
 clr_pixel_buffer:
     movw    r30, r20                ; Load passed pointer into Z (r30=lo, r31=hi)
-    rjmp    set_pixel_body
+    rjmp    clr_pixel_body
 
 ; LS013B7DH03 128x128 memory LCD
 ; Disp_send.display_data[(uint16_t)((127-x)*18) + (y>>3)] &= ~(uint8_t)(0x80 >> (y & 0x07));

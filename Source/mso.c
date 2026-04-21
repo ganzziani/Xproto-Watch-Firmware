@@ -10,6 +10,9 @@
 #include "utils.h"
 #include "config.h"
 
+static uint16_t slow_count;
+static uint32_t slow_sum1, slow_sum2;
+
 // Function prototypes
 static void Reduce(void);
 static void RestorefromMeter(void);		        // Restores srate and gains
@@ -3032,6 +3035,7 @@ void Apply(void) {
     TCE1.CTRLA = 0;		    // TCE1 controls Interrupt ADC, srate: 6, 7, 8, 9, 10 and fixed value for slow sampling
     TCE1.CTRLB = 0;
     TCE1.INTCTRLA = 0;
+    slow_count = 0; slow_sum1 = 0; slow_sum2 = 0;
     TCC1.CTRLA = 0;
     TCC1.CTRLB = 0;
     // TCC0 controls the auto trigger and auto key repeat
@@ -3134,8 +3138,6 @@ void Apply(void) {
 
 // Slow sampling control - 640Hz or 1600Hz
 ISR(TCE1_OVF_vect) {
-    static uint16_t count=0;
-    static uint32_t sum1,sum2;
     uint8_t mul,chd,ch1,ch2,sch1,sch2;
     uint8_t ou8CursorX,ou8CursorY;
 
@@ -3159,17 +3161,17 @@ ISR(TCE1_OVF_vect) {
         if(testbit(CH2ctrl,submult)) ch2=addwsat(ch2,-(int8_t)sch1);   // CH1+CH2
         else ch2=mul;                                                  // CH1*CH2
     }
-    sum1+=ch1;
-    sum2+=ch2;
+    slow_sum1+=ch1;
+    slow_sum2+=ch2;
 
-    count++;
+    slow_count++;
     setbit(Misc,slowacq);
-    if(count>=T.SCOPE.slowval) {
-        count=0;
+    if(slow_count>=T.SCOPE.slowval) {
+        slow_count=0;
         // Average
-        if(testbit(CH1ctrl,chaverage)) ch1=sum1/T.SCOPE.slowval;
-        if(testbit(CH2ctrl,chaverage)) ch2=sum2/T.SCOPE.slowval;
-        sum1=0; sum2=0;
+        if(testbit(CH1ctrl,chaverage)) ch1=slow_sum1/T.SCOPE.slowval;
+        if(testbit(CH2ctrl,chaverage)) ch2=slow_sum2/T.SCOPE.slowval;
+        slow_sum1=0; slow_sum2=0;
         if(testbit(Display,elastic)) {
             ch1=average(T.SCOPE.DC.CH1data[Index],ch1);
             ch2=average(T.SCOPE.DC.CH2data[Index],ch2);
@@ -3190,7 +3192,7 @@ ISR(TCE1_OVF_vect) {
     }
     if(testbit(MFFT, scopemode) && !testbit(Mcursors,roll)) {  // Draw data if in scope mode
         // Draw Channel 1
-        if(count==0 || !testbit(CH1ctrl,chaverage)) {
+        if(slow_count==0 || !testbit(CH1ctrl,chaverage)) {
             uint8_t oldch1;
             // Apply position
             ch1=addwsat(ch1,M.CH1pos);
@@ -3210,7 +3212,7 @@ ISR(TCE1_OVF_vect) {
             }
         }
         // Draw Channel 2
-        if(count==0 || !testbit(CH2ctrl,chaverage)) {
+        if(slow_count==0 || !testbit(CH2ctrl,chaverage)) {
             uint8_t oldch2;
             // Apply position
             ch2=addwsat(ch2,M.CH2pos);
@@ -3258,7 +3260,7 @@ ISR(TCE1_OVF_vect) {
         }
     }
     else if(testbit(MFFT, fftmode) && testbit(Display,showset)) set_pixel(Index>>1, 63);   // FFT progress
-    if(count==0) {
+    if(slow_count==0) {
         Index++;
         if(Index==0) {
             setbit(Misc,sacquired);
@@ -3307,46 +3309,25 @@ ISR(TCC2_LUNF_vect) {
     setbit(Display, trgtimeout);
 }
 
+static void SetupDMACh(DMA_CH_t *ch, uint8_t trigsrc, volatile void *src, volatile void *dest) {
+    setbit(ch->CTRLA, 6);                       // reset channel
+    ch->ADDRCTRL  = 0b00000101;                 // src fixed, incr dest, reload dest @ end block
+    ch->TRIGSRC   = trigsrc;
+    ch->TRFCNT    = 512;
+    ch->DESTADDR0 = ((uint16_t)dest >> 0) & 0xFF;
+    ch->DESTADDR1 = ((uint16_t)dest >> 8) & 0xFF;
+    ch->SRCADDR0  = ((uint16_t)src  >> 0) & 0xFF;
+    ch->SRCADDR1  = ((uint16_t)src  >> 8) & 0xFF;
+    ch->CTRLA     = 0b00100100;                 // repeat, 1 byte burst
+}
+
 void StartDMAs(void) {
-    setbit(DMA.CH0.CTRLA,6);    // reset DMA CH0
-    setbit(DMA.CH1.CTRLA,6);    // reset DMA CH1
-    // DMA for ADC CH0
-    DMA.CH0.ADDRCTRL  = 0b00000101;         // Source fixed, incr dest, reload dest @ end block
-    DMA.CH0.TRIGSRC   = 0x10;               // ADCA CH0 is trigger source
-    DMA.CH0.TRFCNT    = 512;                // buffer size
-    DMA.CH0.DESTADDR0 = (((uint16_t) T.SCOPE.TempCH1)>>0*8) & 0xFF;
-    DMA.CH0.DESTADDR1 = (((uint16_t) T.SCOPE.TempCH1)>>1*8) & 0xFF;
-//  DMA.CH0.DESTADDR2 = 0;
-    DMA.CH0.SRCADDR0  = (((uint16_t)(&ADCA.CH0.RESL))>>0*8) & 0xFF;
-    DMA.CH0.SRCADDR1  = (((uint16_t)(&ADCA.CH0.RESL))>>1*8) & 0xFF;
-//  DMA.CH0.SRCADDR2  = 0;
-    DMA.CH0.CTRLA     = 0b00100100;         // repeat, 1 byte burst
-    // DMA for logic
+    SetupDMACh(&DMA.CH0, 0x10, &ADCA.CH0.RESL, T.SCOPE.TempCH1); // ADC CH0 → CH1 buf
     if(testbit(CHDctrl,chon)) {
         WaitDisplay();                          // Let display finish using DMA
-        setbit(DMA.CH2.CTRLA,6);                // reset DMA CH2
-        DMA.CH2.ADDRCTRL  = 0b00000101;         // Source fixed, incr dest, reload dest @ end block
-        DMA.CH2.TRIGSRC   = 0x10;               // ADCA CH0 is trigger source
-        DMA.CH2.TRFCNT    = 512;                // buffer size
-        DMA.CH2.DESTADDR0 = (((uint16_t) T.SCOPE.TempCHD)>>0*8) & 0xFF;
-        DMA.CH2.DESTADDR1 = (((uint16_t) T.SCOPE.TempCHD)>>1*8) & 0xFF;
-    //  DMA.CH2.DESTADDR2 = 0;
-        DMA.CH2.SRCADDR0  = (((uint16_t)(&VPORT2.IN))>>0*8) & 0xFF;
-        DMA.CH2.SRCADDR1  = (((uint16_t)(&VPORT2.IN))>>1*8) & 0xFF;
-    //  DMA.CH2.SRCADDR2  = 0;
-        DMA.CH2.CTRLA     = 0b00100100;         // repeat, 1 byte burst
+        SetupDMACh(&DMA.CH2, 0x10, &VPORT2.IN, T.SCOPE.TempCHD); // logic → CHD buf
     }
-    // DMA for ADC CH1
-    DMA.CH1.ADDRCTRL  = 0b00000101;         // Source fixed, incr dest, reload dest @ end block
-    DMA.CH1.TRIGSRC   = 0x10;               // ADCA CH0 is trigger source (Using ADCB CH0 as source produces a bug..)
-    DMA.CH1.TRFCNT    = 512;                // buffer size
-    DMA.CH1.DESTADDR0 = (((uint16_t) T.SCOPE.TempCH2)>>0*8) & 0xFF;
-    DMA.CH1.DESTADDR1 = (((uint16_t) T.SCOPE.TempCH2)>>1*8) & 0xFF;
-//  DMA.CH1.DESTADDR2 = 0;
-    DMA.CH1.SRCADDR0  = (((uint16_t)(&ADCB.CH0.RESL))>>0*8) & 0xFF;
-    DMA.CH1.SRCADDR1  = (((uint16_t)(&ADCB.CH0.RESL))>>1*8) & 0xFF;
-//  DMA.CH1.SRCADDR2  = 0;
-    DMA.CH1.CTRLA     = 0b00100100;     // repeat, 1 byte burst
+    SetupDMACh(&DMA.CH1, 0x10, &ADCB.CH0.RESL, T.SCOPE.TempCH2); // ADC CH1 → CH2 buf (ADCB trigger has a bug, use 0x10)
     // Start DMAs
     if(testbit(CHDctrl,chon)) setbit(DMA.CH2.CTRLA, 7);
     setbit(DMA.CH0.CTRLA, 7);           

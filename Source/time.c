@@ -1,6 +1,6 @@
 // TO DO: Temperature compensation:
 // f = fo (1-PPM(T-To))^2
-// RTC will lose time if the temperature is increased or decreased from the room temperature value (25°C)
+// RTC will lose time if the temperature is increased or decreased from the room temperature value (25Â°C)
 // Coefficient = ?T^2 x -0.036 ppm
 //The firmware repeats the following steps once per minute to calculate and accumulate lost time.
 // 1. The ADC is used to measure the die temperature from the on-chip temperature sensor.
@@ -485,17 +485,12 @@ void DigitalFace(void) {
 }
 
 void ShowMoonIcon(uint8_t row, uint8_t col) {
-    uint8_t index, Phase;
-    Phase = MoonPhase;
-    if(Phase < 7) index = 0;            //   0-  6 ( 0- 3%) New Moon
-    else if(Phase < 52) index = 8;      //   7- 51 ( 3-22%) Waxing Crescent
-    else if(Phase < 66) index = 16;     //  52- 65 (22-28%) First Quarter
-    else if(Phase < 111) index = 24;    //  66-110 (28-47%) Waxing Gibbous
-    else if(Phase < 125) index = 32;    // 111-124 (47-53%) Full Moon
-    else if(Phase < 170) index = 40;    // 125-169 (53-72%) Waning Gibbous
-    else if(Phase < 184) index = 48;    // 170-183 (72-78%) Last Quarter
-    else if(Phase < 229) index = 56;    // 184-228 (78-97%) Waning Crescent: 
-    else index = 0;                     // 229-236:         Back to New Moon
+    uint8_t index = 0;
+    for(uint8_t i = 0; i < 8; i++) {
+        if(MoonPhase < pgm_read_byte(&MoonPhaseThresh[i])) break;
+        index += 8;
+    }
+    if(index >= 64) index = 0;  // Phase >= 229: back to New Moon
     uint8_t *DisplayPointer = Disp_send.DataAddress -(row)*18 + (col);
     SetPData(DisplayPointer, &MoonPhaseBMP[index], 8);
 }
@@ -543,18 +538,14 @@ void AnalogFace(void) {
         clr_display();
         clrbit(WatchBits, dateChanged);
         if(!testbit(WSettings, style)) {
-            lcd_goto( 58,  1); printN_5x8(12);  // Hour numbers around the circle
-            lcd_goto( 82,  2); printN_5x8(1);
-            lcd_goto(100,  5); printN_5x8(2);
-            lcd_goto(108,  8); printN_5x8(3);
-            lcd_goto(100, 11); printN_5x8(4);
-            lcd_goto( 80, 13); printN_5x8(5);
-            lcd_goto( 55, 14); printN_5x8(6);
-            lcd_goto( 31, 13); printN_5x8(7);
-            lcd_goto( 11, 11); printN_5x8(8);
-            lcd_goto(  3,  8); printN_5x8(9);
-            lcd_goto( 14,  5); printN_5x8(10);
-            lcd_goto( 30,  2); printN_5x8(11);
+            static const uint8_t hour_xy[12][2] PROGMEM = {  // Hour numbers around the circle
+                { 58, 1},{ 82, 2},{100, 5},{108, 8},{100,11},{ 80,13},
+                { 55,14},{ 31,13},{ 11,11},{  3, 8},{ 14, 5},{ 30, 2}
+            };
+            for(uint8_t i=0; i<12; i++) {
+                lcd_goto(pgm_read_byte(&hour_xy[i][0]), pgm_read_byte(&hour_xy[i][1]));
+                printN_5x8(i==0 ? 12 : i);
+            }
             for(uint8_t i=0; i<60; i++) {       // Circumference markers
                 set_line(63+Sine60(i,60),63-Cosine60(i,60),
                 63+Sine60(i,63),63-Cosine60(i,63));
@@ -591,21 +582,21 @@ void AnalogFace(void) {
     PrintHands(h, m, s);
 }
 
+static void DrawHand(uint8_t angle, uint8_t half_base, uint8_t length) {
+    fillTriangle(
+        63+Sine60(angle-half_base+60, 8), 63-Cosine60(angle-half_base+60, 8),
+        63+Sine60(angle+half_base,    8), 63-Cosine60(angle+half_base,    8),
+        63+Sine60(angle,         length), 63-Cosine60(angle,         length),
+        PIXEL_TGL);
+}
+
 void PrintHands(uint8_t h, uint8_t m, uint8_t s) {
     if(h>=12) h-=12;
     h=h*5+m/12; // Add minutes/12 to hour needle (5 transitions per hour)
-    // Hours
-    fillTriangle(63+Sine60(h-5+60, 8), 63-Cosine60(h-5+60, 8),    // Add 60 to keep angle positive
-    63+Sine60(h+5,    8), 63-Cosine60(h+5,    8),
-    63+Sine60(h,     36), 63-Cosine60(h,     36), PIXEL_TGL);
-    // Minutes
-    fillTriangle(63+Sine60(m-4+60, 8), 63-Cosine60(m-4+60, 8),
-    63+Sine60(m+4,    8), 63-Cosine60(m+4,    8),
-    63+Sine60(m,     50), 63-Cosine60(m,     50), PIXEL_TGL);    
-    // Seconds
-    if(!testbit(WSettings, style) && SecTimeout) {    
+    DrawHand(h, 5, 36);  // Hours
+    DrawHand(m, 4, 50);  // Minutes
+    if(!testbit(WSettings, style) && SecTimeout)
         set_line_c(63,63,63+Sine60(s,54),63-Cosine60(s,54), PIXEL_TGL);
-    }
 }
 
 void ShowAlarmTime(uint8_t col, uint8_t row) {
@@ -784,7 +775,7 @@ void Stopwatch(void) {
 void EditAlarms(void) {
     Type_Alarm Alarms[TOTAL_ALARMS-1];      // The last alarm slot is used for the Countdown timer
     eeprom_read_block(&Alarms, &EE_Alarms, (TOTAL_ALARMS-1)*sizeof(Type_Alarm));
-    uint8_t oldWSettings = MStatus;
+    uint8_t oldMStatus = MStatus;
     clrbit(MStatus, goback);
     setbit(Misc, redraw);
     uint8_t selectx=0, selecty=0;
@@ -903,7 +894,7 @@ void EditAlarms(void) {
         
     } while(!testbit(MStatus, goback) && SecTimeout);
     eeprom_write_block(&Alarms, &EE_Alarms, 4*sizeof(Type_Alarm));
-    MStatus = oldWSettings;
+    MStatus = oldMStatus;
     SoundOff();
     FindNextAlarm();
     clrbit(MStatus, goback);

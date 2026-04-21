@@ -11,6 +11,8 @@
 // 29.530588853 * 65536 = 1935316
 #define MOON_CYCLE_LENGTH 1935316UL
 
+const uint8_t MoonPhaseThresh[8] PROGMEM = {7,52,66,111,125,170,184,229};
+
 uint8_t CalculateMoonPhase(Type_Time *date) {
     // Calculate moon phase by counting moon cycles from known date
     Type_Time KnownNewMoon;     // Known new moon: January 25th 1944
@@ -78,16 +80,12 @@ void Moon(void) {
 		    lcd_goto(34,0);
 		    print5x8(PSTR("Moon Phase"));
             PrintDate(34,1,&date);
-            uint8_t index;
-            if(Phase < 7) index = 0;           // New Moon: 0-6 (0-3%)
-            else if(Phase < 52) index = 1;     // Waxing Crescent: 7-51 (3-22%)
-            else if(Phase < 66) index = 2;     // First Quarter: 52-65 (22-28%)
-            else if(Phase < 111) index = 3;    // Waxing Gibbous: 66-110 (28-47%)
-            else if(Phase < 125) index = 4;    // Full Moon: 111-124 (47-53%)
-            else if(Phase < 170) index = 5;    // Waning Gibbous: 125-169 (53-72%)
-            else if(Phase < 184) index = 6;    // Last Quarter: 170-183 (72-78%)
-            else if(Phase < 229) index = 7;    // Waning Crescent: 184-228 (78-97%)
-            else index = 0;                    // Back to New Moon: 229-236
+            uint8_t index = 0;
+            for(uint8_t i = 0; i < 8; i++) {
+                if(Phase < pgm_read_byte(&MoonPhaseThresh[i])) break;
+                index++;
+            }
+            if(index >= 8) index = 0;  // Phase >= 229: back to New Moon
             lcd_goto(24,13); print5x8(STRS_MoonPhase[index]);
             lcd_goto(0,15);  print5x8(STR_MoonMenu);
             dma_display();

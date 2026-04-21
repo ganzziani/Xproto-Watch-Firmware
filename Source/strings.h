@@ -37,5 +37,6 @@ extern const char STR_Human[];
 extern const char STR_Profiles[];
 extern const char STR_am[];
 extern const char STR_pm[];
+extern const char STR_Reset[];
 
 #endif

@@ -618,8 +618,8 @@ static void MoveStyx(void) {
             if(vlen < 1) vlen = 1;
 
             // Get vector components (scaled by line length)
-            int16_t x_offset = ((int32_t)Sin(T.QIX.Styx[i].vect_dir) * vlen) >> 1;
-            int16_t y_offset = ((int32_t)Cos(T.QIX.Styx[i].vect_dir) * vlen) >> 1;
+            int16_t x_offset = ((int16_t)Sin(T.QIX.Styx[i].vect_dir) * vlen) >> 1;
+            int16_t y_offset = ((int16_t)Cos(T.QIX.Styx[i].vect_dir) * vlen) >> 1;
 
             // Save old position in case we need to rollback
             fixed old_x = T.QIX.Styx[i].x;
@@ -912,15 +912,15 @@ static void DrawGame(void) {
     T.QIX.multiplier_timer--;
     if(T.QIX.multiplier_timer == 0) {
         uint8_t multiplier = T.QIX.score_multiplier;
-        multiplier++;
-        if(multiplier>3) {
-            multiplier=1;
+        if(multiplier>2) {
             // Higher multiplier factor is active for less time:
             // 3:  85 frames -> ~ 1.4 seconds
             // 2: 170 frames -> ~ 2.8 seconds
             // 1: 255 frames -> ~ 4.2 seconds
-             T.QIX.multiplier_timer = 85 * (4-multiplier);
+            T.QIX.multiplier_timer = 85 * (4-multiplier);
+            multiplier=0;
         }
+        multiplier++;
         T.QIX.score_multiplier = multiplier;
     }
     
