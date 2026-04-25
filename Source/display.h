@@ -43,7 +43,6 @@ void printN11x21(uint8_t x, uint8_t y, uint8_t Data, uint8_t digits);
 void SwitchBuffers(void);
 void clr_display(void);
 void displayBlack(void);
-void clr_display_all(void);
 void OR_display(uint8_t *BufferIn);
 void OR_display1(uint8_t *BufferIn);
 void pixel(uint8_t x, uint8_t y, uint8_t c);

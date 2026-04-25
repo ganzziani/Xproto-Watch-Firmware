@@ -100,7 +100,6 @@ const int8_t SIN60[] PROGMEM = {
 
 // Scaled Sine: 60 values -> 2*PI
 int8_t Sine60(uint8_t angle, int8_t scale) {
-    //    if(angle<0) angle=60-angle;
     while(angle>=60) angle-=60;
     int8_t temp = (int8_t)pgm_read_byte_near(SIN60+angle);
     return FMULS8R(temp, scale);
@@ -108,7 +107,6 @@ int8_t Sine60(uint8_t angle, int8_t scale) {
 
 // Scaled Cosine: 60 values -> 2*PI
 int8_t Cosine60(uint8_t angle, int8_t scale) {
-    //    if(angle<0) angle=-angle;
     angle+=15;
     while(angle>=60) angle-=60;
     int8_t temp = (int8_t)pgm_read_byte_near(SIN60+angle);

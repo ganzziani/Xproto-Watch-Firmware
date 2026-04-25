@@ -225,43 +225,20 @@ void ShowScreenshot(void) {
 }
 
 void OWSettings(void) {
+    // Menu order → WSettings bit position
+    static const uint8_t settings_bits[5] PROGMEM = {hourbeep, time24, PostYear, PostMonth, ShowMoon};
     clrbit(MStatus, goback);
     uint8_t select=0;
     uint8_t timeout=255;
     do {
         clr_display();
         lcd_goto(28,0); print5x8(&STRS_mainmenu[3][0]);    // STRS_mainmenu[3][0] contains the word Settings
-        for(uint8_t i=0; i<5; i++) {   // case 5 (Sunrise/Sunset) not yet implemented
-            lcd_goto(2,i+2); 
+        for(uint8_t i=0; i<5; i++) {
+            lcd_goto(2,i+2);
             if(i==select) {
                 putchar5x8('-'); putchar5x8(0x81); // Print arrow
             } else u8CursorX+=12;
-            switch(i) {
-                case 0: // Hourly beep
-                    if(testbit(WSettings, hourbeep)) setbit(Misc,negative);
-                break;
-                case 1: // 24 Hour format
-                    if(testbit(WSettings, time24)) setbit(Misc,negative);
-                break;
-                case 2: // Year at the end
-                    if(testbit(WSettings,PostYear)) setbit(Misc,negative);
-                break;
-                case 3: // Month after day
-                    if(testbit(WSettings,PostMonth)) setbit(Misc,negative);
-                break;
-                case 4: // Show Moon icon
-                    if(testbit(WSettings,ShowMoon)) setbit(Misc,negative);
-                break;
-/*                case 5: // Show Sunrise and Sunset times
-                    if(testbit(WSettings,ShowSun)) setbit(Misc,negative);
-                break;
-                case 6: // Language
-                break;
-                case 7: // Latitude
-                break;
-                case 8: // Longitude
-                break;*/
-            }
+            if(WSettings & (1 << pgm_read_byte(&settings_bits[i]))) setbit(Misc,negative);
             print5x8(STRS_Settings[i]);
             clrbit(Misc,negative);
         }
@@ -269,9 +246,6 @@ void OWSettings(void) {
         PrintDate(1,13,0);
         PrintTime(68,13);
         lcd_goto(1,15); print5x8(PSTR("TOGGLE"));
-        // lcd_goto(30,15); print5x8(Language); 
-        // lcd_goto(30,15); print5x8(PSTR("ALTITUDE")); 
-        // lcd_goto(80,15); print5x8(PSTR("LONGITUDE"));
         if(testbit(Misc,userinput)) {
             clrbit(Misc, userinput);
             timeout = 255;
@@ -279,14 +253,7 @@ void OWSettings(void) {
             if(testbit(Buttons,KUR) || testbit(Buttons,KUL)) select--;
             if(testbit(Buttons,KML)) setbit(MStatus, goback);
             if(testbit(Buttons,K1)) {   // Toggle
-                switch(select) {
-                    case 0: togglebit(WSettings, hourbeep);  break;
-                    case 1: togglebit(WSettings, time24);    break;
-                    case 2: togglebit(WSettings, PostYear);  break;
-                    case 3: togglebit(WSettings, PostMonth); break;
-                    case 4: togglebit(WSettings, ShowMoon);  break;
-                    //case 5: togglebit(WSettings, ShowSun);   break;
-                }
+                WSettings ^= (1 << pgm_read_byte(&settings_bits[select]));
             }
             if(select>=5) select=0;
         }

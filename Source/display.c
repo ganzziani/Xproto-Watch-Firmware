@@ -60,31 +60,6 @@ void displayBlack(void) {
     lcd_goto(0,0);
 }
 
-// Clear display buffers 1 and 2
-void clr_display_all(void) {
-    uint8_t *p;
-    p=Disp_send.display_data1;
-    for(uint8_t i=0; i<2; i++) {
-        for(uint8_t j=0; j<128; j++) {
-            // Unroll inner loop for speed - Clear 16 lines
-            #ifdef INVERT_DISPLAY
-            *p++=255; *p++=255; *p++=255; *p++=255;
-            *p++=255; *p++=255; *p++=255; *p++=255;
-            *p++=255; *p++=255; *p++=255; *p++=255;
-            *p++=255; *p++=255; *p++=255; *p++=255;            
-            #else
-            // Unroll inner loop for speed - Clear 16 lines
-            *p++=0; *p++=0; *p++=0; *p++=0;
-            *p++=0; *p++=0; *p++=0; *p++=0;
-            *p++=0; *p++=0; *p++=0; *p++=0;
-            *p++=0; *p++=0; *p++=0; *p++=0;            
-            #endif
-            p+=2;   // Skip line LCD setup
-        }
-        p=Disp_send.display_data2;
-    }
-}
-
 // Or the BufferIn into the active display buffer
 void OR_display(uint8_t *BufferIn) {
     uint8_t *p=Disp_send.SPI_Address+2;  // Locate pointer at start of active buffer;

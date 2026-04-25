@@ -8,11 +8,12 @@
 // Game states
 #define STATE_MENU      0
 #define STATE_INIT      1
-#define STATE_LEVELUP   2
-#define STATE_SPAWN     3
-#define STATE_PLAYING   4
-#define STATE_DIED      5
-#define STATE_GAMEOVER  6
+#define STATE_INITLEVEL 3
+#define STATE_LEVELUP   4
+#define STATE_SPAWN     5
+#define STATE_PLAYING   6
+#define STATE_DIED      7
+#define STATE_GAMEOVER  8
 
 // Game constants
 #define STYX_MAX        2       // Maximum Styx creatures
@@ -20,14 +21,18 @@
 #define TRAP_MAX        2       // Maximum traps
 #define DOT_MAX         60      // Maximum trap dots
 #define MAX_TRAIL       255     // Maximum trail length
-#define CAPTURE_GOAL    80      // Percentage to complete level
-#define STACK_MAX       380     // Flood fill stack size (increased for complex fills)
+// Capture completion: playfield interior is 124 x 117 = 14508 fillable pixels.
+// 80 % of 14508 ≈ 11607 pixels required to advance level.
+#define TOTAL_FILLABLE       14508      // (DISPLAY_MAX_X-3) * (DISPLAY_MAX_Y - UI_TOP_MARGIN - 2)
+#define CAPTURE_GOAL_PIXELS  11606      // ~80 % of TOTAL_FILLABLE
+// captureProgress is on a 0–127 scale so that scaling to any bar width is a shift.
+#define STACK_MAX       960     // Flood fill stack size (increased for complex fills)
 #define MAX_IDLE_TIME   250     // Max idle time before death
 
 // Styx movement constants
 #define STYX_RETRY_COUNT        3       // Number of retries to find valid line position
 #define STYX_BOUNDARY_MARGIN    3       // Minimum distance from screen edge for Styx
-#define STYX_MAX_DEFAULT        16      // Maximum Styx line vector length (multiplier; larger = longer lines)
+#define STYX_MAX_DEFAULT        20      // Maximum Styx line vector length (multiplier; larger = longer lines)
 #define STYX_SPEED              30      // Velocity divisor base: dx = int2fix(Sin(dir))/(STYX_SPEED-rand)
                                         // rand is 0-15, so actual divisor range is (STYX_SPEED-15)..STYX_SPEED
                                         // Higher value = slower Styx movement
@@ -113,14 +118,16 @@ typedef struct {
     uint8_t traps_active;
     uint8_t gameState;
     uint16_t filled_pixels;
-    uint8_t capturedPercent;
+    uint8_t captureProgress;      // 0–127 (127 ≈ 100 % captured)
     uint8_t score_multiplier;
     uint8_t multiplier_timer;
     uint8_t StyxSpeed;
     ManStruct Man;
     StyxStruct Styx[STYX_MAX];
     TrapStruct Traps[TRAP_MAX];
-    uint8_t LayerWall[DISPLAY_DATA_SIZE];
+    // Layer_Filled holds every "solid" pixel: perimeter walls, drawn walls, and
+    // captured-interior pixels. A pixel is a "wall" (walkable boundary) iff it
+    // is filled AND has at least one empty 4-neighbor (see is_wall() in qix.c).
     uint8_t LayerFilled[DISPLAY_DATA_SIZE];
     uint8_t LayerStyx[DISPLAY_DATA_SIZE];
     uint8_t FillStack[2][STACK_MAX];

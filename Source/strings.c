@@ -120,7 +120,7 @@ const char STRS_Settings[][18] PROGMEM = {
     " Year at the end ",
     " Month after day ",
     " Show Moon icon  ",
-    " Sunrise &Sunset ",
+//    " Sunrise &Sunset ",
 };
 
 const char STR_ON[] PROGMEM = " ON";

@@ -40,6 +40,8 @@ void BigPrintMonth(void);
 void BigPrintYear(void);
 void ShowMoonIcon(uint8_t row, uint8_t col);
 void PrintHands(uint8_t h, uint8_t m, uint8_t s);
+static void ShowBellIcon(void);
+static void PrintLap(uint8_t lapl, uint8_t lap, uint8_t h, uint8_t m, uint8_t s);
 
 const uint8_t monthDays[] PROGMEM = { 31,28,31,30,31,30,31,31,30,31,30,31 };		// Days in a month
 volatile uint8_t MoonPhase;
@@ -252,35 +254,16 @@ void Watch(void) {
                     setbit(WatchBits, dateChanged); // Make sure to clear the cursor
                 }                    
                 cli();  // Prevent the RTC interrupt from changing the time in this block
-                switch(Menu) {
-                    case SET_SECOND:
-                        if(testbit(Buttons,KUR)) NowSecond++;
-                        if(testbit(Buttons,KBR)) NowSecond--;
-                    break;
-                    case SET_MINUTE:
-                        if(testbit(Buttons,KUR)) NowMinute++;
-                        if(testbit(Buttons,KBR)) NowMinute--;
-                    break;
-                    case SET_HOUR:
-                        setbit(WatchBits, hourChanged);
-                        if(testbit(Buttons,KUR)) NowHour++;
-                        if(testbit(Buttons,KBR)) NowHour--;
-                    break;
-                    case SET_DAY:
-                        setbit(WatchBits, dateChanged);
-                        if(testbit(Buttons,KUR)) NowDay++;
-                        if(testbit(Buttons,KBR)) NowDay--;
-                    break;
-                    case SET_MONTH:
-                        setbit(WatchBits, dateChanged);
-                        if(testbit(Buttons,KUR)) NowMonth++;
-                        if(testbit(Buttons,KBR)) NowMonth--;
-                    break;
-                    case SET_YEAR:
-                        setbit(WatchBits, dateChanged);
-                        if(testbit(Buttons,KUR)) NowYear++;
-                        if(testbit(Buttons,KBR)) NowYear--;
-                    break;
+                // SET_SECOND..SET_YEAR (1..6) map to NowSecond..NowYear at GPIO0..GPIO5 (addresses 0..5)
+                if(Menu >= SET_SECOND && Menu <= SET_YEAR) {
+                    static const uint8_t set_flags[6] PROGMEM = {
+                        0, 0, 1<<hourChanged, 1<<dateChanged, 1<<dateChanged, 1<<dateChanged
+                    };
+                    uint8_t idx = Menu - SET_SECOND;
+                    volatile uint8_t *var = (volatile uint8_t *)(uintptr_t)idx;
+                    WatchBits |= pgm_read_byte(&set_flags[idx]);
+                    if(testbit(Buttons, KUR)) (*var)++;
+                    if(testbit(Buttons, KBR)) (*var)--;
                 }
                 SetTimeTimer();     // Validate time variables, update TCF0, enable interrupts
             }
@@ -417,9 +400,7 @@ void DigitalFace(void) {
 			else bitmap(2,0,BattPwrIcon); // If BattLevel is zero, Vin is  above 4.2V -> the device is charging
 			ShowAlarmTime(74, 0);
 			lcd_goto(118,0);
-			if(testbit(MStatus,alarm_on) &&											// Show bell character
-			(NowSecond&0x01 || !testbit(MStatus, sound_on))) putchar5x8(CHAR_BELL);   // Blink character at alarm time
-			else putchar5x8(' ');
+			ShowBellIcon();
         }            
         {
             uint8_t Ones=NowMinute, Tens=0;
@@ -493,6 +474,24 @@ void ShowMoonIcon(uint8_t row, uint8_t col) {
     if(index >= 64) index = 0;  // Phase >= 229: back to New Moon
     uint8_t *DisplayPointer = Disp_send.DataAddress -(row)*18 + (col);
     SetPData(DisplayPointer, &MoonPhaseBMP[index], 8);
+}
+
+// Show bell character when alarm is armed, blinking when sound is playing
+static void ShowBellIcon(void) {
+    if(testbit(MStatus,alarm_on) &&
+       (NowSecond&0x01 || !testbit(MStatus, sound_on))) putchar5x8(CHAR_BELL);
+    else putchar5x8(' ');
+}
+
+// Print "Lap NN:[ ]HH:MM:SS" at column 1, row lapl
+static void PrintLap(uint8_t lapl, uint8_t lap, uint8_t h, uint8_t m, uint8_t s) {
+    lcd_goto(1, lapl);
+    print5x8(PSTR("Lap "));
+    printN5x8(lap); putchar5x8(':');
+    if(h<100) putchar5x8(' ');
+    printN5x8(h); putchar5x8(':');
+    printN5x8(m); putchar5x8(':');
+    printN5x8(s);
 }
 
 void BigPrintMonth(void) {
@@ -575,9 +574,7 @@ void AnalogFace(void) {
     h = T.TIME.oldHour   = NowHour;
     if(!testbit(WSettings, style)) {
         lcd_goto(60,11);
-        if(testbit(MStatus,alarm_on) &&                                           // Show bell character
-        (NowSecond&0x01 || !testbit(MStatus, sound_on))) putchar5x8(CHAR_BELL);   // Blink character at alarm time
-        else putchar5x8(' ');
+        ShowBellIcon();
     }
     PrintHands(h, m, s);
 }
@@ -641,11 +638,7 @@ void CountDown(void) {
                 if(start) {    // LAP
                     lap++;
                     lapl++; if(lapl>=15) lapl=3;
-                    lcd_goto(1,lapl); print5x8(PSTR("  Lap ")); printN5x8(lap); putchar5x8(':');
-                    if(hour<100) putchar5x8(' ');
-                    printN5x8(hour); putchar5x8(':');
-                    printN5x8(minute); putchar5x8(':');
-                    printN5x8(second);
+                    PrintLap(lapl, lap, hour, minute, second);
                     } else {            // Stopped -> clear counter
                     hour=0; minute=0; second=0;
                     lapl = 2; lap=0;
@@ -721,11 +714,7 @@ void Stopwatch(void) {
                 if(TCC1.CTRLA) {    // LAP
                     lap++;
                     lapl++; if(lapl>=16) lapl=3;
-                    lcd_goto(6,lapl); print5x8(PSTR("Lap ")); printN5x8(lap); putchar5x8(':');
-                    if(hour<100) putchar5x8(' ');
-                    printN5x8(hour); putchar5x8(':');
-                    printN5x8(minute); putchar5x8(':');
-                    printN5x8(second); putchar5x8(':');
+                    PrintLap(lapl, lap, hour, minute, second); putchar5x8(':');
                     printN5x8(hundredth);
                 } else {            // Stopped -> clear counter
                     hour=0; minute=0; second=0; hundredth=0;

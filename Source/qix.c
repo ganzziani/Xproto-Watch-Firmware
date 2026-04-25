@@ -8,14 +8,11 @@
 #include "qix.h"
 
 // Sound Tunes stored in Flash Memory
-static const uint8_t TuneWallStart[] PROGMEM = { 10, NOTE_C6, 0 };
-static const uint8_t TuneStuck[] PROGMEM = { 30, NOTE_G6, 0 };
 static const uint8_t TuneSpawn[] PROGMEM = { 5, NOTE_C6, 5, NOTE_E6, 5, NOTE_G6, 5, NOTE_C7, 5, NOTE_E7, 5, NOTE_G7, 5, NOTE_C8, 0 };
 static const uint8_t TuneDead[] PROGMEM = { 20, NOTE_C7, 10, NOTE_OFF, 20, NOTE_G6, 10, NOTE_OFF, 20, NOTE_C6, 0 };
 static const uint8_t TuneLevelUp[] PROGMEM = { 20, NOTE_C6, 20, NOTE_E6, 20, NOTE_G6, 20, NOTE_C7, 0 };
-static const uint8_t TuneFill[] PROGMEM = { 5, NOTE_C6, 5, NOTE_D6, 5, NOTE_E6, 5, NOTE_F6, 5, NOTE_G6, 5, NOTE_A6, 5, NOTE_B6, 5, NOTE_C7, 0 };
-static const uint8_t TuneStyxClose[] PROGMEM = { 5, NOTE_C7, 5, NOTE_E7, 0 };
-static const uint8_t TuneStyxFar[] PROGMEM = { 10, NOTE_C6, 0 };
+static const uint8_t TuneFill[] PROGMEM = { 100, NOTE_C6, 100, NOTE_F7, 100, NOTE_G7, 0 };
+static const uint8_t TuneStartWall[] PROGMEM = { 10, NOTE_C6, 0 };
     
 static void QixEngine(void);
 static void HandleInput(void);          // Checks Buttons
@@ -36,6 +33,7 @@ static uint8_t fleft(uint8_t x, uint8_t y);   // Fill left into Layer_Styx
 static uint8_t scanne(uint8_t x, uint8_t y, uint8_t xmax);  // Scan for non-boundary pixel
 static uint8_t scaneq(uint8_t x, uint8_t y, uint8_t xmax);  // Scan for boundary pixel
 static uint8_t popcount8(uint8_t b);     // Count set bits in a byte
+static uint8_t is_wall(uint8_t x, uint8_t y);  // Filled pixel on a region boundary
 static void DrawGame(void);             // Render display
 
 // Precomputed direction deltas (index 0 unused)
@@ -48,12 +46,15 @@ static const uint8_t dir_right[5] = {0, DIR_RIGHT, DIR_LEFT,  DIR_UP,   DIR_DOWN
 static const uint8_t dir_back[5]  = {0, DIR_DOWN,  DIR_UP,    DIR_RIGHT,DIR_LEFT};
 
 // Buffer pointer offsets for display functions.
-// The display is rotated 90 degrees, so the lower-level pixel/line functions 
+// The display is rotated 90 degrees, so the lower-level pixel/line functions
 // expect pointers at a specific offset within the buffer. This offset compensates
 // for the rotation by pre-adjusting the base pointer position.
-// Offset = 127 * DISPLAY_BYTES_IN_ROW positions the pointer correctly for the 
+// Offset = 127 * DISPLAY_BYTES_IN_ROW positions the pointer correctly for the
 // rotated coordinate system used by set_line_buffer, toggle_line_buffer, etc.
-#define Layer_Wall      (T.QIX.LayerWall+127*DISPLAY_BYTES_IN_ROW)
+//
+// Layer_Filled holds every solid pixel — perimeter walls, drawn walls, and the
+// captured interior. Use is_wall(x, y) to ask "is this a walkable boundary
+// pixel" (filled with at least one empty 4-neighbor).
 #define Layer_Filled    (T.QIX.LayerFilled+127*DISPLAY_BYTES_IN_ROW)
 #define Layer_Styx      (T.QIX.LayerStyx+127*DISPLAY_BYTES_IN_ROW)
 
@@ -69,7 +70,7 @@ void Qix(void) {
                 clrbit(Misc, userinput);
                 if(testbit(Buttons, K1)) T.QIX.StyxSpeed = 90;
                 if(testbit(Buttons, K2)) T.QIX.StyxSpeed = 60;
-                if(testbit(Buttons, K3)) T.QIX.StyxSpeed = 30;
+                if(testbit(Buttons, K3)) T.QIX.StyxSpeed = 16;
                 if(testbit(Buttons, K1) || testbit(Buttons, K2) || testbit(Buttons, K3)) QixEngine();
                 if(testbit(Buttons, KML)) setbit(MStatus, goback);
             }
@@ -96,30 +97,34 @@ void QixEngine(void) {
                 T.QIX.level = 0;
                 T.QIX.score = 0;
                 T.QIX.Man.lives = 3;
-                T.QIX.gameState = STATE_LEVELUP;
-                T.QIX.Man.trailX[0] = DISPLAY_MAX_X / 2;   // Center of screen
-                T.QIX.Man.trailY[0] = DISPLAY_MAX_Y-1;     // On the bottom border
+                T.QIX.gameState = STATE_INITLEVEL;
             break;
             case STATE_LEVELUP:
+                Sound(TuneLevelUp);
+                // Stay in this state for a couple of seconds, then fall thru to the next state
+                for(int i=0; i<120; i++) DrawGame();         // Render display
+            case STATE_INITLEVEL:
+                T.QIX.Man.trailX[0] = DISPLAY_MAX_X / 2;   // Center of screen
+                T.QIX.Man.trailY[0] = DISPLAY_MAX_Y-1;     // On the bottom border
                 // Clear layers
                 for(uint16_t i = 0; i < DISPLAY_DATA_SIZE; i++) {
-                    T.QIX.LayerWall[i] = T.QIX.LayerFilled[i] = T.QIX.LayerStyx[i] = 0;
+                    T.QIX.LayerFilled[i] = T.QIX.LayerStyx[i] = 0;
                 }
-                // Draw main borders (leave top area for UI)
-                set_line_buffer(1, 8, DISPLAY_MAX_X-1, 8, Layer_Wall);
-                set_line_buffer(1, DISPLAY_MAX_Y-1, DISPLAY_MAX_X-1, DISPLAY_MAX_Y-1, Layer_Wall);
-                set_line_buffer(1, 8, 1, DISPLAY_MAX_Y-1, Layer_Wall);
-                set_line_buffer(DISPLAY_MAX_X-1, 8, DISPLAY_MAX_X-1, DISPLAY_MAX_Y-1, Layer_Wall);
-                // Outside of the main border will be considered filled, useful for functions that check boundaries
+                // Draw the perimeter walls into the combined Layer_Filled. These
+                // bound the flood-fill on their own — no separate outer sentinel
+                // is needed (and adding one would corrupt is_wall at the edges).
                 set_line_buffer(0, 7, DISPLAY_MAX_X, 7, Layer_Filled);
                 set_line_buffer(0, DISPLAY_MAX_Y, DISPLAY_MAX_X, DISPLAY_MAX_Y, Layer_Filled);
                 set_line_buffer(0, 7, 0, DISPLAY_MAX_Y, Layer_Filled);
                 set_line_buffer(DISPLAY_MAX_X, 7, DISPLAY_MAX_X, DISPLAY_MAX_Y, Layer_Filled);
+                set_line_buffer(1, 8, DISPLAY_MAX_X-1, 8, Layer_Filled);
+                set_line_buffer(1, DISPLAY_MAX_Y-1, DISPLAY_MAX_X-1, DISPLAY_MAX_Y-1, Layer_Filled);
+                set_line_buffer(1, 8, 1, DISPLAY_MAX_Y-1, Layer_Filled);
+                set_line_buffer(DISPLAY_MAX_X-1, 8, DISPLAY_MAX_X-1, DISPLAY_MAX_Y-1, Layer_Filled);
 
-                Sound(TuneLevelUp);
                 T.QIX.level++;
                 T.QIX.filled_pixels = 0;
-                T.QIX.capturedPercent = 0;
+                T.QIX.captureProgress = 0;
                 // Initialize score multiplier system
                 T.QIX.gameState = STATE_SPAWN;
                 InitTraps(T.QIX.level);
@@ -182,18 +187,24 @@ static void HandleInput(void) {
             uint8_t y = fix2int(T.QIX.Man.y);
             // Start/stop drawing with top buttons
             if (testbit(Buttons, KUL) || testbit(Buttons, KUR)) {
-                T.QIX.Man.action = MAN_DRAWING;
-                Sound(TuneWallStart);
-                // Find direction perpendicular to wall
-                if(get_pixel_buffer(x,y-1,Layer_Filled)) {
-                    direction = DIR_DOWN;
-                } else if(get_pixel_buffer(x,y+1,Layer_Filled)) {
-                    direction = DIR_UP;
-                } else if(get_pixel_buffer(x+1,y,Layer_Filled)) {
-                    direction = DIR_LEFT;
-                } else if(get_pixel_buffer(x-1,y,Layer_Filled)) {
-                    direction = DIR_RIGHT;
+                // Find a direction perpendicular to the wall pointing into
+                // empty (uncaptured) space — i.e. a 4-neighbor that is NOT in
+                // Layer_Filled. With one combined layer, walls and captured
+                // interior are both "filled", so empty == not filled.
+                uint8_t draw_dir = DIR_NONE;
+                if(y > UI_TOP_MARGIN && !get_pixel_buffer(x, y-1, Layer_Filled)) {
+                    draw_dir = DIR_UP;
+                } else if(y < DISPLAY_MAX_Y && !get_pixel_buffer(x, y+1, Layer_Filled)) {
+                    draw_dir = DIR_DOWN;
+                } else if(x > 0 && !get_pixel_buffer(x-1, y, Layer_Filled)) {
+                    draw_dir = DIR_LEFT;
+                } else if(x < DISPLAY_MAX_X && !get_pixel_buffer(x+1, y, Layer_Filled)) {
+                    draw_dir = DIR_RIGHT;
                 }
+                if(draw_dir == DIR_NONE) return;    // No empty side — stay walking
+                T.QIX.Man.action = MAN_DRAWING;
+                Sound(TuneStartWall);
+                direction = draw_dir;
                 T.QIX.Man.old_direction = direction;
                 T.QIX.Man.trailX[0] = x;
                 T.QIX.Man.trailY[0] = y;
@@ -220,7 +231,7 @@ static uint8_t PlayerInput(uint8_t motion, uint8_t x, uint8_t y) {
     for (uint8_t d = 1; d <= 4; d++) {
         uint8_t nx = x + dx[d];
         uint8_t ny = y + dy[d];
-        if (get_pixel_buffer(nx, ny, Layer_Wall)) {
+        if (is_wall(nx, ny)) {
             candidate[count++] = d;
             if (count == 2) break;
         }
@@ -289,11 +300,12 @@ static void MovePlayer(void) {
                 return;
             }
             
-            // Check if hit existing wall (completed area)
-            if(get_pixel_buffer(new_x, new_y, Layer_Wall)) {
-                // Transfer trail to the Wall and Filled buffers
+            // Check if hit existing wall (completed area). With one layer the
+            // player can only reach a "filled" pixel by walking into a wall —
+            // captured interior is enclosed and unreachable from empty space.
+            if(get_pixel_buffer(new_x, new_y, Layer_Filled)) {
+                // Transfer trail into the combined Layer_Filled
                 for(uint8_t i=0; i<T.QIX.Man.trail_len; i++) {
-                    set_pixel_buffer(T.QIX.Man.trailX[i], T.QIX.Man.trailY[i], Layer_Wall);
                     set_pixel_buffer(T.QIX.Man.trailX[i], T.QIX.Man.trailY[i], Layer_Filled);
                 }
                 DoFill();
@@ -352,7 +364,7 @@ static void Perimeter_Movement(uint8_t *direction, uint8_t x, uint8_t y, uint8_t
 
     for (uint8_t i = 0; i < 4; i++) {
         uint8_t d = scan[i];
-        if (get_pixel_buffer(x + dx[d], y + dy[d], Layer_Wall)) {
+        if (is_wall(x + dx[d], y + dy[d])) {
             *direction = d;
             return;
         }
@@ -409,6 +421,8 @@ static void InitTraps(uint8_t level) {
         T.QIX.traps_active = 2;
     }
     for(uint8_t i = 0; i < T.QIX.traps_active; i++) {
+        T.QIX.Traps[i].active = 1;
+        T.QIX.Traps[i].stuck_count = 0;
         T.QIX.Traps[i].length = (level/4)+1;
         uint8_t r = prandom();
         if(testbit(r,7)) {
@@ -442,44 +456,36 @@ static void MoveTraps(void) {
         uint8_t new_x = old_x + dx[dir];
         uint8_t new_y = old_y + dy[dir];
         
-        // Check if trap is stuck (can't find valid move along filled edge)
-        uint8_t ahead_filled = get_pixel_buffer(new_x, new_y, Layer_Filled);
-        if(!ahead_filled) {
+        // Check if trap is stuck (Perimeter_Movement found no wall to follow,
+        // so the proposed step lands off the wall).
+        if(!is_wall(new_x, new_y)) {
             T.QIX.Traps[i].stuck_count++;
             if(T.QIX.Traps[i].stuck_count > 50) {
-                // Trap is stuck - relocate to a random position on filled edge
+                // Trap is stuck — relocate to a random wall pixel
                 T.QIX.Traps[i].stuck_count = 0;
-                // Find a new starting point on the filled area boundary
                 for(uint8_t attempt = 0; attempt < 20; attempt++) {
                     uint8_t rx = prandom() >> 1;    // rx: [0, 127]
                     uint8_t ry = prandom() >> 1;    // ry: [0, 127]
-                    if(get_pixel_buffer(rx, ry, Layer_Filled)) {
-                        // Check if adjacent to empty space (boundary)
-                        if(!get_pixel_buffer(rx+1, ry, Layer_Filled) ||
-                           !get_pixel_buffer(rx-1, ry, Layer_Filled) ||
-                           !get_pixel_buffer(rx, ry+1, Layer_Filled) ||
-                           !get_pixel_buffer(rx, ry-1, Layer_Filled)) {
-                            new_x = rx;
-                            new_y = ry;
-                            break;
-                        }
+                    if(is_wall(rx, ry)) {
+                        new_x = rx;
+                        new_y = ry;
+                        break;
                     }
                 }
             }
         } else {
             T.QIX.Traps[i].stuck_count = 0;  // Reset stuck counter on successful move
         }
-        
-        // Update head position
-        T.QIX.Traps[i].x[0] = (uint8_t)new_x;
-        T.QIX.Traps[i].y[0] = (uint8_t)new_y;
-        
-        // Shift body segments to follow head (each segment follows the one ahead)
-        // Process in reverse order so each segment takes the position of the one before it
+
+        // Shift body segments back one slot so the body follows the head's
+        // previous trajectory, THEN write the new head into slot 0. Doing the
+        // shift first prevents body[1] from being overwritten with the new head.
         for(uint8_t j = T.QIX.Traps[i].length - 1; j > 0; j--) {
             T.QIX.Traps[i].x[j] = T.QIX.Traps[i].x[j-1];
             T.QIX.Traps[i].y[j] = T.QIX.Traps[i].y[j-1];
         }
+        T.QIX.Traps[i].x[0] = (uint8_t)new_x;
+        T.QIX.Traps[i].y[0] = (uint8_t)new_y;
         
         // Grow trap at higher levels (from original Styx TB.C)
         // Simplified: grow if length < 8, or randomly based on level
@@ -713,12 +719,44 @@ static void MoveStyx(void) {
     }
 }
 
+// A pixel is a "wall" — i.e. a walkable boundary — iff it is in Layer_Filled
+// AND at least one of its 8 neighbors is empty AND inside the empty-playfield
+// interior box [2..DISPLAY_MAX_X-2, UI_TOP_MARGIN+1..DISPLAY_MAX_Y-2]. Pixels
+// outside that box are treated as filled (closed boundary). Pure interior
+// pixels of a captured region (all in-bounds neighbors filled) are NOT walls.
+//
+// 8-neighbor scope is required: at corners where two walls meet at the
+// playfield edge (e.g. the foot of a drawn vertical wall on the bottom border),
+// every 4-neighbor is filled — only a diagonal pixel reaches the empty
+// interior. A 4-neighbor-only check would mis-classify those corners as
+// non-walls and Perimeter_Movement would reverse the player there.
+//
+// The clamped box prevents the converse mistake: pixels deep inside a captured
+// region's edge that's glued to the playfield border (e.g. (49,126) when the
+// capture covers x=1..50) would otherwise look like walls just because their
+// out-of-playfield neighbor (x,127) isn't marked filled.
+static uint8_t is_wall(uint8_t x, uint8_t y) {
+    if(!get_pixel_buffer(x, y, Layer_Filled)) return 0;
+    uint8_t xlo = (x > 2)                 ? x - 1 : 2;
+    uint8_t xhi = (x < DISPLAY_MAX_X - 2) ? x + 1 : DISPLAY_MAX_X - 2;
+    uint8_t ylo = (y > UI_TOP_MARGIN + 1) ? y - 1 : UI_TOP_MARGIN + 1;
+    uint8_t yhi = (y < DISPLAY_MAX_Y - 2) ? y + 1 : DISPLAY_MAX_Y - 2;
+    for(uint8_t ny = ylo; ny <= yhi; ny++) {
+        for(uint8_t nx = xlo; nx <= xhi; nx++) {
+            if(nx == x && ny == y) continue;
+            if(!get_pixel_buffer(nx, ny, Layer_Filled)) return 1;
+        }
+    }
+    return 0;
+}
+
 // Count set bits in a byte (for filled pixel counting)
 static uint8_t popcount8(uint8_t b) {
-    b = b - ((b >> 1) & 0x55);
+    b = (b & 0x55) + ((b >> 1) & 0x55);
     b = (b & 0x33) + ((b >> 2) & 0x33);
     return (b + (b >> 4)) & 0x0F;
 }
+
 
 // Scan-line fill helper: fill right into Layer_Styx, bounded by Layer_Filled
 // Returns the boundary position (first pixel NOT filled)
@@ -885,13 +923,15 @@ static void DoFill(void) {
         }
     }
 
-    // --- Update score and percentage ---
+    // --- Update score and progress ---
     T.QIX.filled_pixels += filled_pixels;
-    // Total fillable pixels: interior playfield area
-    uint16_t total_pixels = (uint16_t)(DISPLAY_MAX_X - 3) * (DISPLAY_MAX_Y - UI_TOP_MARGIN - 3);
-    T.QIX.capturedPercent = (uint8_t)((uint32_t)T.QIX.filled_pixels * 100 / total_pixels);
 
-    if(T.QIX.capturedPercent >= CAPTURE_GOAL) {
+    // Progress on 0–127 scale.
+    // TOTAL_FILLABLE: 14508 
+    T.QIX.captureProgress = T.QIX.filled_pixels / 114;  // Max value is 127
+
+    // Level complete at ~80 % — simple comparison, no division needed
+    if(T.QIX.filled_pixels >= CAPTURE_GOAL_PIXELS) {
         T.QIX.gameState = STATE_LEVELUP;
     }
 
@@ -901,7 +941,7 @@ static void DoFill(void) {
     else if(T.QIX.Man.speed <= float2fix(0.75)) speed_mult = 2; // Medium = 2x
     else speed_mult = 1;                                        // Fast = 1x
 
-    uint16_t points = (uint16_t)filled_pixels * speed_mult * T.QIX.score_multiplier;
+    uint16_t points = (filled_pixels * speed_mult * T.QIX.score_multiplier)>>2;
     T.QIX.score += points;
 }
 
@@ -926,7 +966,6 @@ static void DrawGame(void) {
     
     clr_display();  // Clear active buffer
     // OR game layers into the active display buffer
-    OR_display(T.QIX.LayerWall);
     OR_display(T.QIX.LayerFilled);
     OR_display(T.QIX.LayerStyx);
     // Draw player
@@ -963,6 +1002,7 @@ static void DrawGame(void) {
     putchar5x8('0' + T.QIX.score_multiplier);
     print5x8(PSTR(" Score:"));
     print16_5x8(T.QIX.score);
+    set_line(0, 7, T.QIX.captureProgress, 7);    // Show captured progress as a line above the play field
     // Draw lives as pixels at the right edge
     for(uint8_t y = 0; y < T.QIX.Man.lives; y++) {
         set_pixel(DISPLAY_MAX_X, y<<1);

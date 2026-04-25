@@ -12,6 +12,7 @@
 // y=127-y;
 // Disp_send.display_data[(uint16_t)(x<<4) + (y>>3)] |= (uint8_t)(0x80 >> (y & 0x07));
 
+#if 0   // toggle_pixel / toggle_line are unused — wrap in #if 0 to exclude from build
 .global toggle_pixel_buffer
 toggle_pixel_buffer:
     movw    r30, r20                ; Load passed pointer into Z (r30=lo, r31=hi)
@@ -199,6 +200,7 @@ toggle_line_body:
     lat     Z, r0                   ; Toggle bits in display data
     dec     r21
     rjmp    .TVertical_Loop
+#endif  // #if 0 — end of unused toggle functions
 
 // White background
 #ifdef INVERT_DISPLAY
