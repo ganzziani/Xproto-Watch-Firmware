@@ -1,7 +1,6 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
-#include <stdlib.h>
 #include <string.h>
 #include "main.h"
 #include "utils.h"
@@ -11,19 +10,17 @@
 static const uint8_t TuneSpawn[] PROGMEM = { 5, NOTE_C6, 5, NOTE_E6, 5, NOTE_G6, 5, NOTE_C7, 5, NOTE_E7, 5, NOTE_G7, 5, NOTE_C8, 0 };
 static const uint8_t TuneDead[] PROGMEM = { 20, NOTE_C7, 10, NOTE_OFF, 20, NOTE_G6, 10, NOTE_OFF, 20, NOTE_C6, 0 };
 static const uint8_t TuneLevelUp[] PROGMEM = { 20, NOTE_C6, 20, NOTE_E6, 20, NOTE_G6, 20, NOTE_C7, 0 };
-static const uint8_t TuneFill[] PROGMEM = { 100, NOTE_C6, 100, NOTE_F7, 100, NOTE_G7, 0 };
 static const uint8_t TuneStartWall[] PROGMEM = { 10, NOTE_C6, 0 };
     
 static void QixEngine(void);
 static void HandleInput(void);          // Checks Buttons
 static void MovePlayer(void);           // Updates Man
 static uint8_t PlayerInput(uint8_t motion, uint8_t x, uint8_t y);   // Find direction based on player's input
-static void Perimeter_Movement(uint8_t *direction, uint8_t x, uint8_t y, uint8_t traversal); // Finds next direction along wall perimeter
-static void SpawnPlayer(void);          // Spawn animation and variable update
-static void KillPlayer(void);           // Death animation
+static void Perimeter_Direction(uint8_t *direction, uint8_t x, uint8_t y, uint8_t traversal); // Finds next direction along wall perimeter
+static uint8_t find_rescue_wall(uint8_t *x, uint8_t *y); // Find a random valid wall pixel (shared rescue logic)
 static void InitTraps(uint8_t level);   // Initialize Traps
 static void MoveTraps(void);            // Updates Traps positions
-static void InitStyx(uint8_t level);    // Initialize Styx
+static void InitStyx(void);    // Initialize Styx
 static void NewStyxDirection(uint8_t n); // Change direction and line size
 static uint8_t CheckStyxCollision(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2);  // Check if Styx line hits wall or trail
 static void MoveStyx(void);             // Updates Styx positions
@@ -37,8 +34,9 @@ static uint8_t is_wall(uint8_t x, uint8_t y);  // Filled pixel on a region bound
 static void DrawGame(void);             // Render display
 
 // Precomputed direction deltas (index 0 unused)
-static const int8_t dx[5] = {0,  0,  0, -1,  1};
-static const int8_t dy[5] = {0, -1,  1,  0,  0};
+// dx[0]/dy[0] = center (0,0); indices 1-4 = cardinal; indices 5-8 = diagonal
+static const int8_t dx[9] = { 0,  0,  0, -1,  1, -1, -1,  1, 1 };
+static const int8_t dy[9] = { 0, -1,  1,  0,  0, -1,  1, -1, 1 };
 
 // Direction lookup tables (Index: 1=DIR_UP  2=DIR_DOWN  3=DIR_LEFT  4=DIR_RIGHT)
 static const uint8_t dir_left[5]  = {0, DIR_LEFT,  DIR_RIGHT, DIR_DOWN, DIR_UP};
@@ -68,9 +66,9 @@ void Qix(void) {
             clrbit(MStatus, update);
             if(testbit(Misc,userinput)) {
                 clrbit(Misc, userinput);
-                if(testbit(Buttons, K1)) T.QIX.StyxSpeed = 90;
-                if(testbit(Buttons, K2)) T.QIX.StyxSpeed = 60;
-                if(testbit(Buttons, K3)) T.QIX.StyxSpeed = 16;
+                if(testbit(Buttons, K1)) T.QIX.difficulty = 1;
+                if(testbit(Buttons, K2)) T.QIX.difficulty = 2;
+                if(testbit(Buttons, K3)) T.QIX.difficulty = 3;
                 if(testbit(Buttons, K1) || testbit(Buttons, K2) || testbit(Buttons, K3)) QixEngine();
                 if(testbit(Buttons, KML)) setbit(MStatus, goback);
             }
@@ -87,22 +85,20 @@ void Qix(void) {
 
 // Game engine main loop
 void QixEngine(void) {
-    T.QIX.gameState = STATE_INIT;
+    uint8_t StateCounter=0;
+    uint8_t oldState=0;
     clrbit(MStatus, goback);
     setbit(MStatus,update);
+    T.QIX.level = 0;
+    T.QIX.score = 0;
+    T.QIX.Man.lives = 3;
+    T.QIX.score_multiplier = 1;
+    T.QIX.multiplier_timer = 0;
+    T.QIX.gameState = STATE_INITLEVEL;
     do {
+        DrawGame();
         if(testbit(Buttons, KML)) T.QIX.gameState = STATE_GAMEOVER; // Exit to menu
         switch(T.QIX.gameState) {
-            case STATE_INIT:    // Initialize Game
-                T.QIX.level = 0;
-                T.QIX.score = 0;
-                T.QIX.Man.lives = 3;
-                T.QIX.gameState = STATE_INITLEVEL;
-            break;
-            case STATE_LEVELUP:
-                Sound(TuneLevelUp);
-                // Stay in this state for a couple of seconds, then fall thru to the next state
-                for(int i=0; i<120; i++) DrawGame();         // Render display
             case STATE_INITLEVEL:
                 T.QIX.Man.trailX[0] = DISPLAY_MAX_X / 2;   // Center of screen
                 T.QIX.Man.trailY[0] = DISPLAY_MAX_Y-1;     // On the bottom border
@@ -125,35 +121,60 @@ void QixEngine(void) {
                 T.QIX.level++;
                 T.QIX.filled_pixels = 0;
                 T.QIX.captureProgress = 0;
-                // Initialize score multiplier system
                 T.QIX.gameState = STATE_SPAWN;
                 InitTraps(T.QIX.level);
-                InitStyx(T.QIX.level);
-                break;
+                InitStyx();
+            break;
             case STATE_SPAWN:
-                DrawGame();         // Render display
-                SpawnPlayer();      // Spawn animation and variables update
-                T.QIX.gameState = STATE_PLAYING;
+                if(StateCounter==0) {
+                    Sound(TuneSpawn);
+                    // Locate player on last good position
+                    T.QIX.Man.x = T.QIX.Man.trailX[0];
+                    T.QIX.Man.y = T.QIX.Man.trailY[0];
+                    T.QIX.Man.direction = DIR_NONE;
+                    T.QIX.Man.action = MAN_WALKING;
+                    T.QIX.Man.trail_len = 0;
+                    T.QIX.Man.idle = 0;
+                }
+                // Spawn animation: circle closing in toward player position
+                lcd_circle(T.QIX.Man.x, T.QIX.Man.y, 121-(StateCounter<<2), PIXEL_SET);
+                if(StateCounter>=30) T.QIX.gameState = STATE_PLAYING;
             break;
             case STATE_PLAYING:
                 HandleInput();      // Updates p.dx/dy/state
                 MovePlayer();       // Updates p.x/y
                 MoveStyx();         // Updates Styx positions
                 MoveTraps();        // Update Traps positions
-                DrawGame();         // Render display
             break;
             case STATE_DIED:
-                KillPlayer();       // Death animation
-                T.QIX.Man.lives--;
-                if(T.QIX.Man.lives==0) T.QIX.gameState = STATE_GAMEOVER;
-                else T.QIX.gameState = STATE_SPAWN;
+                if(StateCounter==0) {
+                    Sound(TuneDead);
+                    T.QIX.Man.lives--;
+                } else {
+                    // Death animation: circle expanding outward from player position
+                    lcd_circle(T.QIX.Man.x, T.QIX.Man.y, StateCounter<<2, PIXEL_SET);
+                }
+                if(StateCounter>=30) {
+                    if(T.QIX.Man.lives==0) T.QIX.gameState = STATE_GAMEOVER;
+                    else T.QIX.gameState = STATE_SPAWN;
+                }
             break;
             case STATE_GAMEOVER:
                 if(testbit(MStatus, update)) {   // Wait for keypress
                     setbit(MStatus, goback);
-                }                    
+                }
             break;
-        }        
+            case STATE_DELAY:
+            default:
+                if(StateCounter>=60) T.QIX.gameState=STATE_INITLEVEL;
+        }
+        if(oldState!=T.QIX.gameState) {
+            oldState=T.QIX.gameState;
+            StateCounter=0;
+        }
+        else {
+            if(StateCounter<255) StateCounter++;
+        }
         WaitDisplay();
         dma_display();
         SwitchBuffers();
@@ -169,9 +190,6 @@ static void HandleInput(void) {
     if(Buttons==0) T.QIX.Man.direction = DIR_NONE;
     if(testbit(MStatus, update)) {
         clrbit(MStatus, update);
-        if(testbit(Buttons, K1)) T.QIX.Man.speed = float2fix(0.5);      // Slow
-        if(testbit(Buttons, K2)) T.QIX.Man.speed = float2fix(0.75);     // Medium
-        if(testbit(Buttons, K3)) T.QIX.Man.speed = float2fix(1.0);        // Fast
         if(T.QIX.Man.action==MAN_DRAWING) { // Drawing mode controls
             if (testbit(Buttons, KUL)) {    // Turn left
                 direction = dir_left[T.QIX.Man.old_direction];
@@ -183,24 +201,19 @@ static void HandleInput(void) {
                 T.QIX.Man.old_direction = direction;
             }                
         } else {    // Walking mode controls
-            uint8_t x = fix2int(T.QIX.Man.x);
-            uint8_t y = fix2int(T.QIX.Man.y);
+            uint8_t x = T.QIX.Man.x;
+            uint8_t y = T.QIX.Man.y;
             // Start/stop drawing with top buttons
             if (testbit(Buttons, KUL) || testbit(Buttons, KUR)) {
-                // Find a direction perpendicular to the wall pointing into
-                // empty (uncaptured) space — i.e. a 4-neighbor that is NOT in
-                // Layer_Filled. With one combined layer, walls and captured
-                // interior are both "filled", so empty == not filled.
+                // Find a direction into uncaptured (empty) space. Bounds guards
+                // are omitted: the player is always on the inner perimeter
+                // (x>=1, y>=8), so out-of-range neighbors are outer-wall pixels
+                // that are already filled — get_pixel_buffer returns 1 correctly.
                 uint8_t draw_dir = DIR_NONE;
-                if(y > UI_TOP_MARGIN && !get_pixel_buffer(x, y-1, Layer_Filled)) {
-                    draw_dir = DIR_UP;
-                } else if(y < DISPLAY_MAX_Y && !get_pixel_buffer(x, y+1, Layer_Filled)) {
-                    draw_dir = DIR_DOWN;
-                } else if(x > 0 && !get_pixel_buffer(x-1, y, Layer_Filled)) {
-                    draw_dir = DIR_LEFT;
-                } else if(x < DISPLAY_MAX_X && !get_pixel_buffer(x+1, y, Layer_Filled)) {
-                    draw_dir = DIR_RIGHT;
-                }
+                if     (!get_pixel_buffer(x, y-1, Layer_Filled)) draw_dir = DIR_UP;
+                else if(!get_pixel_buffer(x, y+1, Layer_Filled)) draw_dir = DIR_DOWN;
+                else if(!get_pixel_buffer(x-1, y, Layer_Filled)) draw_dir = DIR_LEFT;
+                else if(!get_pixel_buffer(x+1, y, Layer_Filled)) draw_dir = DIR_RIGHT;
                 if(draw_dir == DIR_NONE) return;    // No empty side — stay walking
                 T.QIX.Man.action = MAN_DRAWING;
                 Sound(TuneStartWall);
@@ -236,7 +249,10 @@ static uint8_t PlayerInput(uint8_t motion, uint8_t x, uint8_t y) {
             if (count == 2) break;
         }
     }
-    // We assume valid perimeter ? exactly 2 neighbors
+    // Guard against corners / post-fill positions with <2 wall neighbors —
+    // reading candidate[1] when count<2 is undefined (uninitialized stack).
+    if(count == 0) return T.QIX.Man.direction;
+    if(count == 1) return candidate[0];
     uint8_t d0 = candidate[0];
     uint8_t d1 = candidate[1];
     // Determine which one satisfies motion rule
@@ -258,16 +274,16 @@ static uint8_t PlayerInput(uint8_t motion, uint8_t x, uint8_t y) {
 // Updates Man position and trail
 static void MovePlayer(void) {
     // Get current position
-    uint8_t x = fix2int(T.QIX.Man.x);
-    uint8_t y = fix2int(T.QIX.Man.y);
+    uint8_t x = T.QIX.Man.x;
+    uint8_t y = T.QIX.Man.y;
     // If drawing, add point to trail
     if (T.QIX.Man.action == MAN_DRAWING) {
-        switch(T.QIX.Man.direction) {
-            case DIR_UP:    T.QIX.Man.y -= T.QIX.Man.speed; break;
-            case DIR_DOWN:  T.QIX.Man.y += T.QIX.Man.speed; break;
-            case DIR_LEFT:  T.QIX.Man.x -= T.QIX.Man.speed; break;
-            case DIR_RIGHT: T.QIX.Man.x += T.QIX.Man.speed; break;
-            default:        T.QIX.Man.direction = DIR_NONE;
+        uint8_t d = T.QIX.Man.direction;
+        if((uint8_t)(d - DIR_UP) <= (DIR_RIGHT - DIR_UP)) {
+            T.QIX.Man.x += dx[d];
+            T.QIX.Man.y += dy[d];
+        } else {
+            T.QIX.Man.direction = DIR_NONE;
         }
         // Check if idle for too long while drawing
         if(T.QIX.Man.direction==DIR_NONE) {
@@ -277,9 +293,8 @@ static void MovePlayer(void) {
             }
         } else T.QIX.Man.idle = 0;
 
-        // Check collision with Styx while drawing
-        uint8_t new_x = fix2int(T.QIX.Man.x);
-        uint8_t new_y = fix2int(T.QIX.Man.y);
+        uint8_t new_x = T.QIX.Man.x;
+        uint8_t new_y = T.QIX.Man.y;
         
         // New position is different than trail head
         if((x!=new_x) || (y!=new_y)) {
@@ -313,17 +328,27 @@ static void MovePlayer(void) {
                 T.QIX.Man.trail_len = 0;
                 T.QIX.Man.action = MAN_WALKING;
                 T.QIX.Man.direction = DIR_NONE;
-            }                
+            }
         }
-    } else { // Man walking, speed is fixed
+    } else { // Man walking
+        // If the current position is no longer a valid wall (e.g. a large fill
+        // just made this boundary pixel interior, or the player was placed here
+        // after death), find a new wall before doing anything else.
+        if(!is_wall(x, y)) {
+            if(find_rescue_wall(&x, &y)) {
+                T.QIX.Man.x = x;
+                T.QIX.Man.y = y;
+            }
+            return;
+        }
         // Update position
         if(T.QIX.Man.direction != DIR_NONE) {
-            Perimeter_Movement(&T.QIX.Man.direction, x, y, T.QIX.Man.lastDir);
+            Perimeter_Direction(&T.QIX.Man.direction, x, y, T.QIX.Man.lastDir);
             uint8_t dir = T.QIX.Man.direction;
             x+=dx[dir];
             y+=dy[dir];
-            T.QIX.Man.x = int2fix(x);
-            T.QIX.Man.y = int2fix(y);
+            T.QIX.Man.x = x;
+            T.QIX.Man.y = y;
         }            
         // Check collision with Traps while walking
         for(uint8_t i=0; i<T.QIX.traps_active; i++) {
@@ -331,6 +356,7 @@ static void MovePlayer(void) {
             for(uint8_t j=0; j<T.QIX.Traps[i].length; j++) {
                 if(x==T.QIX.Traps[i].x[j] && y==T.QIX.Traps[i].y[j]) {
                     T.QIX.gameState = STATE_DIED;
+                    find_rescue_wall(&T.QIX.Man.trailX[0], &T.QIX.Man.trailY[0]);
                 }
             }                                    
         }
@@ -342,7 +368,7 @@ static void MovePlayer(void) {
 // traversal: DIR_CW or DIR_CCW determines which side the wall is on
 // Scan order: inner side -> ahead -> outer side -> back
 // The first direction that has a wall pixel is chosen
-static void Perimeter_Movement(uint8_t *direction, uint8_t x, uint8_t y, uint8_t traversal) {
+static void Perimeter_Direction(uint8_t *direction, uint8_t x, uint8_t y, uint8_t traversal) {
     uint8_t dir = *direction;
     if (dir < 1 || dir > 4) return;
 
@@ -371,44 +397,16 @@ static void Perimeter_Movement(uint8_t *direction, uint8_t x, uint8_t y, uint8_t
     }
 }
 
-// Spawn player: animation and variables update
-static void SpawnPlayer(void) {
-    Sound(TuneSpawn);
-    // Locate player on last good position
-    T.QIX.Man.x = int2fix(T.QIX.Man.trailX[0]);
-    T.QIX.Man.y = int2fix(T.QIX.Man.trailY[0]);
-    T.QIX.Man.direction = DIR_NONE;
-    T.QIX.Man.action = MAN_WALKING;
-    T.QIX.Man.trail_len = 0;
-    T.QIX.Man.idle = 0;
-    T.QIX.Man.speed = float2fix(1.0);
-    // Perform Spawn animation: circle with decreasing radius on the Man's position
-    // Get current position
-    uint8_t x = fix2int(T.QIX.Man.x);
-    uint8_t y = fix2int(T.QIX.Man.y);
-    for(uint8_t i=120; i>0; i-=4) {
-        for(uint8_t j=0; j<2; j++) {
-            lcd_circle(x, y, i, PIXEL_TGL);
-            WaitDisplay();
-            dma_display();
-        }
+// Find a random valid wall pixel for stuck-recovery.
+// Shared by MoveTraps and by MovePlayer (after a fill removes the player's footing).
+// Returns 1 and updates *x/*y on success, 0 if no wall found after 20 tries.
+static uint8_t find_rescue_wall(uint8_t *x, uint8_t *y) {
+    for(uint8_t attempt = 0; attempt < 250; attempt++) {
+        uint8_t rx = qrandom() >> 1;
+        uint8_t ry = qrandom() >> 1;
+        if(is_wall(rx, ry)) { *x = rx; *y = ry; return 1; }
     }
-}
-
-// Handle player death
-static void KillPlayer(void) {
-    Sound(TuneDead);
-    // Perform Kill animation: circle with increasing radius on the Man's position
-    // Get current position
-    uint8_t x = fix2int(T.QIX.Man.x);
-    uint8_t y = fix2int(T.QIX.Man.y);
-    for(uint8_t i=0; i<120; i+=4) {
-        for(uint8_t j=0; j<2; j++) {
-            lcd_circle(x, y, i, PIXEL_TGL);
-            WaitDisplay();
-            dma_display();
-        }
-    }
+    return 0;
 }
 
 // Initialize Traps
@@ -424,7 +422,7 @@ static void InitTraps(uint8_t level) {
         T.QIX.Traps[i].active = 1;
         T.QIX.Traps[i].stuck_count = 0;
         T.QIX.Traps[i].length = (level/4)+1;
-        uint8_t r = prandom();
+        uint8_t r = qrandom();
         if(testbit(r,7)) {
             T.QIX.Traps[i].head_idx = DIR_CW;
             T.QIX.Traps[i].direction = DIR_RIGHT;
@@ -449,29 +447,20 @@ static void MoveTraps(void) {
         uint8_t old_y = T.QIX.Traps[i].y[0];
         
         // Move trap head along edges of filled areas using perimeter movement
-        Perimeter_Movement(&T.QIX.Traps[i].direction, old_x, old_y, T.QIX.Traps[i].head_idx);
+        Perimeter_Direction(&T.QIX.Traps[i].direction, old_x, old_y, T.QIX.Traps[i].head_idx);
         
         // Get new head position after perimeter movement calculation
         uint8_t dir = T.QIX.Traps[i].direction;
         uint8_t new_x = old_x + dx[dir];
         uint8_t new_y = old_y + dy[dir];
         
-        // Check if trap is stuck (Perimeter_Movement found no wall to follow,
+        // Check if trap is stuck (Perimeter_Direction found no wall to follow,
         // so the proposed step lands off the wall).
         if(!is_wall(new_x, new_y)) {
             T.QIX.Traps[i].stuck_count++;
-            if(T.QIX.Traps[i].stuck_count > 50) {
-                // Trap is stuck — relocate to a random wall pixel
+            if(T.QIX.Traps[i].stuck_count > 100) {
                 T.QIX.Traps[i].stuck_count = 0;
-                for(uint8_t attempt = 0; attempt < 20; attempt++) {
-                    uint8_t rx = prandom() >> 1;    // rx: [0, 127]
-                    uint8_t ry = prandom() >> 1;    // ry: [0, 127]
-                    if(is_wall(rx, ry)) {
-                        new_x = rx;
-                        new_y = ry;
-                        break;
-                    }
-                }
+                find_rescue_wall(&new_x, &new_y);
             }
         } else {
             T.QIX.Traps[i].stuck_count = 0;  // Reset stuck counter on successful move
@@ -484,30 +473,23 @@ static void MoveTraps(void) {
             T.QIX.Traps[i].x[j] = T.QIX.Traps[i].x[j-1];
             T.QIX.Traps[i].y[j] = T.QIX.Traps[i].y[j-1];
         }
-        T.QIX.Traps[i].x[0] = (uint8_t)new_x;
-        T.QIX.Traps[i].y[0] = (uint8_t)new_y;
+        T.QIX.Traps[i].x[0] = new_x;
+        T.QIX.Traps[i].y[0] = new_y;
         
         // Grow trap at higher levels (from original Styx TB.C)
         // Simplified: grow if length < 8, or randomly based on level
         uint8_t level = T.QIX.level;
-        uint8_t shouldGrow = 0;
         
-        // Always grow until length reaches 8
-        if(T.QIX.Traps[i].length < 8) {
-            shouldGrow = 1;
-        } else if(level > 3 && prandom() > 200) {
-            // At higher levels, occasional random growth (approx 22% chance per frame when level > 3)
-            shouldGrow = 1;
-        }
-        
-        if(shouldGrow && T.QIX.Traps[i].length < DOT_MAX - 1) {
+        if (((T.QIX.Traps[i].length < 8) ||  // Always grow until length reaches 8
+            (level > 3 && qrandom() > 200))  // At higher levels, occasional random growth (approx 22% chance per frame when level > 3)
+            && T.QIX.Traps[i].length < DOT_MAX - 1) {
             T.QIX.Traps[i].length++;
         }
-      
-        // Check collision with player while walking
-        uint8_t px = fix2int(T.QIX.Man.x);
-        uint8_t py = fix2int(T.QIX.Man.y);
-        for(uint8_t j = 0; j < T.QIX.Traps[i].length && j < DOT_MAX; j++) {
+     
+        // Check collision with player
+        uint8_t px = T.QIX.Man.x;
+        uint8_t py = T.QIX.Man.y;
+        for(uint8_t j = 0; j < T.QIX.Traps[i].length; j++) {
             if(px == T.QIX.Traps[i].x[j] && py == T.QIX.Traps[i].y[j]) {
                 T.QIX.gameState = STATE_DIED;
             }
@@ -515,17 +497,24 @@ static void MoveTraps(void) {
     }        
 }    
 
-static void InitStyx(uint8_t level) {
+static void InitStyx(void) {
+    T.QIX.StyxSpeed = STYX_MIN_SPEED * T.QIX.difficulty;
     // Initialize Styx creatures
     T.QIX.styx_active = (T.QIX.level < 3) ? 1 : 2;
     for(uint8_t i=0; i<T.QIX.styx_active; i++) {
+        uint16_t max_vec_length;
+        max_vec_length = STYX_MAX_DEFAULT*T.QIX.difficulty + T.QIX.level*2;
+        if(T.QIX.styx_active >= 2) {
+            max_vec_length = max_vec_length / 2;
+        }
+        if(max_vec_length>100) max_vec_length=100;
+        T.QIX.Styx[i].max_vec_length = max_vec_length;
         T.QIX.Styx[i].active = 1;
         // Start in upper center
         T.QIX.Styx[i].x = int2fix(DISPLAY_MAX_X/2);
         T.QIX.Styx[i].y = int2fix(DISPLAY_MAX_Y/3);
         T.QIX.Styx[i].vect_dir = 0;
         T.QIX.Styx[i].vect_length = 10;
-        T.QIX.Styx[i].max_vec_length = 10;
         T.QIX.Styx[i].line_idx = 0;
         uint8_t x = fix2int(T.QIX.Styx[i].x);
         uint8_t y = fix2int(T.QIX.Styx[i].y);
@@ -540,23 +529,11 @@ static void InitStyx(uint8_t level) {
 }
 
 static void NewStyxDirection(uint8_t n) {
-    // Target line length: full STYX_MAX_DEFAULT for one Styx, 2/3 for two
-    // (original used a divisor of 3-5, which in the divisor model gave long lines;
-    //  here vect_length is a multiplier so we target STYX_MAX_DEFAULT directly)
-    if(T.QIX.styx_active >= 2) {
-        T.QIX.Styx[n].max_vec_length = STYX_MAX_DEFAULT * 2 / 3;
-    } else {
-        T.QIX.Styx[n].max_vec_length = STYX_MAX_DEFAULT;
-    }
-    uint8_t dir = qrandom();
-    uint8_t rand15_1 = prandom();
-    uint8_t rand15_2 = rand15_1 & 0x0F;
-    rand15_1 >>= 4;
     uint8_t speed = T.QIX.StyxSpeed;
-    T.QIX.Styx[n].dx = int2fix(Sin(dir))/(speed-rand15_1);
-    T.QIX.Styx[n].dy = int2fix(Cos(dir))/(speed-rand15_2);
-    uint8_t rand = prandom();
-    int inc = (int8_t)(rand & 0x0F);
+    T.QIX.Styx[n].dx = (fixed)(speed)*(127-qrandom());
+    T.QIX.Styx[n].dy = (fixed)(speed)*(127-qrandom());
+    uint8_t rand = qrandom();
+    int8_t inc = (int8_t)(rand & 0x0F);
     if(testbit(rand, 7)) inc=-inc;
     T.QIX.Styx[n].vect_dirinc = inc;
 }
@@ -564,35 +541,34 @@ static void NewStyxDirection(uint8_t n) {
 // Check if Styx line collides with walls or filled areas
 // Returns: 1 if collision, 0 if clear
 static uint8_t CheckStyxCollision(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2) {
-    // Simple Bresenham-like check along the line
-    int8_t sdx = (int8_t)x2 - (int8_t)x1;
-    int8_t sdy = (int8_t)y2 - (int8_t)y1;
-    uint8_t adx = (sdx < 0) ? -sdx : sdx;
-    uint8_t ady = (sdy < 0) ? -sdy : sdy;
-    uint8_t steps = (adx > ady) ? adx : ady;
-    
+    int16_t sdx = (int16_t)x2 - (int16_t)x1;
+    int16_t sdy = (int16_t)y2 - (int16_t)y1;
+    int16_t adx = (sdx < 0) ? -sdx : sdx;
+    int16_t ady = (sdy < 0) ? -sdy : sdy;
+    uint8_t steps = (adx > ady) ? (uint8_t)adx : (uint8_t)ady;
+
     if(steps == 0) {
         return get_pixel_buffer(x1, y1, Layer_Filled);
     }
-    
-    int8_t x_inc = (sdx > 0) ? 1 : (sdx < 0) ? -1 : 0;
-    int8_t y_inc = (sdy > 0) ? 1 : (sdy < 0) ? -1 : 0;
-    
-    int16_t x = x1 * 256;  // Use fixed point for smooth stepping
-    int16_t y = y1 * 256;
-    sdx = x_inc * (256 / steps);
-    sdy = y_inc * (256 / steps);
-    
-    for(uint8_t i = 0; i <= steps; i++) {
-        uint8_t cx = x >> 8;
-        uint8_t cy = y >> 8;
-        if(get_pixel_buffer(cx, cy, Layer_Filled)) {
+
+    // Per-step delta in 8.8 fixed point. Must be (sdx*256)/steps -- the
+    // previous form `sign * (256/steps)` only carried the direction and
+    // truncated to int8_t, so most lines were never traversed and the Styx
+    // could drift undetected through captured area.
+    int16_t step_x = (sdx * 256) / steps;
+    int16_t step_y = (sdy * 256) / steps;
+    int16_t x = (int16_t)x1 * 256;
+    int16_t y = (int16_t)y1 * 256;
+
+    for(uint8_t i = 0; i < steps; i++) {
+        if(get_pixel_buffer((uint8_t)(x >> 8), (uint8_t)(y >> 8), Layer_Filled)) {
             return 1;
         }
-        x += sdx;
-        y += sdy;
+        x += step_x;
+        y += step_y;
     }
-    return 0;
+    // Check endpoint exactly to absorb integer-rounding error.
+    return get_pixel_buffer(x2, y2, Layer_Filled);
 }
 
 // Updates Styx positions and draw lines into the LayerStyx buffer
@@ -605,13 +581,13 @@ static void MoveStyx(void) {
     memset(T.QIX.LayerStyx, 0, DISPLAY_DATA_SIZE);
 
     for (uint8_t i = 0; i < T.QIX.styx_active; i++) {
-        if(!T.QIX.Styx[i].active) break;
+        if(!T.QIX.Styx[i].active) continue;
 
         uint8_t retries = 3;  // Allow 3 tries to find a good line location
 
         while(retries > 0) {
             // Random direction change based on level (from TA.C: random(get_level()+30)>28)
-            if(prandom() < (T.QIX.level + 30)) {
+            if(qrandom() < (T.QIX.level + 30)) {
                 NewStyxDirection(i);
             }
 
@@ -683,9 +659,6 @@ static void MoveStyx(void) {
                 }
 
                 // Adjust line length toward maximum
-                if(T.QIX.Styx[i].vect_length > STYX_MAX_DEFAULT) {
-                    T.QIX.Styx[i].vect_length = STYX_MAX_DEFAULT;
-                }
                 if(T.QIX.Styx[i].vect_length < T.QIX.Styx[i].max_vec_length) {
                     T.QIX.Styx[i].vect_length++;
                 } else if(T.QIX.Styx[i].vect_length > T.QIX.Styx[i].max_vec_length) {
@@ -695,7 +668,6 @@ static void MoveStyx(void) {
                 retries = 0;  // Success, exit retry loop
             }
         }
-
         // Redraw all STYX_LINES history slots for this creature into the now-clear layer.
         // Because the layer was zeroed above, set_line_buffer (OR) is correct here.
         // When the Styx is stuck (all retries failed), the buffer didn't advance so the
@@ -706,7 +678,6 @@ static void MoveStyx(void) {
                             Layer_Styx);
         }
     }
-
     // Check player trail collision against the fully rebuilt Styx layer.
     // Done once after all creatures are drawn so both Styx hit the trail correctly.
     if(T.QIX.Man.action == MAN_DRAWING) {
@@ -719,7 +690,7 @@ static void MoveStyx(void) {
     }
 }
 
-// A pixel is a "wall" — i.e. a walkable boundary — iff it is in Layer_Filled
+// A pixel is a "wall" — i.e. a walkable boundary — if it is in Layer_Filled
 // AND at least one of its 8 neighbors is empty AND inside the empty-playfield
 // interior box [2..DISPLAY_MAX_X-2, UI_TOP_MARGIN+1..DISPLAY_MAX_Y-2]. Pixels
 // outside that box are treated as filled (closed boundary). Pure interior
@@ -729,7 +700,7 @@ static void MoveStyx(void) {
 // playfield edge (e.g. the foot of a drawn vertical wall on the bottom border),
 // every 4-neighbor is filled — only a diagonal pixel reaches the empty
 // interior. A 4-neighbor-only check would mis-classify those corners as
-// non-walls and Perimeter_Movement would reverse the player there.
+// non-walls and Perimeter_Direction would reverse the player there.
 //
 // The clamped box prevents the converse mistake: pixels deep inside a captured
 // region's edge that's glued to the playfield border (e.g. (49,126) when the
@@ -750,18 +721,17 @@ static uint8_t is_wall(uint8_t x, uint8_t y) {
     return 0;
 }
 
-// Count set bits in a byte (for filled pixel counting)
+// SWAR Popcount algorithm - Count set bits in a byte
 static uint8_t popcount8(uint8_t b) {
-    b = (b & 0x55) + ((b >> 1) & 0x55);
-    b = (b & 0x33) + ((b >> 2) & 0x33);
-    return (b + (b >> 4)) & 0x0F;
+    b -= (b >> 1) & 0x55;               // 2-bit sums  (saves one AND vs your version)
+    b = (b & 0x33) + ((b >> 2) & 0x33); // 4-bit sums
+    return (b + (b >> 4)) & 0x0F;       // 8-bit sum
 }
-
 
 // Scan-line fill helper: fill right into Layer_Styx, bounded by Layer_Filled
 // Returns the boundary position (first pixel NOT filled)
 static uint8_t fright(uint8_t x, uint8_t y) {
-    while(x <= DISPLAY_MAX_X) {
+    while(x < DISPLAY_MAX_X) {
         if(get_pixel_buffer(x, y, Layer_Filled) || get_pixel_buffer(x, y, Layer_Styx)) return x;
         set_pixel_buffer(x, y, Layer_Styx);
         x++;
@@ -808,13 +778,36 @@ static uint8_t scaneq(uint8_t x, uint8_t y, uint8_t xmax) {
 //   Pass 2: Byte-level sweep sets every unfilled, non-Styx pixel in Layer_Filled.
 // Layer_Styx is used as a disposable temp; MoveStyx() rebuilds it next frame.
 static void DoFill(void) {
-    Sound(TuneFill);
+    Sound(TuneAlarm1);
 
     // --- Pass 1: Mark the Styx's region in Layer_Styx ---
     memset(T.QIX.LayerStyx, 0, DISPLAY_DATA_SIZE);
 
     uint8_t seedX = fix2int(T.QIX.Styx[0].x);
     uint8_t seedY = fix2int(T.QIX.Styx[0].y);
+
+    // Defensive guard: if the seed is already filled (e.g. the Styx ended up
+    // sitting on the just-committed trail or inside captured space), pass 1
+    // would silently no-op and pass 2 would fill the entire playfield. Try the
+    // recorded Styx line endpoints as alternate seeds before giving up.
+    if(get_pixel_buffer(seedX, seedY, Layer_Filled)) {
+        uint8_t found = 0;
+        for(uint8_t j = 0; j < STYX_LINES && !found; j++) {
+            uint8_t lx = T.QIX.Styx[0].line_x1[j];
+            uint8_t ly = T.QIX.Styx[0].line_y1[j];
+            for(uint8_t e = 0; e < 2; e++) {
+                // Unsigned-subtract range check: lx in [2,DISPLAY_MAX_X-2], ly in [UI_TOP_MARGIN+1,DISPLAY_MAX_Y-2]
+                if((uint8_t)(lx - 2)                <= (DISPLAY_MAX_X - 4) &&
+                   (uint8_t)(ly - (UI_TOP_MARGIN+1)) <= (DISPLAY_MAX_Y - UI_TOP_MARGIN - 3) &&
+                   !get_pixel_buffer(lx, ly, Layer_Filled)) {
+                    seedX = lx; seedY = ly; found = 1; break;
+                }
+                lx = T.QIX.Styx[0].line_x2[j];
+                ly = T.QIX.Styx[0].line_y2[j];
+            }
+        }
+        if(!found) return;
+    }
 
     if(!get_pixel_buffer(seedX, seedY, Layer_Filled)) {
         uint16_t sp = 0;
@@ -932,36 +925,29 @@ static void DoFill(void) {
 
     // Level complete at ~80 % — simple comparison, no division needed
     if(T.QIX.filled_pixels >= CAPTURE_GOAL_PIXELS) {
-        T.QIX.gameState = STATE_LEVELUP;
+        Sound(TuneLevelUp);
+        T.QIX.gameState = STATE_DELAY;
     }
 
-    // Award points: filled_pixels x speed_multiplier x score_multiplier
-    uint8_t speed_mult;
-    if(T.QIX.Man.speed <= float2fix(0.5)) speed_mult = 3;      // Slow = 3x
-    else if(T.QIX.Man.speed <= float2fix(0.75)) speed_mult = 2; // Medium = 2x
-    else speed_mult = 1;                                        // Fast = 1x
-
-    uint16_t points = (filled_pixels * speed_mult * T.QIX.score_multiplier)>>2;
+    // Award points: filled_pixels x score_multiplier
+    uint16_t points = (filled_pixels * T.QIX.score_multiplier)>>4;
     T.QIX.score += points;
 }
 
-// Render display
-// Display refresh rate: ~60Hz (every 16.67ms)
+// Render display. Display's refresh rate: ~60Hz (every 16.67ms)
 static void DrawGame(void) {
     // Update score multiplier timer
-    T.QIX.multiplier_timer--;
-    if(T.QIX.multiplier_timer == 0) {
+    uint8_t timer = T.QIX.multiplier_timer;
+    timer--;
+    if(timer == 0) {
         uint8_t multiplier = T.QIX.score_multiplier;
-        if(multiplier>2) {
-            // Higher multiplier factor is active for less time:
-            // 3:  85 frames -> ~ 1.4 seconds
-            // 2: 170 frames -> ~ 2.8 seconds
-            // 1: 255 frames -> ~ 4.2 seconds
-            T.QIX.multiplier_timer = 85 * (4-multiplier);
-            multiplier=0;
-        }
+        if(multiplier>2) multiplier=0;
         multiplier++;
+        // 3:  85 frames -> ~ 1.4 seconds
+        // 2: 170 frames -> ~ 2.8 seconds
+        // 1: 255 frames -> ~ 4.2 seconds
         T.QIX.score_multiplier = multiplier;
+        timer = 85 * (4-multiplier);
     }
     
     clr_display();  // Clear active buffer
@@ -969,13 +955,12 @@ static void DrawGame(void) {
     OR_display(T.QIX.LayerFilled);
     OR_display(T.QIX.LayerStyx);
     // Draw player
-    uint8_t x = fix2int(T.QIX.Man.x);
-    uint8_t y = fix2int(T.QIX.Man.y);    
-    clr_pixel(x,y);
-    set_pixel(x-1,y);
-    set_pixel(x+1,y);
-    set_pixel(x,y-1);
-    set_pixel(x,y+1);
+    uint8_t x = T.QIX.Man.x;
+    uint8_t y = T.QIX.Man.y;
+    for(uint8_t i=0; i<=8; i++) {   // i=0: center; i=1-8: 8 neighbors
+        set_pixel(x+dx[i],y+dy[i]);
+    }
+    if(timer&0x03) clr_pixel(x,y); // flash center off 3/4 of frames
     // Draw the drawing trail
     for(uint8_t i=0; i<T.QIX.Man.trail_len; i++) {
         set_pixel(T.QIX.Man.trailX[i], T.QIX.Man.trailY[i]);
@@ -983,7 +968,7 @@ static void DrawGame(void) {
     // Draw traps body with alternating on/off pattern (from TB.C dot_type concept)
     for (uint8_t i = 0; i < T.QIX.traps_active; i++) {
         if(!T.QIX.Traps[i].active) continue;
-        for(uint8_t j = 0; j < T.QIX.Traps[i].length && j < DOT_MAX; j++) {
+        for(uint8_t j = 0; j < T.QIX.Traps[i].length; j++) {
             uint8_t tx = T.QIX.Traps[i].x[j];
             uint8_t ty = T.QIX.Traps[i].y[j];
             // Alternate dots on/off for crawling effect
@@ -1002,10 +987,10 @@ static void DrawGame(void) {
     putchar5x8('0' + T.QIX.score_multiplier);
     print5x8(PSTR(" Score:"));
     print16_5x8(T.QIX.score);
-    set_line(0, 7, T.QIX.captureProgress, 7);    // Show captured progress as a line above the play field
+    set_line(0, UI_BOTTOM_MARGIN, T.QIX.captureProgress, UI_BOTTOM_MARGIN);
     // Draw lives as pixels at the right edge
     for(uint8_t y = 0; y < T.QIX.Man.lives; y++) {
         set_pixel(DISPLAY_MAX_X, y<<1);
     }
-
+    T.QIX.multiplier_timer = timer;
  }

@@ -25,16 +25,7 @@ typedef struct {
     uint16_t size;
 } SnakeStruct;
 
-typedef struct {
-    uint8_t points;
-    uint8_t x1;
-    uint8_t x2;
-    uint8_t y;
-    uint8_t state;
-} PaddleStruct;
-
 void Snake(void);
-void Pong(void);
 void Chess(void);
 
 #endif

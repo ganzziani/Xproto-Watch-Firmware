@@ -6,14 +6,12 @@
 #include "LS013B7DH03.h"
 
 // Game states
-#define STATE_MENU      0
-#define STATE_INIT      1
-#define STATE_INITLEVEL 3
-#define STATE_LEVELUP   4
-#define STATE_SPAWN     5
-#define STATE_PLAYING   6
-#define STATE_DIED      7
-#define STATE_GAMEOVER  8
+#define STATE_INITLEVEL 0
+#define STATE_SPAWN     1
+#define STATE_PLAYING   2
+#define STATE_DIED      3
+#define STATE_GAMEOVER  4
+#define STATE_DELAY     5
 
 // Game constants
 #define STYX_MAX        2       // Maximum Styx creatures
@@ -32,18 +30,13 @@
 // Styx movement constants
 #define STYX_RETRY_COUNT        3       // Number of retries to find valid line position
 #define STYX_BOUNDARY_MARGIN    3       // Minimum distance from screen edge for Styx
-#define STYX_MAX_DEFAULT        20      // Maximum Styx line vector length (multiplier; larger = longer lines)
-#define STYX_SPEED              30      // Velocity divisor base: dx = int2fix(Sin(dir))/(STYX_SPEED-rand)
-                                        // rand is 0-15, so actual divisor range is (STYX_SPEED-15)..STYX_SPEED
-                                        // Higher value = slower Styx movement
+#define STYX_MAX_DEFAULT        16      // Maximum Styx line vector length
+#define STYX_MIN_SPEED          4       // Minimum speed
 
 // Trap growth constants  
 #define TRAP_INITIAL_GROWTH     8       // Initial trap length before random growth
 #define TRAP_RANDOM_GROWTH_LEVEL 3      // Level at which random trap growth begins
 #define TRAP_RANDOM_GROWTH_CHANCE 200   // Random threshold for trap growth (0-255)
-
-// Fill algorithm constants
-#define FILL_STACK_OVERFLOW_CHECK 2     // Stack entries to reserve as safety margin
 
 // UI/constants from display
 #define UI_TOP_MARGIN           8       // Top margin for UI elements
@@ -65,12 +58,11 @@
 // Man structure
 typedef struct {
     uint8_t lives;
-    fixed x;                // Fixed-point position
-    fixed y;
+    uint8_t x;              // position
+    uint8_t y;
     uint8_t direction;      // Current movement direction
     uint8_t old_direction;  // Previous movement direction
     uint8_t action;         // Walking or drawing
-    fixed speed;            // Movement speed (fixed point)
     uint8_t idle;           // Idle counter
     uint8_t trailX[MAX_TRAIL];
     uint8_t trailY[MAX_TRAIL];
@@ -89,8 +81,6 @@ typedef struct {
     uint8_t vect_length;    // Length of the line vector (0-255, 256=cycle)
     int8_t  vect_dirinc;    // Vector rotation increment
     uint8_t max_vec_length; // Maximum line vector length
-    int8_t  vect_inc;       // Rotation speed of the line
-    uint8_t line_len;       // Length of the current line segment
     uint8_t line_idx;       // Current line segment index in history
     // Styx line history: x1, y1, x2, y2 for each segment
     uint8_t line_x1[STYX_LINES];
@@ -112,6 +102,7 @@ typedef struct {
 } TrapStruct;
 
 typedef struct {
+    uint8_t difficulty;
     uint16_t score;
     uint8_t level;
     uint8_t styx_active;
@@ -127,7 +118,8 @@ typedef struct {
     TrapStruct Traps[TRAP_MAX];
     // Layer_Filled holds every "solid" pixel: perimeter walls, drawn walls, and
     // captured-interior pixels. A pixel is a "wall" (walkable boundary) iff it
-    // is filled AND has at least one empty 4-neighbor (see is_wall() in qix.c).
+    // is filled AND has at least one empty 8-neighbor within the playfield box
+    // (see is_wall() in qix.c).
     uint8_t LayerFilled[DISPLAY_DATA_SIZE];
     uint8_t LayerStyx[DISPLAY_DATA_SIZE];
     uint8_t FillStack[2][STACK_MAX];

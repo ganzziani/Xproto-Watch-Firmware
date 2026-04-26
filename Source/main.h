@@ -319,13 +319,6 @@ typedef union {
         uint8_t Fruitx,Fruity;
         uint8_t Fruit;
     } SNAKE;
-    struct {
-        uint8_t display_setup[2];
-        uint8_t buffer2[DISPLAY_DATA_SIZE];
-        fixed   ballx, bally;
-        fixed   speedx, speedy;
-        PaddleStruct Player1, Player2;
-    } PONG;
     structQIX QIX;
 } TempData;
 
