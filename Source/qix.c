@@ -1,3 +1,17 @@
+/*
+ * Qix game for the Xproto Oscilloscope Watch
+ *
+ * Based on Qix (Taito, 1981) — original game concept by Randy and Sandy Pfeiffer.
+ *   https://en.wikipedia.org/wiki/Qix
+ *
+ * Adapted from the source code of Styx (Windmill Software, 1983),
+ * a PC port of Qix for IBM CGA graphics, generously shared by Windmill.
+ *   https://en.wikipedia.org/wiki/Styx_(Windmill_game)
+ *
+ * The fill algorithm is derived from Alvy Ray Smith's TINT FILL,
+ * as implemented in Styx's TD.C.
+ */
+
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
@@ -91,7 +105,7 @@ void QixEngine(void) {
     setbit(MStatus,update);
     T.QIX.level = 0;
     T.QIX.score = 0;
-    T.QIX.Man.lives = 3;
+    T.QIX.Man.lives = 8;
     T.QIX.score_multiplier = 1;
     T.QIX.multiplier_timer = 0;
     T.QIX.gameState = STATE_INITLEVEL;
@@ -930,7 +944,7 @@ static void DoFill(void) {
     }
 
     // Award points: filled_pixels x score_multiplier
-    uint16_t points = (filled_pixels * T.QIX.score_multiplier)>>4;
+    uint16_t points = (filled_pixels * T.QIX.score_multiplier)>>5;
     T.QIX.score += points;
 }
 
@@ -989,8 +1003,8 @@ static void DrawGame(void) {
     print16_5x8(T.QIX.score);
     set_line(0, UI_BOTTOM_MARGIN, T.QIX.captureProgress, UI_BOTTOM_MARGIN);
     // Draw lives as pixels at the right edge
-    for(uint8_t y = 0; y < T.QIX.Man.lives; y++) {
-        set_pixel(DISPLAY_MAX_X, y<<1);
+    for(uint8_t y = T.QIX.Man.lives; y; y--) {
+        set_pixel(DISPLAY_MAX_X, y);
     }
     T.QIX.multiplier_timer = timer;
  }
