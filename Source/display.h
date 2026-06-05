@@ -44,7 +44,6 @@ void SwitchBuffers(void);
 void clr_display(void);
 void displayBlack(void);
 void OR_display(uint8_t *BufferIn);
-void OR_display1(uint8_t *BufferIn);
 void pixel(uint8_t x, uint8_t y, uint8_t c);
 void sprite(uint8_t x, uint8_t y, const int8_t *ptr);
 void set_line_c(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c);

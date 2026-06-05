@@ -135,7 +135,6 @@ void Chess(void) {
     clrbit(MStatus, goback);
     T.CHESS.level = 0;
     clr_display();
-
     do {
         if (testbit(MStatus, update)) {
             clrbit(MStatus, update);
@@ -162,7 +161,6 @@ void Chess(void) {
         WaitDisplay();
         SLP();
     } while (!testbit(MStatus, goback));
-
     setbit(MStatus, update);
 }
 

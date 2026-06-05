@@ -46,14 +46,14 @@ void Diagnose(void) {
         SREG = SecTimeout;
         sei();
         print5x8(PSTR("\nVRef:   ")); print16_5x8(MeasureVRef());
-        ANALOG_OFF();
+
         print5x8(PSTR("\nClock:  ")); printhex5x8(CLK.CTRL); printhex5x8(OSC.CTRL); printhex5x8(OSC.STATUS); printhex5x8(OSC.XOSCFAIL);
         OFFRED();
         OFFGRN();
         for(uint8_t i=0; i<16; i++) {           // Print GPIO registers
             if(i<8) lcd_goto(i*16,10);
             else lcd_goto((i-8)*16,11);
-            printhex5x8(*((uint8_t *)i));
+            printhex5x8(*((uint8_t *)i));       // Print content of GPIO register
         }
         lcd_goto(1,15); print5x8(PSTR("OFFSET  LIGHT   SPEED"));
         if(testbit(Misc,userinput)) {
@@ -81,6 +81,7 @@ void Diagnose(void) {
         SLP();          // Sleep
     } while(!testbit(MStatus, goback));
     OFFWHITE();
+    ANALOG_OFF();
     LOGIC_OFF();
     TCC0.CTRLA = 0;
     TCC1.CTRLA = 0;

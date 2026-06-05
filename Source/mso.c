@@ -514,7 +514,8 @@ void MSO(void) {
                 // Turn the Watchdog timer off
                 CCPWrite(&WDT.CTRL, WDT_PER_8KCLK_gc | WDT_CEN_bm);
                 uint8_t tlevelo;
-				if(M.Tsource==0) { // // CH1 is trigger source
+				if(M.Tsource==0) {      // CH1 is trigger source
+                    // Apply CH1 offset to trigger level
                     tlevelo=addwsat(M.Tlevel, -T.SCOPE.CH1.offset);
                     if(testbit(Trigger, window)) windowCH1(M.Window1,M.Window2);
                     else if(testbit(Trigger, slope)) {
@@ -535,7 +536,7 @@ void MSO(void) {
                     }
 				}
 				else if(M.Tsource==1) {   // CH2 is trigger source
-                    // Apply CH1 offset to trigger level
+                    // Apply CH2 offset to trigger level
                     tlevelo=addwsat(M.Tlevel, -T.SCOPE.CH2.offset);
                     if(testbit(Trigger, window)) windowCH2(M.Window1,M.Window2);
                     else if(testbit(Trigger, slope)) {
@@ -1713,7 +1714,7 @@ checknext:
                 case MSPI:    // SPI Menu
                     if(testbit(Buttons,K1)) togglebit(Sniffer,CPOL);        // Toggle CPOL
                     if(testbit(Buttons,K2)) togglebit(Sniffer,CPHA);        // Toggle CPHA
-                    if(testbit(Buttons,K3)) togglebit(Sniffer,SSINV);       // Toggle CPHA
+                    if(testbit(Buttons,K3)) togglebit(Sniffer,SSINV);       // Toggle SSINV
                 break;
                 case MCH1MATH:    // Channel 1 Math
                     if(testbit(Buttons,K1)) Menu = MCH1OPER;                // Go to Operator menu
@@ -1752,7 +1753,7 @@ checknext:
                             clrbit(CH1ctrl,submult);
                         }
                     }
-                    if(testbit(Buttons,K3)) togglebit(CH1ctrl,derivative);   // Average
+                    if(testbit(Buttons,K3)) togglebit(CH1ctrl,derivative);
                 break;
                 case MCH2OPER:  // Channel 2 Operator
                     if(testbit(Buttons,K1)) {   // Subtract

@@ -1,6 +1,5 @@
 // OW Bugs:
 // exit scope from slow sampling rates, causes a blank vertical line on the scope icon
-// pressing buttons multiple times on the Diagnose screen causes a reset
 // TODO & Optimizations:
 /*      Custom bootloader
             - Save constants tables in bootloader
@@ -184,7 +183,7 @@ int main(void) {
     PORTE.PIN4CTRL  = 0b01000000;   // Invert Pin 4 output
     PORTCFG.MPCMASK = 0xFF;
     PORTF.PIN0CTRL  = 0x58;         // Pull up on pin Port F, invert input
-    PORTF.INTCTRL   = 0x02;         // PORTA will generate medium level interrupts
+    PORTF.INTCTRL   = 0x02;         // PORTF will generate medium level interrupts
     PORTF.INT0MASK  = 0xFF;         // All inputs are the source for the interrupt
     PORTCFG.VPCTRLA = 0x41;         // VP1 Map to PORTE, VP0 Map to PORTB
     PORTCFG.VPCTRLB = 0x32;         // VP3 Map to PORTD, VP2 Map to PORTC

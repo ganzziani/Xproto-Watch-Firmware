@@ -63,16 +63,12 @@ void displayBlack(void) {
 // Or the BufferIn into the active display buffer
 void OR_display(uint8_t *BufferIn) {
     uint8_t *p=Disp_send.SPI_Address+2;  // Locate pointer at start of active buffer;
-    for(uint16_t i=0; i<DISPLAY_DATA_SIZE; i++) {
-        *p++ |= *BufferIn++;
-    }
-}
-
-// Or the BufferIn into display buffer 1
-void OR_display1(uint8_t *BufferIn) {
-    uint8_t *p=Disp_send.display_data1;  // Locate pointer at start of active buffer;
-    for(uint16_t i=0; i<DISPLAY_DATA_SIZE; i++) {
-        *p++ |= *BufferIn++;
+    for(uint8_t i=128; i; i--) { // Copy all 2048 bytes in the buffer
+        for(uint8_t j=16; j; j--) {
+            *p++ |= *BufferIn++;
+        }
+        p+=2;           // Skip trailer bytes
+        BufferIn+=2;
     }
 }
 

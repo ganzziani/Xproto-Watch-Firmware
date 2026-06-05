@@ -8,10 +8,10 @@
 // Licensed under the terms of the GNU GPLv3+
 
 #include <util/delay.h>
-#include "main.h"
+#include "..\main.h"
 #include "usb_xmega.h"
-#include "mso.h"
-#include "interface.h"
+#include "..\mso.h"
+#include "..\interface.h"
 
 // Volatile?
 uint8_t ep0_buf_in[USB_EP0SIZE];

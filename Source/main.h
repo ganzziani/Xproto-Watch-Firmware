@@ -154,10 +154,11 @@
 #define AlarmMinute GPIO8   // Alarm Minute
 #define SecTimeout  GPIO9   // Remaining seconds to display seconds
 #define BattLevel   GPIOA   // Battery Level (0 to 11)
-#define MStatus     GPIOB   // Status and Miscellaneous bits
+                            // Status and Miscellaneous bits
 #define WatchBits   GPIOC   // Watch Bits
 #define WSettings   GPIOD   // Watch Settings
-#define Menu        GPIOE   // Menu
+                            // Menu
+                            // Current buttons pressed
 
 // MStatus          (GPIOB) - Status and Miscellaneous bits
 #define update      0       // Update
