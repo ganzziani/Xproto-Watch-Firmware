@@ -147,9 +147,9 @@ void SetTimeTimer(void) {
     cli();                          // Disable global interrupts
     if(AlarmMinute>=60) AlarmMinute=0;
     if(AlarmHour>=24) AlarmHour=0;
-    if(NowSecond==255) NowSecond=59;
+    if(NowSecond==255) NowSecond=59;// Underflow
     if(NowSecond>=60) NowSecond=0;
-    if(NowMinute==255) {
+    if(NowMinute==255) {            // Underflow
         NowMinute=59;
         NowHour--;
         setbit(WatchBits, hourChanged);
@@ -159,7 +159,7 @@ void SetTimeTimer(void) {
         NowHour++;
         setbit(WatchBits, hourChanged);
     }
-    if(NowHour==255) NowHour=23;
+    if(NowHour==255) NowHour=23;    // Underflow
     if(NowHour>=24) NowHour=0;
     if(NowMonth==0)  NowMonth=12;
     if(NowMonth>12) NowMonth=1;
@@ -537,7 +537,7 @@ void AnalogFace(void) {
         clr_display();
         clrbit(WatchBits, dateChanged);
         if(!testbit(WSettings, style)) {
-            static const uint8_t hour_xy[12][2] PROGMEM = {  // Hour numbers around the circle
+            static const uint8_t hour_xy[12][2] PROGMEM = {  // Hour numbers coordinates
                 { 58, 1},{ 82, 2},{100, 5},{108, 8},{100,11},{ 80,13},
                 { 55,14},{ 31,13},{ 11,11},{  3, 8},{ 14, 5},{ 30, 2}
             };
@@ -545,9 +545,9 @@ void AnalogFace(void) {
                 lcd_goto(pgm_read_byte(&hour_xy[i][0]), pgm_read_byte(&hour_xy[i][1]));
                 printN_5x8(i==0 ? 12 : i);
             }
-            for(uint8_t i=0; i<60; i++) {       // Circumference markers
+            for(uint8_t i=0; i<60; i++) {       // Circumference markers (3 pixel long)
                 set_line(63+Sine60(i,60),63-Cosine60(i,60),
-                63+Sine60(i,63),63-Cosine60(i,63));
+                         63+Sine60(i,63),63-Cosine60(i,63));
             }
             ShowAlarmTime(42, 10);
             // Date
@@ -556,7 +556,9 @@ void AnalogFace(void) {
                 printN3x6(NowDay);
                 putchar3x6(' ');
             }
-            print3x6(STRS_Months_short[NowMonth-1]);
+            for(uint8_t i=0; i<3; i++) {    // Print first 3 letters of month
+                putchar3x6(pgm_read_byte(&STRS_Months[NowMonth-1][i]));
+            }
             if(!testbit(WSettings, PostMonth)) {
                 putchar3x6(' ');
                 printN3x6(NowDay);
@@ -580,11 +582,12 @@ void AnalogFace(void) {
 }
 
 static void DrawHand(uint8_t angle, uint8_t half_base, uint8_t length) {
-    fillTriangle(
-        63+Sine60(angle-half_base+60, 8), 63-Cosine60(angle-half_base+60, 8),
-        63+Sine60(angle+half_base,    8), 63-Cosine60(angle+half_base,    8),
-        63+Sine60(angle,         length), 63-Cosine60(angle,         length),
-        PIXEL_TGL);
+    int8_t angle1 = angle-half_base+60;
+    int8_t angle2 = angle+half_base;
+    ToggleTriangle(
+        63+Sine60(angle1, 8),      63-Cosine60(angle1, 8),
+        63+Sine60(angle2, 8),      63-Cosine60(angle2, 8),
+        63+Sine60(angle,  length), 63-Cosine60(angle,  length));
 }
 
 void PrintHands(uint8_t h, uint8_t m, uint8_t s) {
@@ -593,7 +596,7 @@ void PrintHands(uint8_t h, uint8_t m, uint8_t s) {
     DrawHand(h, 5, 36);  // Hours
     DrawHand(m, 4, 50);  // Minutes
     if(!testbit(WSettings, style) && SecTimeout)
-        set_line_c(63,63,63+Sine60(s,54),63-Cosine60(s,54), PIXEL_TGL);
+        DrawHand(s, 0, 50);  // Seconds
 }
 
 void ShowAlarmTime(uint8_t col, uint8_t row) {
@@ -890,61 +893,46 @@ void EditAlarms(void) {
     SecTimeout = 60;
 }
 
-// Finds the next alarm within 24 hours
+// Finds the next alarm within 24 hours by converting each candidate to
+// "minutes from now" (0–1440) and picking the minimum.
 void FindNextAlarm(void) {
-    uint8_t Tomorrow = NowWeekDay+1;
-    if(Tomorrow>=7) Tomorrow=0;
-    uint8_t Todaybit=0x40;
-    Todaybit = Todaybit >> NowWeekDay;
-    uint8_t Tomorrowbit=0x40;
-    Tomorrowbit = Tomorrowbit >> Tomorrow;
+    uint8_t Tomorrow = NowWeekDay + 1;
+    if(Tomorrow >= 7) Tomorrow = 0;
+    uint8_t Todaybit    = 0x40 >> NowWeekDay;
+    uint8_t Tomorrowbit = 0x40 >> Tomorrow;
+
+    uint16_t nowMin  = (uint16_t)NowHour * 60 + NowMinute;
+    uint16_t bestDelta = 1441;   // Larger than any valid delta (max is 1439)
+    uint8_t  bestIdx   = 0xFF;
+
     clrbit(MStatus, alarm_on);
-	setbit(WatchBits, hourChanged);
-    for(uint8_t i=0; i<TOTAL_ALARMS; i++) {     // Search all alarms
-        if(EE_Alarms[i].active & 0x80) {           // This alarm is active
-            uint8_t NewAlarmHour   = EE_Alarms[i].hour;
-            uint8_t NewAlarmMinute = EE_Alarms[i].minute;
-            // Check if there is an alarm for tomorrow
-            if(EE_Alarms[i].active & Tomorrowbit) {
-                // Compare only if this alarm occurs before NOW (it is within 24 hours)
-                if(((NowHour ==NewAlarmHour) && (NowMinute>NewAlarmMinute)) ||
-                    (NowHour > NewAlarmHour)) {
-                    if(!testbit(MStatus, alarm_on)) {     // Not found the next alarm yet
-                        setbit(MStatus, alarm_on);        // Just copy new alarm
-                        LoadAlarm(i);
-                    } else {                                // There was a previous alarm, copy if new alarm occurs sooner
-                        if(((NowHour ==AlarmHour) && (NowMinute>AlarmMinute)) ||    // Current alarm will occur tomorrow
-                        (NowHour > AlarmHour)) {                    
-                            if(((AlarmHour ==NewAlarmHour) && (AlarmMinute>NewAlarmMinute)) ||  // Compare and use soonest alarm
-                            (AlarmHour > NewAlarmHour)) {
-                                LoadAlarm(i);
-                            }                                                       // Keep existing alarm if it occurs today
-                        }                        
-                    }
-                }
-            }
-            // Check if there is an alarm for today
-            if(EE_Alarms[i].active & Todaybit) {
-                // Compare only if this alarm occurs now or after NOW
-                if(((NowHour ==NewAlarmHour) && (NowMinute<=NewAlarmMinute)) ||
-                    (NowHour < NewAlarmHour)) {
-                    if(!testbit(MStatus, alarm_on)) {     // Not found the next alarm yet
-                        setbit(MStatus, alarm_on);        // Just copy new alarm
-                        LoadAlarm(i);
-                    } else {                                // There was a previous alarm, copy if new alarm occurs sooner
-                        if(((NowHour ==AlarmHour) && (NowMinute>AlarmMinute)) ||    // Current alarm will occur tomorrow, copy this new alarm
-                        (NowHour > AlarmHour)) {
-                            LoadAlarm(i);
-                        } else {                                                    // Otherwise, compare and use soonest alarm
-                            if(((AlarmHour ==NewAlarmHour) && (AlarmMinute>NewAlarmMinute)) ||
-                                (AlarmHour > NewAlarmHour)) {
-                                    LoadAlarm(i);
-                            }
-                        }
-                    }
-                }
-            }                
+    setbit(WatchBits, hourChanged);
+
+    for(uint8_t i = 0; i < TOTAL_ALARMS; i++) {
+        if(!(EE_Alarms[i].active & 0x80)) continue;
+
+        uint16_t alarmMin = (uint16_t)EE_Alarms[i].hour * 60 + EE_Alarms[i].minute;
+
+        // Minutes from now (handles day wrap: if alarm < now, it's tomorrow)
+        uint16_t delta = (alarmMin >= nowMin)
+                        ? (alarmMin - nowMin)           // Today
+                        : (1440 - nowMin + alarmMin);   // Tomorrow (wraps midnight)
+
+        // Check if this alarm is active for today
+        if((EE_Alarms[i].active & Todaybit) && delta < bestDelta) {
+            bestDelta = delta;
+            bestIdx   = i;
         }
+        // Check if this alarm is active for tomorrow (only valid when alarmMin < nowMin)
+        if((EE_Alarms[i].active & Tomorrowbit) && alarmMin < nowMin && delta < bestDelta) {
+            bestDelta = delta;
+            bestIdx   = i;
+        }
+    }
+
+    if(bestIdx != 0xFF) {
+        setbit(MStatus, alarm_on);
+        LoadAlarm(bestIdx);
     }
 }
 
@@ -979,7 +967,7 @@ void Calendar(void) {
             }                
             lcd_goto(4,2); print5x8(STR_Weekdays);
             for(uint8_t i=27; i<=123; i+=16) {
-                lcd_hline(1,126,i,PIXEL_SET);
+                DrawHLine(1,126,i,PIXEL_SET);
             }
             for(uint8_t i=1; i<128; i+=18) {
                 set_line(i,27,i,123);
@@ -1041,34 +1029,34 @@ void Calendar(void) {
     } while(!testbit(MStatus, goback));
 }
 
+// Compute the base weekday shift from years and months (1944-01-01 was Saturday)
+// Returns the accumulated day offset for the 1st of the given month
+static uint8_t computeWeekdayBase(const Type_Time *timeptr) {
+    uint8_t days = timeptr->year;
+    for (uint8_t y = 0; y < timeptr->year; y++) {
+        if (LEAP_YEAR(y)) days++;
+    }
+    for (uint8_t m = 0; m < timeptr->month - 1; m++) {
+        days += pgm_read_byte_near(monthDays + m) - 28;
+        if (m == 1 && LEAP_YEAR(timeptr->year)) days++;
+    }
+    return days;
+}
+
 // Returns the column number for the calendar display, 1944-01-01 was Saturday
 uint8_t firstdayofmonth(Type_Time *timeptr) {
-    uint8_t days = (timeptr->year);                 // The first weekday of the year increases on each year
-    for (uint8_t y=0; y<timeptr->year; y++) {       // On leap years, it increases by 2
-	    if (LEAP_YEAR(y)) days++;
-    }
-    for (uint8_t m=0; m<(timeptr->month)-1; m++) {    // Advance days for previous months in this year
-	    days += pgm_read_byte_near(monthDays+m)-28;
-	    if (m==1 && LEAP_YEAR(timeptr->year)) days++;
-    }
-	days += 6;                                      // Add 6 so that Saturday is on 6th column
-	while(days>=7) days-=7;                         // Calculate modulo to return the weekday
-    return days;                            
+    uint8_t days = computeWeekdayBase(timeptr);
+    days += 6;                                      // Add 6 so that Saturday is on 6th column
+    while(days>=7) days-=7;                         // Calculate modulo to return the weekday
+    return days;
 }
 
 // Finds the correct day of the week for the current date. 1944-01-01 was Saturday (Sunday is 0)
 void findweekday(void) {
-    uint8_t days = NowYear;                         // The first weekday of the year increases on each year
-    for (uint8_t y=0; y<NowYear; y++) {             // On leap years, it increases by 2
-        if (LEAP_YEAR(y)) days++;
-    }
-    for (uint8_t m=0; m<NowMonth-1; m++) {          // Advance days for previous months in this year
-        days += pgm_read_byte_near(monthDays+m)-28;
-        if (m==1 && LEAP_YEAR(NowYear)) days++;
-    }
+    uint8_t days = computeWeekdayBase(NOW);
     days += NowDay;                                 // Add remaining days in this month
-    days -=2;                                       // Subtract 2 so Sunday is 0
-	while(days>=7) days-=7;                         // Calculate modulo to return the weekday
+    days -= 2;                                      // Subtract 2 so Sunday is 0
+    while(days>=7) days-=7;                         // Calculate modulo to return the weekday
     NowWeekDay = days;                              // Return week day. Saturday is 0
 }
 
@@ -1078,33 +1066,6 @@ uint8_t DaysInMonth(Type_Time *timeptr) {
     daysinmonth = pgm_read_byte_near(monthDays+timeptr->month-1);
     if (timeptr->month==2 && LEAP_YEAR(timeptr->year)) daysinmonth++;
     return daysinmonth;
-}
-
-// Absolute days away from Now date
-uint16_t DaysAwayfromToday(Type_Time *timeptr) {
-    uint16_t days=0;
-    int8_t delta;
-    uint8_t y1 = NowYear;
-    uint8_t y2 = timeptr->year;
-    if(y2>=y1) delta = 1; else delta = -1;
-    while(y1!=y2) {     // Count days for every year
-        days += 365;
-        if (LEAP_YEAR(y1)) days++;
-        y1+=delta;
-    }     
-    uint8_t m1 = NowMonth-1;
-    uint8_t m2 = timeptr->month-1;
-    if(m2>=m1) delta = 1; else delta = -1;
-    while(m1!=m2) {     // Count days for every month
-        days += pgm_read_byte_near(monthDays+m1);
-        if (m1==1 && LEAP_YEAR(NowYear)) days++;
-        m1+=delta;
-    }
-    uint8_t d1 = NowDay;
-    uint8_t d2 = timeptr->day;
-    if(d2>=d1) delta = d2-d1; else delta = d1-d2;
-    days += delta;      // Add remaining days
-    return days;
 }
 
 uint32_t DaysSinceEpoch(const Type_Time *t) {

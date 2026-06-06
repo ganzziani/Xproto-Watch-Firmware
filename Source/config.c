@@ -24,30 +24,24 @@ void Diagnose(void) {
     TCC0.CTRLA = 3;                 // CPU clock
     TCC1.CTRLA = 0b00001000;        // Source is Event CH0
     LOGIC_ON();
+    ANALOG_ON();
     do {
         uint8_t temp = TCF0.CNTL;
         if((temp&0x01) == 0) ONGRN();
-        else if((temp&0x01) == 1) ONRED();
+        else ONRED();
         if((temp&0x03) == 2) Sound(TuneBeep);
         clr_display();
-        lcd_goto(0,0);
-        print5x8(VERSION); print5x8(PSTR(" Build: "));
-        printhex5x8(BUILD_NUMBER>>8); printhex5x8(BUILD_NUMBER&0x00FF);
-        print5x8(STR_Reset); printhex5x8(RST.STATUS);     // Show reset cause
-        print5x8(PSTR("\nTimerC: ")); printhex5x8(TCC1.CNTH); printhex5x8(TCC1.CNTL);
-        print5x8(PSTR("\nTimerF: ")); printhex5x8(TCF0.CNTH); printhex5x8(TCF0.CNTL);
-        //lcd_goto(0,3); print5x8(PSTR("XMEGA:  rev")); putchar5x8('A'+MCU.REVID);
-        print5x8(PSTR("\nLogic:  ")); printhex5x8(VPORT2.IN);      // Shows the logic input data
-        ANALOG_ON();
-        print5x8(PSTR("\nVin:    ")); print16_5x8(MeasureVin(1));
+        print5x8(PSTR("\nTMRC ")); printhex5x8(TCC1.CNTH); printhex5x8(TCC1.CNTL);
+        print5x8(PSTR("\nTMRF ")); printhex5x8(TCF0.CNTH); printhex5x8(TCF0.CNTL);
+        print5x8(PSTR("\nLOGI ")); printhex5x8(VPORT2.IN);      // Shows the logic input data
+        print5x8(PSTR("\nVIN  ")); print16_5x8(MeasureVin(1));
         cli();
         SecTimeout = SREG;  // MeasureVCC alters the T bit!
-        print5x8(PSTR("\nVCC:    ")); print16_5x8(MeasureVCC());
+        print5x8(PSTR("\nVCC  ")); print16_5x8(MeasureIntV(MEASURE_VCC));
         SREG = SecTimeout;
         sei();
-        print5x8(PSTR("\nVRef:   ")); print16_5x8(MeasureVRef());
-
-        print5x8(PSTR("\nClock:  ")); printhex5x8(CLK.CTRL); printhex5x8(OSC.CTRL); printhex5x8(OSC.STATUS); printhex5x8(OSC.XOSCFAIL);
+        print5x8(PSTR("\nVREF ")); print16_5x8(MeasureIntV(MEASURE_VREF));
+        print5x8(PSTR("\nCLK  ")); printhex5x8(CLK.CTRL); printhex5x8(OSC.CTRL); printhex5x8(OSC.STATUS); printhex5x8(OSC.XOSCFAIL);
         OFFRED();
         OFFGRN();
         for(uint8_t i=0; i<16; i++) {           // Print GPIO registers
@@ -98,9 +92,8 @@ void About(void) {
     print5x8(&STRS_mainmenu[1][0]);    // STRS_mainmenu[1][0] contains the word Oscilloscope
     print5x8(&STRS_mainmenu[0][3]);    // STRS_mainmenu[0][2] contains the word Watch
     lcd_goto(1,13);
-    print5x8(VERSION); print5x8(PSTR(" Build: "));
-    printhex5x8(BUILD_NUMBER>>8); printhex5x8(BUILD_NUMBER&0x00FF);
-    lcd_goto(1,14); print5x8(PSTR("Build Date 20")); printN5x8(BUILD_YEAR);
+    print5x8(VERSION); putchar5x8(' '); printhex5x8(BUILD_NUMBER>>8); printhex5x8(BUILD_NUMBER&0x00FF);
+    putchar5x8('\n'); printN5x8(BUILD_YEAR);
     putchar5x8('/'); printN5x8(BUILD_MONTH);
     putchar5x8('/'); printN5x8(BUILD_DAY);
     print5x8(STR_Reset); printhex5x8(RST.STATUS);    // Show reset cause
@@ -112,13 +105,13 @@ void About(void) {
         PrintTime(34,7);
         dma_display();
         WaitDisplay();
-        int16_t Vref = MeasureVRef();
+        int16_t Vref = MeasureIntV(MEASURE_VREF);
         if(Vref<1997 || Vref>2099) {    // Vref outside +/- 2.5%
             ONRED();
         } else OFFRED();
         ANALOG_OFF();
-        if(TCD1.CTRLA==0) SLP();          // Sleep if not sound playing
-        else wait_ms(255);
+        if(TCD1.CTRLA==0) SLP();        // Sleep if not sound playing
+        else delay_ms(255);
     } while(timeout-- && !testbit(Misc,userinput));
     clrbit(Misc, userinput);
     setbit(MStatus, update);
@@ -129,7 +122,7 @@ void Profiles(void) {
     uint8_t slot=0;
     do {
         clr_display();
-        lcd_goto(0,0); print5x8(&STRS_mainmenu[1][0]);    // STRS_mainmenu[1][0] contains the word Oscilloscope
+        print5x8(&STRS_mainmenu[1][0]);    // STRS_mainmenu[1][0] contains the word Oscilloscope
         print5x8(STR_Profiles);
         for(uint8_t i=0; i<8; i++) {
             lcd_goto(5,i+2);

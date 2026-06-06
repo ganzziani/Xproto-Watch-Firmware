@@ -12,7 +12,6 @@
 // y=127-y;
 // Disp_send.display_data[(uint16_t)(x<<4) + (y>>3)] |= (uint8_t)(0x80 >> (y & 0x07));
 
-#if 0   // toggle_pixel / toggle_line are unused — wrap in #if 0 to exclude from build
 .global toggle_pixel_buffer
 toggle_pixel_buffer:
     movw    r30, r20                ; Load passed pointer into Z (r30=lo, r31=hi)
@@ -45,7 +44,7 @@ toggle_pixel_body:
     brpl    0b                      ; repeat while y >= 0
     lat     z, r24                  ; Toggle bits in display data
     ret
-
+#if 0   // toggle_line is unused — wrap in #if 0 to exclude from build
 ; void toggle_line_buffer(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t *p);
 ; Parameters: r24=x1, r22=y1, r20=x2, r18=y2, r26:r27=p (X register, lo:hi)
 ; Note: pointer passed in r25:r24... but r24 is x1.

@@ -71,7 +71,7 @@ void Moon(void) {
             }
         }
         if(newday!=date.day) {
-            displayBlack();
+            clr_display();
             #ifdef INVERT_DISPLAY
             setbit(Misc,negative);
             #endif

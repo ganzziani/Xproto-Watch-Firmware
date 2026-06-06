@@ -126,8 +126,7 @@ void chess_init_board(void) {
  *
  * Arguments are passed in arg_* globals; the return value is search_result.
  * ------------------------------------------------------------------------- */
-void D(void)
-{
+void ChessEngine(void) {
 CALL:
     if (--T.CHESS.MP < T.CHESS.SA) {        /* Stack underrun: search too deep  */
         ++T.CHESS.MP;

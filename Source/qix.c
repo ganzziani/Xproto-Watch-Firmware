@@ -151,7 +151,7 @@ void QixEngine(void) {
                     T.QIX.Man.idle = 0;
                 }
                 // Spawn animation: circle closing in toward player position
-                lcd_circle(T.QIX.Man.x, T.QIX.Man.y, 121-(StateCounter<<2), PIXEL_SET);
+                DrawCircle(T.QIX.Man.x, T.QIX.Man.y, 121-(StateCounter<<2), PIXEL_SET);
                 if(StateCounter>=30) T.QIX.gameState = STATE_PLAYING;
             break;
             case STATE_PLAYING:
@@ -166,7 +166,7 @@ void QixEngine(void) {
                     T.QIX.Man.lives--;
                 } else {
                     // Death animation: circle expanding outward from player position
-                    lcd_circle(T.QIX.Man.x, T.QIX.Man.y, StateCounter<<2, PIXEL_SET);
+                    DrawCircle(T.QIX.Man.x, T.QIX.Man.y, StateCounter<<2, PIXEL_SET);
                 }
                 if(StateCounter>=30) {
                     if(T.QIX.Man.lives==0) T.QIX.gameState = STATE_GAMEOVER;
@@ -994,7 +994,6 @@ static void DrawGame(void) {
         } 
     }
     // Draw UI elements
-    lcd_goto(0, 0);
     print5x8(PSTR("Lvl:"));
     printN5x8(T.QIX.level);
     print5x8(PSTR(" x"));

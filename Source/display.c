@@ -46,22 +46,8 @@ void clr_display(void) {
     lcd_goto(0,0);
 }
 
-// Clear active display buffer
-void displayBlack(void) {
-    uint8_t *p=Disp_send.SPI_Address+2;  // Locate pointer at start of active buffer;
-    for(uint8_t i=128; i; i--) { // Erase all 2048 bytes in the buffer
-        // Unroll inner loop for speed - Clear 16 lines
-        *p++=0; *p++=0; *p++=0; *p++=0;
-        *p++=0; *p++=0; *p++=0; *p++=0;
-        *p++=0; *p++=0; *p++=0; *p++=0;
-        *p++=0; *p++=0; *p++=0; *p++=0;
-        p+=2;   // Skip line LCD setup
-    }
-    lcd_goto(0,0);
-}
-
 // Or the BufferIn into the active display buffer
-void OR_display(uint8_t *BufferIn) {
+void OR_display(const uint8_t *BufferIn) {
     uint8_t *p=Disp_send.SPI_Address+2;  // Locate pointer at start of active buffer;
     for(uint8_t i=128; i; i--) { // Copy all 2048 bytes in the buffer
         for(uint8_t j=16; j; j--) {
@@ -81,43 +67,6 @@ void sprite(uint8_t x, uint8_t y, const int8_t *ptr) {
         b=pgm_read_byte(ptr++);  // Get next y
         if((uint8_t)a==255) return;     // 255 marks the end of the sprite
     } while(1);
-}
-
-//-----------------------------------------------------------------------
-void set_line_c(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c) {
-    uint8_t dxabs,dyabs;
-    int8_t dx,dy,stepx,stepy;
-    dx=(int8_t)x2-x1;      // the horizontal distance of the line
-    dy=(int8_t)y2-y1;      // the vertical distance of the line
-    if(dy<0) { dyabs=-dy; stepy=-1; }
-    else { dyabs=dy; stepy=1; }
-    if(dx<0) { dxabs=-dx; stepx=-1; }
-    else {dxabs=dx; stepx=1; }
-    pixel(x1,y1,c);
-    if (dxabs>=dyabs) { // the line is more horizontal than vertical
-        uint8_t e=(uint8_t)(dxabs>>1);
-        for(uint8_t i=0;i<dxabs;i++) {
-            e+=dyabs;
-            if (e>=dxabs) {
-                e-=dxabs;
-                y1+=stepy;
-            }
-            x1+=stepx;
-            pixel(x1,y1, c);
-        }
-    }
-    else {  // the line is more vertical than horizontal
-        uint8_t e=(uint8_t)(dyabs>>1);
-        for(uint8_t i=0;i<dyabs;i++) {
-            e+=dxabs;
-            if (e>=dyabs) {
-                e-=dyabs;
-                x1+=stepx;
-            }
-            y1+=stepy;
-            pixel(x1,y1,c);
-        }
-    }
 }
 
 // Print a char on the display using the 3x6 font
@@ -250,7 +199,7 @@ void printF(uint8_t x, uint8_t y, int32_t Data) {
             uint16_t FontPointer = (unsigned int)(Font10x15)+(D[i])*20;
             // Upper side
             DisplayPointer--;
-            for(uint8_t i=10; i; i--) {
+            for(uint8_t j=10; j; j--) {
                 uint8_t data = pgm_read_byte_near(FontPointer++);
                 #ifdef INVERT_DISPLAY
                 *DisplayPointer = ~data;
@@ -261,7 +210,7 @@ void printF(uint8_t x, uint8_t y, int32_t Data) {
             }
             // Lower Side
             DisplayPointer = TempPointer;
-            for(uint8_t i=10; i; i--) {
+            for(uint8_t j=10; j; j--) {
                 uint8_t data = pgm_read_byte_near(FontPointer++);
                 #ifdef INVERT_DISPLAY
                 *DisplayPointer = ~data;
@@ -301,27 +250,21 @@ void tiny_printp(uint8_t x, uint8_t y, const char *ptr) {
 // with show==0 to clear, and show==255 to set
 // Special case show==1 to toggle
 void pixel(uint8_t x, uint8_t y, uint8_t show) {
-    uint8_t offset;
-    uint8_t *p=Disp_send.DataAddress;
     if(x>=128 || y>=128) return;
-    p = p - (uint16_t)(x*18) + (y>>3);              // Calculate position
-    offset = (uint8_t)(0x80 >> (y & 0x07));
-    if(show==0)         *p &= ~offset;                      // CLEAR
-    else if(show==1)    *p ^= offset;                       // TOGGLE
-    else if(show==255 || (show>prandom())) *p |= offset;    // SET
+    if(show==0)         clr_pixel(x,y);     // CLEAR
+    else if(show==1)    toggle_pixel(x,y);  // TOGGLE
+    else                set_pixel(x,y);     // SET
 }
 
 // Horizontal line
-void lcd_hline(uint8_t x1, uint8_t x2, uint8_t y, uint8_t c) {
-    if(x1>=192) x1=0; else if(x1>=128) x1=127;  // Handle overflow
-    if(x2>=192) x2=0; else if(x2>=128) x2=127;
+void DrawHLine(uint8_t x1, uint8_t x2, uint8_t y, uint8_t c) {
 	if(x1>=x2) SWAP(x1,x2);
 	for(;x1<=x2;x1++) pixel(x1,y,c);
 }
 
 void Rectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c) {
-    lcd_hline(x1,x2,y1,c);
-    lcd_hline(x1,x2,y2,c);
+    DrawHLine(x1,x2,y1,c);
+    DrawHLine(x1,x2,y2,c);
 	if(y1>=y2) SWAP(y1,y2);
 	for(;y1<=y2;y1++) { pixel(x1,y1,c); pixel(x2,y1,c); }
 }
@@ -329,150 +272,153 @@ void Rectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c) {
 void fillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c) {
     if(y1>=y2) SWAP(y1,y2);    
     while(y1<=y2) {
-        lcd_hline(x1,x2,y1++,c);
+        DrawHLine(x1,x2,y1++,c);
     }
 }
 
+// Toggle a triangle - Bresenham method
+// Original from http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
+// Corrected optimized triangle fill – exact output, no stuck loops
 // Fill a triangle - Bresenham method
 // Original from http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
-void fillTriangle(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2,uint8_t x3,uint8_t y3, uint8_t c) {
-	uint8_t t1x,t2x,y,minx,maxx,t1xp,t2xp;
-	uint8_t changed1 = 0;
-	uint8_t changed2 = 0;
-	int8_t signx1,signx2,dx1,dy1,dx2,dy2;
-	uint8_t e1,e2;
+void ToggleTriangle(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2,uint8_t x3,uint8_t y3) {
+    uint8_t t1x,t2x,y,minx,maxx,t1xp,t2xp;
+    uint8_t changed1 = 0;
+    uint8_t changed2 = 0;
+    int8_t signx1,signx2,dx1,dy1,dx2,dy2;
+    uint8_t e1,e2;
     // Sort vertices
-	if (y1>y2) { SWAP(y1,y2); SWAP(x1,x2); }
-	if (y1>y3) { SWAP(y1,y3); SWAP(x1,x3); }
-	if (y2>y3) { SWAP(y2,y3); SWAP(x2,x3); }
+    if (y1>y2) { SWAP(y1,y2); SWAP(x1,x2); }
+    if (y1>y3) { SWAP(y1,y3); SWAP(x1,x3); }
+    if (y2>y3) { SWAP(y2,y3); SWAP(x2,x3); }
 
-	t1x=t2x=x1; y=y1;   // Starting points
+    t1x=t2x=x1; y=y1;   // Starting points
 
-	dx1 = (int8_t)(x2 - x1); if(dx1<0) { dx1=-dx1; signx1=-1; } else signx1=1;
-	dy1 = (int8_t)(y2 - y1);
- 
-	dx2 = (int8_t)(x3 - x1); if(dx2<0) { dx2=-dx2; signx2=-1; } else signx2=1;
-	dy2 = (int8_t)(y3 - y1);
-	
-	if (dy1 > dx1) {   // swap values
+    dx1 = (int8_t)(x2 - x1); if(dx1<0) { dx1=-dx1; signx1=-1; } else signx1=1;
+    dy1 = (int8_t)(y2 - y1);
+    
+    dx2 = (int8_t)(x3 - x1); if(dx2<0) { dx2=-dx2; signx2=-1; } else signx2=1;
+    dy2 = (int8_t)(y3 - y1);
+    
+    if (dy1 > dx1) {   // swap values
         SWAP(dx1,dy1);
-		changed1 = 1;
-	}
-	if (dy2 > dx2) {   // swap values
+        changed1 = 1;
+    }
+    if (dy2 > dx2) {   // swap values
         SWAP(dy2,dx2);
-		changed2 = 1;
-	}
-	
-	e2 = (uint8_t)(dx2>>1);
+        changed2 = 1;
+    }
+    
+    e2 = (uint8_t)(dx2>>1);
     // Flat top, just process the second half
     if(y1==y2) goto next;
     e1 = (uint8_t)(dx1>>1);
-	
-	for (uint8_t i = 0; i < dx1;) {
-		t1xp=0; t2xp=0;
-		if(t1x<t2x) { minx=t1x; maxx=t2x; }
-		else		{ minx=t2x; maxx=t1x; }
+    
+    for (uint8_t i = 0; i < dx1;) {
+        t1xp=0; t2xp=0;
+        if(t1x<t2x) { minx=t1x; maxx=t2x; }
+        else		{ minx=t2x; maxx=t1x; }
         // process first line until y value is about to change
-		while(i<dx1) {
-			i++;			
-			e1 += dy1;
-	   	   	while (e1 >= dx1) {
-				e1 -= dx1;
-   	   	   	   if (changed1) t1xp=signx1;//t1x += signx1;
-				else          goto next1;
-			}
-			if (changed1) break;
-			else t1x += signx1;
-		}
-	// Move line
-	next1:
+        while(i<dx1) {
+            i++;
+            e1 += dy1;
+            while (e1 >= dx1) {
+                e1 -= dx1;
+                if (changed1) t1xp=signx1;//t1x += signx1;
+                else          goto next1;
+            }
+            if (changed1) break;
+            else t1x += signx1;
+        }
+        // Move line
+        next1:
         // process second line until y value is about to change
-		while (1) {
-			e2 += dy2;		
-			while (e2 >= dx2) {
-				e2 -= dx2;
-				if (changed2) t2xp=signx2;//t2x += signx2;
-				else          goto next2;
-			}
-			if (changed2)     break;
-			else              t2x += signx2;
-		}
-	next2:
-		if(minx>t1x) minx=t1x;
+        while (1) {
+            e2 += dy2;
+            while (e2 >= dx2) {
+                e2 -= dx2;
+                if (changed2) t2xp=signx2;//t2x += signx2;
+                else          goto next2;
+            }
+            if (changed2)     break;
+            else              t2x += signx2;
+        }
+        next2:
+        if(minx>t1x) minx=t1x;
         if(minx>t2x) minx=t2x;
-		if(maxx<t1x) maxx=t1x;
+        if(maxx<t1x) maxx=t1x;
         if(maxx<t2x) maxx=t2x;
-	   	lcd_hline(minx, maxx, y,c);    // Draw line from min to max points found on the y
-		// Now increase y
-		if(!changed1) t1x += signx1;
-		t1x+=t1xp;
-		if(!changed2) t2x += signx2;
-		t2x+=t2xp;
-    	y += 1;
-		if(y==y2) break;
-		
-   }
-	next:
-	// Second half
-	dx1 = (int8_t)(x3 - x2); if(dx1<0) { dx1=-dx1; signx1=-1; } else signx1=1;
-	dy1 = (int8_t)(y3 - y2);
-	t1x=x2;
- 
-	if (dy1 > dx1) {   // swap values
+        DrawHLine(minx, maxx, y, PIXEL_TGL);    // Draw line from min to max points found on the y
+        // Now increase y
+        if(!changed1) t1x += signx1;
+        t1x+=t1xp;
+        if(!changed2) t2x += signx2;
+        t2x+=t2xp;
+        y += 1;
+        if(y==y2) break;
+        
+    }
+    next:
+    // Second half
+    dx1 = (int8_t)(x3 - x2); if(dx1<0) { dx1=-dx1; signx1=-1; } else signx1=1;
+    dy1 = (int8_t)(y3 - y2);
+    t1x=x2;
+    
+    if (dy1 > dx1) {   // swap values
         SWAP(dy1,dx1);
-		changed1 = 1;
-	} else changed1=0;
-	
-	e1 = (uint8_t)(dx1>>1);
-	
-	for (uint8_t i = 0; i<=dx1; i++) {
-		t1xp=0; t2xp=0;
-		if(t1x<t2x) { minx=t1x; maxx=t2x; }
-		else		{ minx=t2x; maxx=t1x; }
-	    // process first line until y value is about to change
-		while(i<dx1) {
-    		e1 += dy1;
-	   	   	while (e1 >= dx1) {
-				e1 -= dx1;
-   	   	   	   	if (changed1) { t1xp=signx1; break; }//t1x += signx1;
-				else          goto next3;
-			}
-			if (changed1) break;
-			else   	   	  t1x += signx1;
-			i++;
-		}
-	next3:
+        changed1 = 1;
+    } else changed1=0;
+    
+    e1 = (uint8_t)(dx1>>1);
+    
+    for (uint8_t i = 0; i<=dx1; i++) {
+        t1xp=0; t2xp=0;
+        if(t1x<t2x) { minx=t1x; maxx=t2x; }
+        else		{ minx=t2x; maxx=t1x; }
+        // process first line until y value is about to change
+        while(i<dx1) {
+            e1 += dy1;
+            while (e1 >= dx1) {
+                e1 -= dx1;
+                if (changed1) { t1xp=signx1; break; }//t1x += signx1;
+                else          goto next3;
+            }
+            if (changed1) break;
+            else   	   	  t1x += signx1;
+            i++;
+        }
+        next3:
         // process second line until y value is about to change
-		while (t2x!=x3) {
-			e2 += dy2;
-	   	   	while (e2 >= dx2) {
-				e2 -= dx2;
-				if(changed2) t2xp=signx2;
-				else          goto next4;
-			}
-			if (changed2)     break;
-			else              t2x += signx2;
-		}	   	   
-	next4:
+        while (t2x!=x3) {
+            e2 += dy2;
+            while (e2 >= dx2) {
+                e2 -= dx2;
+                if(changed2) t2xp=signx2;
+                else          goto next4;
+            }
+            if (changed2)     break;
+            else              t2x += signx2;
+        }
+        next4:
 
-		if(minx>t1x) minx=t1x;
+        if(minx>t1x) minx=t1x;
         if(minx>t2x) minx=t2x;
-		if(maxx<t1x) maxx=t1x;
+        if(maxx<t1x) maxx=t1x;
         if(maxx<t2x) maxx=t2x;
-	   	lcd_hline(minx, maxx, y,c);    // Draw line from min to max points found on the y
-		// Now increase y
-		if(!changed1) t1x += signx1;
-		t1x+=t1xp;
-		if(!changed2) t2x += signx2;
-		t2x+=t2xp;
-    	y += 1;
-		if(y>y3) return;
-	}
+        DrawHLine(minx, maxx, y, PIXEL_TGL);    // Draw line from min to max points found on the y
+        // Now increase y
+        if(!changed1) t1x += signx1;
+        t1x+=t1xp;
+        if(!changed2) t2x += signx2;
+        t2x+=t2xp;
+        y += 1;
+        if(y>y3) return;
+    }
 }
 
 // Draws a circle with center at x,y with given radius.
 // Set show to 1 to draw pixel, set to 0 to hide pixel.
-void lcd_circle(uint8_t x, uint8_t y, uint8_t radius, uint8_t c) {
+void DrawCircle(uint8_t x, uint8_t y, uint8_t radius, uint8_t c) {
     uint8_t xc = 0;
     uint8_t yc = radius;
     int p = 3 - (radius<<1);
@@ -485,21 +431,6 @@ void lcd_circle(uint8_t x, uint8_t y, uint8_t radius, uint8_t c) {
         pixel(x + yc, y - xc, c);
         pixel(x - yc, y + xc, c);
         pixel(x - yc, y - xc, c);
-        if (p < 0) p += (xc++ << 2) + 6;
-        else p += ((xc++ - yc--)<<2) + 10;
-    }
-}
-
-// Circle_fill - Draws and fills a circle
-void circle_fill(uint8_t x,uint8_t y, uint8_t radius, uint8_t c) {
-    uint8_t xc = 0;
-    uint8_t yc = radius;
-    int p = 3 - (radius<<1);
-    while (xc <= yc) {
-		lcd_hline(x - xc, x + xc, y - yc, c);
-		lcd_hline(x - xc, x + xc, y + yc, c);
-		lcd_hline(x - yc, x + yc, y - xc, c);
-		lcd_hline(x - yc, x + yc, y + xc, c);
         if (p < 0) p += (xc++ << 2) + 6;
         else p += ((xc++ - yc--)<<2) + 10;
     }
@@ -651,7 +582,7 @@ void bitmap(uint8_t x, uint8_t y, const uint8_t *BMP) {
 	uint8_t width,height;
     width=pgm_read_byte(BMP++);
     height=pgm_read_byte(BMP++)/8;
-    p= &Disp_send.DataAddress[(uint16_t)((-x)*18)+y];
+    p = Disp_send.DataAddress -(x)*18 + (y);    
   	for (uint8_t col=0; col < width; col++) {
 		for (uint8_t row=0; row<height; row++) {
 			if(count==0) {
@@ -703,8 +634,8 @@ void bitmap_safe(int8_t x, int8_t y, const uint8_t *BMP, uint8_t c) {
     width=pgm_read_byte(BMP++);
     height=pgm_read_byte(BMP++)/8;
     if(width<0 || y+height<=0) return;
-    p= &Disp_send.DataAddress[(int16_t)((-x)*18)+y];
-  	for (int16_t col=x ; col < x+width; col++) {
+    p = Disp_send.DataAddress -(x)*18 + (y);    
+ 	for (int16_t col=x ; col < x+width; col++) {
 		for (int16_t row=y; row<y+height; row++) {
 			if(count==0) {
 				data = pgm_read_byte(BMP++);

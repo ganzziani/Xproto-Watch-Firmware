@@ -130,6 +130,15 @@ FUSES = {
 	.FUSEBYTE5 = 0xDB,  // No EESAVE on chip erase, BOD sampled when active, 2.4V BO level
 };
 
+// Menu animation defines
+#define BMP_WIDTH   80
+#define MARGIN      5
+#define CENTER_X    ((DISPLAY_MAX_X + 1 - BMP_WIDTH) / 2)
+#define LEFT_X      (-BMP_WIDTH - MARGIN)
+#define RIGHT_X     (DISPLAY_MAX_X + 1 + MARGIN)
+#define SLIDE_DIST  (RIGHT_X - CENTER_X)
+#define SLIDE_SPEED 14
+
 // Disable writing to the bootloader section
 LOCKBITS = (0xBF);
 
@@ -307,40 +316,25 @@ int main(void) {
             Sound(TuneBeep);
             int8_t n, step, from;
             if(Menu==old_menu) {        // No animation, just print the bmp
-                n = 117;
+                n = SLIDE_DIST;
                 step = 1;
-                from=-101;
+                from=LEFT_X;
             } else if(Menu>old_menu) {  // Slide left
-                n = step=-15;
-                from=133;
+                n = step=-SLIDE_SPEED;
+                from=RIGHT_X;
             } else {                    // Slide right
-                n = step=15;
-                from=-101;
+                n = step= SLIDE_SPEED;
+                from=LEFT_X;
             }
-            for(; n<118 && n>-118; n+=step) {   // Slide animation
-                if(testbit(Misc, userinput)) {  // Button pressed during animation
-                    clrbit(Misc, userinput);
-                    Sound(TuneBeep);
-                    old_menu=Menu;
-                    if(testbit(Buttons,KUR) || testbit(Buttons,KBR)) {
-                        Menu++;
-                        n=step=-15;
-                        from=133;
-                    }
-                    if(testbit(Buttons,KUL) || testbit(Buttons,KBL)) {
-                        Menu--;
-                        n=step=15;
-                        from=-101;
-                    }                
-                }
+            for(; n<(SLIDE_DIST + 1) && n>-(SLIDE_DIST + 1); n+=step) {   // Slide animation
                 if(Menu>4) Menu=1;
                 if(Menu==0) Menu=4; 
                 if(step>1) step--;
                 if(step<-1) step++;
                 SwitchBuffers();
                 clr_display();
-                bitmap_safe(from+n,4,(uint8_t *)pgm_read_word(BMPs+Menu),PIXEL_SET);
-                bitmap_safe(16+n,4,(uint8_t *)pgm_read_word(BMPs+old_menu),PIXEL_SET);
+                bitmap_safe(from+n,5,(uint8_t *)pgm_read_word(BMPs+Menu),PIXEL_SET);
+                bitmap_safe(CENTER_X+n,5,(uint8_t *)pgm_read_word(BMPs+old_menu),PIXEL_SET);
                 WaitDisplay();
                 dma_display();
             }
@@ -349,6 +343,7 @@ int main(void) {
             lcd_goto(1,15); print5x8(STRS_optionmenu[Menu-1]);
             WaitDisplay();  // Finish previous transmission
             dma_display();
+            clrbit(Misc, userinput);
             clrbit(MStatus, update);
         }
         if(SecTimeout) {    // Stay in main menu...
@@ -807,21 +802,6 @@ void delay_ms(uint8_t n) {
     }
 }
 
-// Delay in mili seconds, take into account current CPU speed
-// If there is user input, exit
-void wait_ms(uint8_t n) {
-    WDR();  // Clear watchdog
-    while(n--) {
-        if(CLK.CTRL==0) {   // CPU is running at 2MHz
-            _delay_us(62);
-        }
-        else {              // CPU is running at 32MHz
-            _delay_us(999);
-        }
-        if(testbit(Misc,userinput)) return;
-    }
-}
-
 const uint16_t Batt_Levels[12] PROGMEM = {
     3400, 3500, 3570, 3640, 3710, 3780, 3850, 3920, 3990, 4060, 4130, 4200
 };
@@ -888,45 +868,33 @@ int16_t MeasureVin(uint8_t scale) {
     return 0;		                // Charging, Voltage >= 4300
 }
 
-// Measure External 2.048V reference assuming VCC/2 is 1.5V
-int16_t MeasureVRef(void) {
-    uint8_t prescaler = (CLK.CTRL == 0) ? 0x00 : 0x04; // DIV4 @ 2MHz, DIV64 @ 32MHz
-    AdcEnable(0x70, 0x38, prescaler);   // 12-bit, ADC7, prescaler
-    int16_t adc_read = 0;
-    for(uint8_t i = 0; i < 16; i++) {  // Add 16 measurements, also randomize seed
-        ADCA.CH0.CTRL = 0x81;
-        while(ADCA.INTFLAGS == 0);
-        ADCA.INTFLAGS = 0x01;
-        adc_read += (int16_t)ADCA.CH0RES;
-        Randomize(ADCA.CH0RES);
-        delay_ms(1);
-    }
-	// VRef = 2*V(ADC7)
-	// RES*Vref/2048 = V(ADC7) = VRef/2
-	// RES*2*1500/2048 = VRef
-	// Vin = (375 * RES) / 256 = (375 * 16*RES) / 4096
-	int16_t volt = ((int32_t)adc_read * 375) >> 12;
-    AdcDisable();
-	return volt;
-}
-
-// Measure VCC (3V) assuming ADC7 is 1.024V
-int16_t MeasureVCC(void) {
+// Measure VCC (3V) assuming ADC7 is 1.024V, or External 2.048V reference assuming VCC/2 is 1.5V
+int16_t MeasureIntV(uint8_t channel) {
     delay_ms(1);
     uint8_t prescaler = (CLK.CTRL == 0) ? 0x02 : 0x07; // DIV16 @ 2MHz, DIV512 @ 32MHz
-    AdcEnable(0x10, 0x38, prescaler);   // no current limit, 12-bit, ADC7, prescaler
+    AdcEnable(channel, 0x38, prescaler);   // no current limit, 12-bit, ADC7, prescaler
     int16_t adc_read = 0;
-    for(uint8_t i = 0; i < 16; i++) {  // Add 16 measurements
+    for(uint8_t i = 0; i < 16; i++) {   // Add 16 measurements
         ADCA.CH0.CTRL = 0x81;
         while(ADCA.INTFLAGS == 0);
         ADCA.INTFLAGS = 0x01;
         adc_read += (int16_t)ADCA.CH0RES;
+        Randomize(ADCA.CH0RES);         // Use this measurement to randomize the seed
         delay_ms(1);
     }
-	// RES*Vref/2048 = V(ADC7)
-	// RES*(VCC/2)/2048 = 1024
-    // VCC = 1024*2048*2/RES = 16*1024*2048*2/16*RES
-	int16_t volt = 67108864 / (int32_t)adc_read;
+    int16_t volt=0;
+    if(channel==0x10) {
+        // RES*Vref/2048 = V(ADC7)
+        // RES*(VCC/2)/2048 = 1024
+        // VCC = 1024*2048*2/RES = 16*1024*2048*2/16*RES
+        volt = 67108864 / (int32_t)adc_read;
+    } else {
+	    // VRef = 2*V(ADC7)
+	    // RES*Vref/2048 = V(ADC7) = VRef/2
+	    // RES*2*1500/2048 = VRef
+	    // Vin = (375 * RES) / 256 = (375 * 16*RES) / 4096
+	    volt = ((int32_t)adc_read * 375) >> 12;
+    }
     AdcDisable();
-	return volt;
+    return volt;
 }

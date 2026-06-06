@@ -1,6 +1,7 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/pgmspace.h>
+#include <string.h>
 #include "main.h"
 #include "utils.h"
 #include "games.h"
@@ -11,17 +12,11 @@ static void MoveSnake(SnakeStruct *Player);
 static void SnakeEngine(void);
 
 void InitSnake(void) {
-    uint16_t k=0;
-    for(uint8_t i=0; i<32; i++) {
-        for(uint8_t j=0; j<32; j++) {
-            T.SNAKE.board[i][j]=0;
-            T.SNAKE.Player1.x[k]=0;
-            T.SNAKE.Player1.y[k]=0;
-            T.SNAKE.Player2.x[k]=0;
-            T.SNAKE.Player2.y[k]=0;
-            k++;
-        }
-    }
+    memset(T.SNAKE.board, 0, BOARD_SIZE);
+    memset(T.SNAKE.Player1.x, 0, sizeof(T.SNAKE.Player1.x));
+    memset(T.SNAKE.Player1.y, 0, sizeof(T.SNAKE.Player1.y));
+    memset(T.SNAKE.Player2.x, 0, sizeof(T.SNAKE.Player2.x));
+    memset(T.SNAKE.Player2.y, 0, sizeof(T.SNAKE.Player2.y));
     T.SNAKE.Player1.x[0]=T.SNAKE.Player1.x[1]=2;
     T.SNAKE.Player1.y[0]=T.SNAKE.Player1.y[1]=2;
     T.SNAKE.Player1.size=2;
@@ -72,7 +67,7 @@ void Snake(void) {
                 }                    
                 if(testbit(Buttons, KML)) setbit(MStatus, goback);
             }
-            lcd_goto(49,0); print5x8(PSTR("Snake"));
+            lcd_goto(49,0); print5x8(STR_Snake);
             lcd_goto(0,2); print5x8(STR_Player); print5x8(STR_P1);
             if(p1==NO_PLAYER1) print5x8(&STRS_mainmenu[2][9]);  // STRS_mainmenu[2][9] contains the text "-  "
             else if(p1==HUMAN_PLAYER1) print5x8(STR_Human);
@@ -81,7 +76,7 @@ void Snake(void) {
             if(p2==NO_PLAYER2) print5x8(&STRS_mainmenu[2][9]);
             else if(p2==HUMAN_PLAYER2) print5x8(STR_Human);
             if(p2==CPU_PLAYER2) print5x8(STR_CPU);
-            lcd_goto(0,15); print5x8(STR_GameMenu);
+            lcd_goto(0,15); print5x8(STR_GameMenu1);
         }
         dma_display();
         WaitDisplay();

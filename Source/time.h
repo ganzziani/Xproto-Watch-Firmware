@@ -25,7 +25,7 @@ typedef struct {
     uint8_t tune;               // Alarm Tune
 } Type_Alarm;
 
-#define LEAP_YEAR(year) (!(year&0x03))   // Year divisible by 4? This check works for the year range of 2000 thru 2099
+#define LEAP_YEAR(year) (!(year&0x03))   // Year divisible by 4? This check works for the year range of 1944 and 2099
 
 extern volatile Type_Time now;
 extern volatile uint8_t MoonPhase;
@@ -39,7 +39,6 @@ void SetTimeTimer(void);
 void GetTimeTimer(void);
 void SetMinuteInterrupt(void);
 uint8_t DaysInMonth(Type_Time *timeptr);
-uint16_t DaysAwayfromToday(Type_Time *timeptr);
 uint8_t CompareDate(const Type_Time *timeptr1, const Type_Time *timeptr2);
 uint32_t DaysSinceEpoch(const Type_Time *timeptr);
 uint16_t DaysDifference(const Type_Time *t1, const Type_Time *t2);

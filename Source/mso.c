@@ -582,7 +582,7 @@ void MSO(void) {
                 clrbit(MStatus, triggered);
                 TCC1.CTRLA = 0;             // Stop post trigger counter
                 // Done with fast sampling, disable DMAs and post trigger counter
-                if(testbit(CHDctrl,chon)) clrbit(DMA.CH2.CTRLA, 7);
+                if(testbit(CHDctrl,digchon)) clrbit(DMA.CH2.CTRLA, 7);
                 clrbit(DMA.CH0.CTRLA, 7);
                 clrbit(DMA.CH1.CTRLA, 7);
                 circular=512-DMA.CH0.TRFCNT;   // get index
@@ -721,7 +721,7 @@ void MSO(void) {
             if(!testbit(Misc, userinput)) clrbit(MStatus, update);
             sei();
         }
-        if(testbit(CHDctrl,chon)) clrbit(DMA.CH2.CTRLA, 7);
+        if(testbit(CHDctrl,digchon)) clrbit(DMA.CH2.CTRLA, 7);
         clrbit(DMA.CH0.CTRLA, 7);
         clrbit(DMA.CH1.CTRLA, 7);
         // When MSO is stopped or in roll mode, cycle is too fast to finish sending
@@ -880,7 +880,7 @@ void MSO(void) {
                     chddata = T.SCOPE.DC.CHDdata[j];
                     // Show Digital Data
                     chdpos = M.CHDpos;
-                    if(testbit(CHDctrl,chon)) {
+                    if(testbit(CHDctrl,digchon)) {
                         uint8_t bitn,bitpos;
                         for(bitpos=128, bitn=7; bitpos; bitpos=bitpos>>1, bitn--) {
                             if(CHDmask&bitpos) {
@@ -1323,7 +1323,7 @@ checknext:
                     }
                 break;
                 case MCHD:                     // Logic Analyzer menu
-                    if(testbit(Buttons,K1)) togglebit(CHDctrl,chon);   // Logic on/off
+                    if(testbit(Buttons,K1)) togglebit(CHDctrl,digchon); // Logic on/off
                     if(testbit(Buttons,K2)) Menu = MCHDSEL1;            // Bit Select
                     if(testbit(Buttons,K3)) Menu = MPROTOCOL;           // Protocol Sniffer
                 break;
@@ -1470,7 +1470,7 @@ checknext:
                 break;
                 case MCHDOPT1:    // Logic Analyzer Options
                     if(testbit(Buttons,K1)) M.CHDpos+=8;                    // Logic Position
-                    if(testbit(Buttons,K2)) togglebit(CHDctrl,chinvert);    // Invert Channel
+                    if(testbit(Buttons,K2)) togglebit(CHDctrl,digchinvert); // Invert Channel
                     if(testbit(Buttons,K3)) togglebit(CHDctrl,low);         // Thick line when logic '0'
                 break;
                 case MMAIN1:     // Menu Select 1: Channel
@@ -2030,7 +2030,7 @@ checknext:
                             if(i==0 && testbit(CH2ctrl,chon)) setbit(Misc,negative);
                         break;
                         case MCHD:
-                            if(i==0 && testbit(CHDctrl,chon)) setbit(Misc,negative);
+                            if(i==0 && testbit(CHDctrl,digchon)) setbit(Misc,negative);
                         break;
                         case MSNIFFER:      // Sniffer mode
                             if( (i==0 && !testbit(Mcursors, singlesniff)) ||
@@ -2079,7 +2079,7 @@ checknext:
                                 (i==2 && testbit(CH2ctrl,chmath)) ) setbit(Misc,negative);
                         break;
                         case MCHDOPT1:
-                            if( (i==1 && testbit(CHDctrl,chinvert)) ||
+                            if( (i==1 && testbit(CHDctrl,digchinvert)) ||
                                 (i==2 && testbit(CHDctrl,low)) ) setbit(Misc,negative);
                         break;
                         case MMAIN3:
@@ -3126,8 +3126,8 @@ void Apply(void) {
     // Logic input options
     uint8_t temp;
     temp=1;         // Sense rising edge (for freq. counter)
-    if(testbit(CHDctrl,chinvert)) temp |=0x40;    // Invert logic inputs
-    if(testbit(CHDctrl,pull)) {                 // Pull
+    if(testbit(CHDctrl,digchinvert)) temp |=0x40;   // Invert logic inputs
+    if(testbit(CHDctrl,pull)) {                     // Pull
         temp|=0x10;
         if(testbit(CHDctrl,pullup)) temp|=0x08;     // Pull up
     }
@@ -3237,7 +3237,7 @@ ISR(TCE1_OVF_vect) {
         // Show Digital Data
         uint8_t chdpos;
         chdpos = M.CHDpos;
-        if(testbit(CHDctrl,chon)) {
+        if(testbit(CHDctrl,digchon)) {
             uint8_t bits, bitn;
             for(bits=0x80, bitn=7; bits; bits=bits>>1, bitn--) {
                 if(CHDmask&bits) {
@@ -3324,13 +3324,13 @@ static void SetupDMACh(DMA_CH_t *ch, uint8_t trigsrc, volatile void *src, volati
 
 void StartDMAs(void) {
     SetupDMACh(&DMA.CH0, 0x10, &ADCA.CH0.RESL, T.SCOPE.TempCH1); // ADC CH0 → CH1 buf
-    if(testbit(CHDctrl,chon)) {
+    if(testbit(CHDctrl,digchon)) {
         WaitDisplay();                          // Let display finish using DMA
         SetupDMACh(&DMA.CH2, 0x10, &VPORT2.IN, T.SCOPE.TempCHD); // logic → CHD buf
     }
     SetupDMACh(&DMA.CH1, 0x10, &ADCB.CH0.RESL, T.SCOPE.TempCH2); // ADC CH1 → CH2 buf (ADCB trigger has a bug, use 0x10)
     // Start DMAs
-    if(testbit(CHDctrl,chon)) setbit(DMA.CH2.CTRLA, 7);
+    if(testbit(CHDctrl,digchon)) setbit(DMA.CH2.CTRLA, 7);
     setbit(DMA.CH0.CTRLA, 7);           
     setbit(DMA.CH1.CTRLA, 7);
 
@@ -3368,8 +3368,8 @@ void SaveEE(void) {
             M.CH1gain=T.SCOPE.old_g1;
             M.CH2gain=T.SCOPE.old_g2;
         }
-        eeprom_write_block(0, &EEGPIO, 12);
-        eeprom_write_block(&M, &EEM, sizeof(NVMVAR));
+        eeprom_write_block((void *)0, &EEGPIO, 12);     // Copy GPIO
+        eeprom_write_block(&M, &EEM, sizeof(NVMVAR));   // Copy M
         T.SCOPE.old_s=Srate;
         T.SCOPE.old_g1=M.CH1gain;
         T.SCOPE.old_g2=M.CH2gain;

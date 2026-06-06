@@ -3,7 +3,7 @@
 
 //#define SPANISH
 
-const char VERSION[]    PROGMEM = "FW 2.84";
+const char VERSION[]    PROGMEM = "FW 2.85";
 
 // Strings with special characters:
 // 0x1F = delta
@@ -37,17 +37,13 @@ const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
 };
 
 const char STRS_Months[][11] PROGMEM = {             // Months
-    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Augosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
 };
-const char STRS_Months_short[][4] PROGMEM = {        // Short Months
-    "ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"
-};
+
 const char STRS_Days[][10] PROGMEM = {               // Days of the week
     " Domingo ", "  Lunes  ", " Martes  ", "Miercoles", " Jueves  ", " Viernes ", " Sabado  "
 };
-const char STRS_Days_short[][4] PROGMEM = {          // Short Days of the week
-    "Do", "Lu", "Ma", "Mi", "Ju", "Vi", "Sa"
-};
+
 const char STR_Weekdays[] PROGMEM = "Do Lu Ma Mi Ju Vi Sa";
 
 const char STR_White[]      PROGMEM = "Blanco: ";
@@ -80,23 +76,21 @@ const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
 const char STRS_Months[][11] PROGMEM = {             // Months
     "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December",
 };
-const char STRS_Months_short[][4] PROGMEM = {        // Short Months
-    "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
-};
+
 const char STRS_Days[][10] PROGMEM = {               // Days of the week
     " Sunday  ", " Monday  ", " Tuesday ", "Wednesday", "Thursday ", " Friday  ", "Saturday "
 };
-const char STRS_Days_short[][4] PROGMEM = {          // Short Days of the week
-    "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"
-};
+
 const char STR_Weekdays[] PROGMEM = "Su Mo Tu We Th Fr Sa";
 
-const char STR_White[]      PROGMEM = "White:  ";
-const char STR_Black[]      PROGMEM = "Black:  ";
-const char STR_Level[]      PROGMEM = "Level:  ";
+const char STR_White[]      PROGMEM = "White: ";
+const char STR_Black[]      PROGMEM = "Black: ";
+const char STR_Level[]      PROGMEM = "Level: ";
 const char STR_Player[]     PROGMEM = "Player ";
 const char STR_Human[]      PROGMEM = "Human ";
-const char STR_GameMenu[]   PROGMEM = "Player1 Player2 Start";
+const char STR_Snake[]      PROGMEM = "Snake";
+const char STR_GameMenu1[]  PROGMEM = "Player1 Player2 Start";
+const char STR_GameMenu2[]  PROGMEM = "Players  Level  Start";
 const char STR_MoonMenu[]   PROGMEM = "Prev.FM Today Next.FM";
 
 const char STR_Profiles[]   PROGMEM = " Profiles";

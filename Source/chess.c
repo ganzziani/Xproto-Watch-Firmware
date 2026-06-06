@@ -44,7 +44,7 @@ extern unsigned char arg_state;
 void PlayChess(void);
 
 /* Engine functions */
-void D(void);
+void ChessEngine(void);
 void chess_init_board(void);
 
 /* Infinity score — must match the value defined in avrmax_48.c */
@@ -119,7 +119,7 @@ void Cursor(uint8_t x, uint8_t y, uint8_t c) {
     if (c == 0) { if ((x + y + 1) & 0x01) color = PIXEL_SET; }  /* Erase */
     if (c == 1) { if ((x + y)     & 0x01) color = PIXEL_SET; }  /* Draw  */
     #endif
-    if (c == 2) { color = PIXEL_TGL; }                           /* Toggle */
+    if (c == 2) { color = PIXEL_TGL; }                          /* Toggle */
     Rectangle(x * 15 + 1, y * 16 + 1, x * 15 + 13, y * 16 + 14, color);
 }
 
@@ -147,15 +147,15 @@ void Chess(void) {
             }
 
             /* Draw menu */
-            lcd_goto(50, 0);  print5x8(&STRS_optionmenu[2][14]);   /* "Chess" */
-            lcd_goto(0,  2);  print5x8(STR_White);
-            if (p & 0x01) { print5x8(STR_CPU);   T.CHESS.Player1 = CPU_PLAYER1;   }
-            else          { print5x8(STR_Human);  T.CHESS.Player1 = HUMAN_PLAYER1; }
-            lcd_goto(0,  3);  print5x8(STR_Black);
-            if (p & 0x02) { print5x8(STR_CPU);   T.CHESS.Player2 = CPU_PLAYER1;   }
-            else          { print5x8(STR_Human);  T.CHESS.Player2 = HUMAN_PLAYER1; }
-            lcd_goto(0,  4);  print5x8(PSTR("Level: "));  printN_5x8(T.CHESS.level);
-            lcd_goto(0, 15);  print5x8(PSTR("Players  Level  Start"));
+            lcd_goto(50, 0); print5x8(&STRS_optionmenu[2][14]);   /* "Chess" */
+            lcd_goto(0,  2); print5x8(STR_White);
+            if (p & 0x01) {  print5x8(STR_CPU);    T.CHESS.Player1 = CPU_PLAYER1;   }
+            else          {  print5x8(STR_Human);  T.CHESS.Player1 = HUMAN_PLAYER1; }
+            lcd_goto(0,  3); print5x8(STR_Black);
+            if (p & 0x02) {  print5x8(STR_CPU);    T.CHESS.Player2 = CPU_PLAYER1;   }
+            else          {  print5x8(STR_Human);  T.CHESS.Player2 = HUMAN_PLAYER1; }
+            lcd_goto(0,  4); print5x8(STR_Level);  printN_5x8(T.CHESS.level);
+            lcd_goto(0, 15); print5x8(STR_GameMenu2);
         }
         dma_display();
         WaitDisplay();
@@ -178,7 +178,7 @@ void PlayChess(void) {
     uint8_t *player;
 
     player = &T.CHESS.Player1;
-    T.CHESS.MP = T.CHESS.SA + U;        /* Initialise engine stack pointer (empty stack) */
+    T.CHESS.MP = T.CHESS.SA + U;        /* Initialize engine stack pointer (empty stack) */
     clrbit(MStatus, goback);
 
     /* Reset engine state */
@@ -269,7 +269,7 @@ void PlayChess(void) {
                  * -------------------------------------------------------- */
                 input_from = INF;
                 node_count = 128 << T.CHESS.level;  /* Thinking time (exponential) */
-                node_count += qrandom();             /* Add slight randomness       */
+                node_count += qrandom();            /* Add slight randomness       */
                 dma_display();
             }
 
@@ -281,7 +281,7 @@ void PlayChess(void) {
             arg_root  = 1;
             arg_depth = 3;
             arg_state = 0;
-            D();
+            ChessEngine();
 
             if (*player == HUMAN_PLAYER1) {
                 if (INF == search_result) {     /* Engine confirmed the move is legal */

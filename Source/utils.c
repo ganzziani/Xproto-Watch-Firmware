@@ -227,7 +227,7 @@ const unsigned char TuneAlarm9[] PROGMEM = {    // Sweet Child O' Mine
     60, NOTE_F7,
     60, NOTE_G_6,
     
-/* Full tune, if it fits in flash:
+/* Full tune, uncomment if it there is available program memory:
     60, NOTE_C_6,
     60, NOTE_C_7,
     60, NOTE_G_6,
@@ -292,8 +292,6 @@ const unsigned char TuneAlarm9[] PROGMEM = {    // Sweet Child O' Mine
     60, NOTE_G_6,*/
     0
 };
-//C6, A?6, F6, E?6, G6, F6, D?6, F6
-
 
 const uint16_t TuneAlarms[] PROGMEM = {
     (uint16_t)&TuneAlarm0,

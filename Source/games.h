@@ -16,10 +16,11 @@
 #define NO_PLAYER2      6
 #define HUMAN_PLAYER2   7
 #define CPU_PLAYER2     8
+#define BOARD_SIZE      (32*32)
 
 typedef struct {
-    uint8_t x[32*32];
-    uint8_t y[32*32];
+    uint8_t x[BOARD_SIZE];
+    uint8_t y[BOARD_SIZE];
     uint8_t direction;
     uint8_t state;
     uint16_t size;

@@ -45,11 +45,11 @@
 #define submult     7       // Math: Multiply
 
 // CHDctrl bits    (GPIO3)
-#define chon        0       // Channel on
+#define digchon     0       // Channel on
 #define pull        1       // Pull input
 #define pullup      2       // Pull up / down
 #define low         3       // Thick line when logic '0'
-#define chinvert    4       // Invert channel
+#define digchinvert 4       // Invert channel
 #define hexs        5       // Serial Hex Display
 #define hexp        6       // Parallel Hex Display
 #define ascii       7       // Use ASCII with UART and SPI Sniffer
@@ -162,7 +162,7 @@
 
 // MStatus          (GPIOB) - Status and Miscellaneous bits
 #define update      0       // Update
-#define counntdwn   1       // Count Down is active
+#define countdwn    1       // Count Down is active
 #define alarm_on    2       // Alarm on
 //#define           3       // 
 //#define           4       // 
@@ -206,11 +206,12 @@ void MSO(void);
 void CalibrateOffset(void);
 uint8_t ReadCalibrationByte(uint8_t location);	// Read out calibration byte
 void delay_ms(uint8_t n);
-void wait_ms(uint8_t n);
 void CCPWrite( volatile uint8_t * address, uint8_t value );
 int16_t MeasureVin(uint8_t scale);
-int16_t MeasureVRef(void);
-int16_t MeasureVCC(void);
+
+#define MEASURE_VCC     0x10
+#define MEASURE_VREF    0x70
+int16_t MeasureIntV(uint8_t channel);
 
 #define Cos(a)  Sin((a)+64)
 
