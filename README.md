@@ -1,7 +1,7 @@
 Xproto-Watch
 ============
 
-The project is developed using Microchip Studio 7 and version 4.0.0 of the AVR 8-Bit Toolchain.
+The project is developed using Microchip Studio 7 and the Native AVR 8-Bit Toolchain.
 
 The Oscilloscope Watch has all the features of a modern watch (time, calendar, alarm, etc...) combined with all the features of the popular Xprotolab (Oscilloscope, Waveform Generator, Logic Analyzer, Protocol Sniffer, Frequency Counter). The Xprotolab has been featured in several other online magazines, such as Hack a Day. and Elektor.
 
