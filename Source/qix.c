@@ -468,6 +468,10 @@ static void MoveTraps(void) {
         // Check if trap is stuck (Perimeter_Direction found no wall to follow,
         // so the proposed step lands off the wall).
         if(!is_wall(new_x, new_y)) {
+            // Do NOT commit the off-wall step. 
+            // Stay on the last valid wall pixel until a rescue wall is found.
+            new_x = old_x;
+            new_y = old_y;
             T.QIX.Traps[i].stuck_count++;
             if(T.QIX.Traps[i].stuck_count > 100) {
                 T.QIX.Traps[i].stuck_count = 0;
@@ -969,9 +973,9 @@ static void DrawGame(void) {
     uint8_t x = T.QIX.Man.x;
     uint8_t y = T.QIX.Man.y;
     for(uint8_t i=0; i<=8; i++) {   // i=0: center; i=1-8: 8 neighbors
-        set_pixel(x+dx[i],y+dy[i]);
+        pixel(x+dx[i], y+dy[i], PIXEL_TGL);
     }
-    if(timer&0x03) clr_pixel(x,y); // flash center off 3/4 of frames
+    if(timer&0x03)  pixel(x, y, PIXEL_TGL); // flash center off 3/4 of frames
     // Draw the drawing trail
     for(uint8_t i=0; i<T.QIX.Man.trail_len; i++) {
         set_pixel(T.QIX.Man.trailX[i], T.QIX.Man.trailY[i]);
@@ -982,12 +986,8 @@ static void DrawGame(void) {
         for(uint8_t j = 0; j < T.QIX.Traps[i].length; j++) {
             uint8_t tx = T.QIX.Traps[i].x[j];
             uint8_t ty = T.QIX.Traps[i].y[j];
-            // Alternate dots on/off for crawling effect
-            if(j & 0x01) {
-                set_pixel(tx, ty);  // Draw odd-indexed segments
-            } else {
-                clr_pixel(tx, ty);  // Clear even-indexed segments
-            }
+            if(tx >= 128 || ty >= 128) continue;
+            clr_pixel(tx, ty);  // Toggle odd-indexed segments
         } 
     }
     // Draw UI elements

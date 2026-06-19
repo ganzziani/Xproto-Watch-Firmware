@@ -31,7 +31,7 @@
 #define STYX_RETRY_COUNT        3       // Number of retries to find valid line position
 #define STYX_BOUNDARY_MARGIN    3       // Minimum distance from screen edge for Styx
 #define STYX_MAX_DEFAULT        16      // Maximum Styx line vector length
-#define STYX_MIN_SPEED          3       // Minimum speed
+#define STYX_MIN_SPEED          2       // Minimum speed
 
 // Trap growth constants  
 #define TRAP_INITIAL_GROWTH     8       // Initial trap length before random growth
