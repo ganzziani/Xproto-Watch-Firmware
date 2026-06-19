@@ -49,7 +49,7 @@ void DrawHLine(uint8_t x1, uint8_t x2, uint8_t y, uint8_t c);
 void Rectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c);
 void fillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c);
 void ToggleTriangle(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2,uint8_t x3,uint8_t y3);
-void DrawCircle(uint8_t x, uint8_t y, uint8_t radius, uint8_t c);
+void DrawCircle(uint8_t x, uint8_t y, uint8_t radius);
 void printV(int16_t Data, uint8_t gain, uint8_t CHCtrl);
 void printF(uint8_t x, uint8_t y, int32_t Data);
 void tiny_printp(uint8_t x, uint8_t y, const char *ptr);

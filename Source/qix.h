@@ -22,7 +22,7 @@
 // Capture completion: playfield interior is 124 x 117 = 14508 fillable pixels.
 // 80 % of 14508 ≈ 11607 pixels required to advance level.
 #define TOTAL_FILLABLE       14508      // (DISPLAY_MAX_X-3) * (DISPLAY_MAX_Y - UI_TOP_MARGIN - 2)
-#define CAPTURE_GOAL_PIXELS  11606      // ~80 % of TOTAL_FILLABLE
+#define CAPTURE_GOAL_PIXELS  10881      // 75 % of TOTAL_FILLABLE
 // captureProgress is on a 0–127 scale so that scaling to any bar width is a shift.
 #define STACK_MAX       960     // Flood fill stack size (increased for complex fills)
 #define MAX_IDLE_TIME   250     // Max idle time before death
@@ -31,7 +31,7 @@
 #define STYX_RETRY_COUNT        3       // Number of retries to find valid line position
 #define STYX_BOUNDARY_MARGIN    3       // Minimum distance from screen edge for Styx
 #define STYX_MAX_DEFAULT        16      // Maximum Styx line vector length
-#define STYX_MIN_SPEED          4       // Minimum speed
+#define STYX_MIN_SPEED          3       // Minimum speed
 
 // Trap growth constants  
 #define TRAP_INITIAL_GROWTH     8       // Initial trap length before random growth

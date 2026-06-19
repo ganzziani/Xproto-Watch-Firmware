@@ -418,19 +418,19 @@ void ToggleTriangle(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2,uint8_t x3,uint8
 
 // Draws a circle with center at x,y with given radius.
 // Set show to 1 to draw pixel, set to 0 to hide pixel.
-void DrawCircle(uint8_t x, uint8_t y, uint8_t radius, uint8_t c) {
+void DrawCircle(uint8_t x, uint8_t y, uint8_t radius) {
     uint8_t xc = 0;
     uint8_t yc = radius;
     int p = 3 - (radius<<1);
     while (xc <= yc) {
-        pixel(x + xc, y + yc, c);
-        pixel(x + xc, y - yc, c);
-        pixel(x - xc, y + yc, c);
-        pixel(x - xc, y - yc, c);
-        pixel(x + yc, y + xc, c);
-        pixel(x + yc, y - xc, c);
-        pixel(x - yc, y + xc, c);
-        pixel(x - yc, y - xc, c);
+        pixel(x + xc, y + yc, PIXEL_SET);
+        pixel(x + xc, y - yc, PIXEL_SET);
+        pixel(x - xc, y + yc, PIXEL_SET);
+        pixel(x - xc, y - yc, PIXEL_SET);
+        pixel(x + yc, y + xc, PIXEL_SET);
+        pixel(x + yc, y - xc, PIXEL_SET);
+        pixel(x - yc, y + xc, PIXEL_SET);
+        pixel(x - yc, y - xc, PIXEL_SET);
         if (p < 0) p += (xc++ << 2) + 6;
         else p += ((xc++ - yc--)<<2) + 10;
     }

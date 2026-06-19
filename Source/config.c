@@ -32,7 +32,7 @@ void Diagnose(void) {
         if((temp&0x03) == 2) Sound(TuneBeep);
         clr_display();
         print5x8(PSTR("\nTMRC ")); printhex5x8(TCC1.CNTH); printhex5x8(TCC1.CNTL);
-        print5x8(PSTR("\nTMRF ")); printhex5x8(TCF0.CNTH); printhex5x8(TCF0.CNTL);
+        print5x8(PSTR("\nTMRF ")); printhex5x8(TCF0.CNTH); printhex5x8(TCF0.CNTL);      // Clock Seconds counter
         print5x8(PSTR("\nLOGI ")); printhex5x8(VPORT2.IN);      // Shows the logic input data
         print5x8(PSTR("\nVIN  ")); print16_5x8(MeasureVin(1));
         cli();

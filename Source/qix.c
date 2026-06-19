@@ -21,7 +21,7 @@
 #include "qix.h"
 
 // Sound Tunes stored in Flash Memory
-static const uint8_t TuneSpawn[] PROGMEM = { 5, NOTE_C6, 5, NOTE_E6, 5, NOTE_G6, 5, NOTE_C7, 5, NOTE_E7, 5, NOTE_G7, 5, NOTE_C8, 0 };
+static const uint8_t TuneSpawn[] PROGMEM = { 40, NOTE_G6, 40, NOTE_C7, 40, NOTE_D7, 80, NOTE_G7, 0 };
 static const uint8_t TuneDead[] PROGMEM = { 20, NOTE_C7, 10, NOTE_OFF, 20, NOTE_G6, 10, NOTE_OFF, 20, NOTE_C6, 0 };
 static const uint8_t TuneLevelUp[] PROGMEM = { 20, NOTE_C6, 20, NOTE_E6, 20, NOTE_G6, 20, NOTE_C7, 0 };
 static const uint8_t TuneStartWall[] PROGMEM = { 10, NOTE_C6, 0 };
@@ -75,6 +75,9 @@ void Qix(void) {
     setbit(MStatus,update);
     clrbit(MStatus, goback);
     clr_display();
+    memset(&T.QIX, 0, sizeof(T.QIX));
+    T.QIX.Man.lives = 8;
+    T.QIX.score_multiplier = 1;
     do {
         if(testbit(MStatus, update)) {
             clrbit(MStatus, update);
@@ -103,12 +106,6 @@ void QixEngine(void) {
     uint8_t oldState=0;
     clrbit(MStatus, goback);
     setbit(MStatus,update);
-    T.QIX.level = 0;
-    T.QIX.score = 0;
-    T.QIX.Man.lives = 8;
-    T.QIX.score_multiplier = 1;
-    T.QIX.multiplier_timer = 0;
-    T.QIX.gameState = STATE_INITLEVEL;
     do {
         DrawGame();
         if(testbit(Buttons, KML)) T.QIX.gameState = STATE_GAMEOVER; // Exit to menu
@@ -151,7 +148,7 @@ void QixEngine(void) {
                     T.QIX.Man.idle = 0;
                 }
                 // Spawn animation: circle closing in toward player position
-                DrawCircle(T.QIX.Man.x, T.QIX.Man.y, 121-(StateCounter<<2), PIXEL_SET);
+                DrawCircle(T.QIX.Man.x, T.QIX.Man.y, 121-(StateCounter<<2));
                 if(StateCounter>=30) T.QIX.gameState = STATE_PLAYING;
             break;
             case STATE_PLAYING:
@@ -166,7 +163,7 @@ void QixEngine(void) {
                     T.QIX.Man.lives--;
                 } else {
                     // Death animation: circle expanding outward from player position
-                    DrawCircle(T.QIX.Man.x, T.QIX.Man.y, StateCounter<<2, PIXEL_SET);
+                    DrawCircle(T.QIX.Man.x, T.QIX.Man.y, StateCounter<<2);
                 }
                 if(StateCounter>=30) {
                     if(T.QIX.Man.lives==0) T.QIX.gameState = STATE_GAMEOVER;
