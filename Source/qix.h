@@ -17,7 +17,7 @@
 #define STYX_MAX        2       // Maximum Styx creatures
 #define STYX_LINES      8       // Line segments per Styx
 #define TRAP_MAX        2       // Maximum traps
-#define DOT_MAX         60      // Maximum trap dots
+#define DOT_MAX         64      // Maximum trap dots
 #define MAX_TRAIL       255     // Maximum trail length
 // Capture completion: playfield interior is 124 x 117 = 14508 fillable pixels.
 // 80 % of 14508 ≈ 11607 pixels required to advance level.

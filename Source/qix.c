@@ -431,8 +431,8 @@ static void InitTraps(uint8_t level) {
     }
     for(uint8_t i = 0; i < T.QIX.traps_active; i++) {
         T.QIX.Traps[i].active = 1;
+        T.QIX.Traps[i].length = 1;
         T.QIX.Traps[i].stuck_count = 0;
-        T.QIX.Traps[i].length = (level/4)+1;
         uint8_t r = qrandom();
         if(testbit(r,7)) {
             T.QIX.Traps[i].head_idx = DIR_CW;
@@ -491,14 +491,15 @@ static void MoveTraps(void) {
         T.QIX.Traps[i].x[0] = new_x;
         T.QIX.Traps[i].y[0] = new_y;
         
-        // Grow trap at higher levels (from original Styx TB.C)
+        // Grow trap at higher levels
         // Simplified: grow if length < 8, or randomly based on level
         uint8_t level = T.QIX.level;
         
-        if (((T.QIX.Traps[i].length < 8) ||  // Always grow until length reaches 8
-            (level > 3 && qrandom() > 200))  // At higher levels, occasional random growth (approx 22% chance per frame when level > 3)
-            && T.QIX.Traps[i].length < DOT_MAX - 1) {
-            T.QIX.Traps[i].length++;
+        if ((T.QIX.Traps[i].length < level) ||      // Always grow until length reaches the level
+             (qrandom() > (255-level))) {           // Random growth, more likely at higher levels
+             if(T.QIX.Traps[i].length < DOT_MAX - 1) {
+                 T.QIX.Traps[i].length++;
+             }                 
         }
      
         // Check collision with player
