@@ -561,29 +561,32 @@ static uint8_t CheckStyxCollision(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2
     int16_t sdy = (int16_t)y2 - (int16_t)y1;
     int16_t adx = (sdx < 0) ? -sdx : sdx;
     int16_t ady = (sdy < 0) ? -sdy : sdy;
-    uint8_t steps = (adx > ady) ? (uint8_t)adx : (uint8_t)ady;
+    int8_t  xi  = (sdx < 0) ? -1 : 1;
+    int8_t  yi  = (sdy < 0) ? -1 : 1;
+    int16_t x   = x1;
+    int16_t y   = y1;
 
-    if(steps == 0) {
-        return get_pixel_buffer(x1, y1, Layer_Filled);
-    }
-
-    // Per-step delta in 8.8 fixed point. Must be (sdx*256)/steps -- the
-    // previous form `sign * (256/steps)` only carried the direction and
-    // truncated to int8_t, so most lines were never traversed and the Styx
-    // could drift undetected through captured area.
-    int16_t step_x = (sdx * 256) / steps;
-    int16_t step_y = (sdy * 256) / steps;
-    int16_t x = (int16_t)x1 * 256;
-    int16_t y = (int16_t)y1 * 256;
-
-    for(uint8_t i = 0; i < steps; i++) {
-        if(get_pixel_buffer((uint8_t)(x >> 8), (uint8_t)(y >> 8), Layer_Filled)) {
-            return 1;
+    // Integer Bresenham walk along the line. Each iteration advances one
+    // pixel along the dominant axis and steps the minor axis when err underflows.
+    if(adx > ady) {                                 // X-dominant
+        int16_t err = adx >> 1;
+        for(uint8_t i = 0; i < (uint8_t)adx; i++) {
+            if(get_pixel_buffer((uint8_t)x, (uint8_t)y, Layer_Filled)) return 1;
+            err -= ady;
+            if(err < 0) { y += yi; err += adx; }
+            x += xi;
         }
-        x += step_x;
-        y += step_y;
+    } else {                                        // Y-dominant (also covers adx==ady and the zero-length case)
+        if(ady == 0) return get_pixel_buffer(x1, y1, Layer_Filled);
+        int16_t err = ady >> 1;
+        for(uint8_t i = 0; i < (uint8_t)ady; i++) {
+            if(get_pixel_buffer((uint8_t)x, (uint8_t)y, Layer_Filled)) return 1;
+            err -= adx;
+            if(err < 0) { x += xi; err += ady; }
+            y += yi;
+        }
     }
-    // Check endpoint exactly to absorb integer-rounding error.
+    // Check endpoint exactly to absorb any rounding at the far end.
     return get_pixel_buffer(x2, y2, Layer_Filled);
 }
 

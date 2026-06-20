@@ -12,11 +12,8 @@ static void MoveSnake(SnakeStruct *Player);
 static void SnakeEngine(void);
 
 void InitSnake(void) {
-    memset(T.SNAKE.board, 0, BOARD_SIZE);
-    memset(T.SNAKE.Player1.x, 0, sizeof(T.SNAKE.Player1.x));
-    memset(T.SNAKE.Player1.y, 0, sizeof(T.SNAKE.Player1.y));
-    memset(T.SNAKE.Player2.x, 0, sizeof(T.SNAKE.Player2.x));
-    memset(T.SNAKE.Player2.y, 0, sizeof(T.SNAKE.Player2.y));
+    memset(T.SNAKE.board, 0, BOARD_SIZE);   // Only the board must be cleared; the
+    // Player x[]/y[] body cells are always written before they are read (see MoveSnake)
     T.SNAKE.Player1.x[0]=T.SNAKE.Player1.x[1]=2;
     T.SNAKE.Player1.y[0]=T.SNAKE.Player1.y[1]=2;
     T.SNAKE.Player1.size=2;
@@ -35,8 +32,12 @@ void NewFruit(void) {
     #define G2 60
     #define Sincrement (G2 - G1)
     do {    /* determine next pixel */
-        T.SNAKE.Fruitx = ( T.SNAKE.Fruitx + Sincrement ) % G1;
-        T.SNAKE.Fruity = ( T.SNAKE.Fruity + Sincrement ) % G2;
+        // Equivalent to (Fruit + Sincrement) % Gn, but without division:
+        // Sincrement < Gn and the value stays in [0,Gn-1], so one subtraction suffices
+        T.SNAKE.Fruitx += Sincrement;
+        if (T.SNAKE.Fruitx >= G1) T.SNAKE.Fruitx -= G1;
+        T.SNAKE.Fruity += Sincrement;
+        if (T.SNAKE.Fruity >= G2) T.SNAKE.Fruity -= G2;
     } while ((T.SNAKE.Fruitx >=32) || (T.SNAKE.Fruity >= 32) ||   // Out of bounds
       (T.SNAKE.board[T.SNAKE.Fruitx][T.SNAKE.Fruity]!=EMPTY)); // Occupied
     T.SNAKE.board[T.SNAKE.Fruitx][T.SNAKE.Fruity] = FRUIT;       // New head position
