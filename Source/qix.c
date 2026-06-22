@@ -75,10 +75,10 @@ void Qix(void) {
     setbit(MStatus,update);
     clrbit(MStatus, goback);
     clr_display();
-    memset(&T.QIX, 0, sizeof(T.QIX));
-    T.QIX.Man.lives = 8;
-    T.QIX.score_multiplier = 1;
     do {
+        memset(&T.QIX, 0, sizeof(T.QIX));
+        T.QIX.Man.lives = 8;
+        T.QIX.score_multiplier = 1;
         if(testbit(MStatus, update)) {
             clrbit(MStatus, update);
             if(testbit(Misc,userinput)) {
