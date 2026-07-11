@@ -23,7 +23,7 @@
 /* -------------------------------------------------------------------------
  * Engine globals declared in avrmax_48.c
  * ------------------------------------------------------------------------- */
-extern long         node_count;
+extern uint16_t     node_count;
 extern signed int   root_eval;
 extern signed int   input_from;
 extern signed int   search_result;
@@ -133,7 +133,7 @@ void Chess(void) {
     uint8_t p = 2;          /* Player-type selector: bit0=White, bit1=Black CPU */
     setbit(MStatus, update);
     clrbit(MStatus, goback);
-    T.CHESS.level = 0;
+    T.CHESS.level = 1;
     clr_display();
     do {
         if (testbit(MStatus, update)) {
@@ -141,7 +141,7 @@ void Chess(void) {
             if (testbit(Misc, userinput)) {
                 clrbit(Misc, userinput);
                 if (testbit(Buttons, K1)) { p++; if (p > 3) p = 0; }
-                if (testbit(Buttons, K2)) { if (++T.CHESS.level >= 16) T.CHESS.level = 0; }
+                if (testbit(Buttons, K2)) { if (++T.CHESS.level > 9) T.CHESS.level = 1; }
                 if (testbit(Buttons, K3)) PlayChess();
                 if (testbit(Buttons, KML)) setbit(MStatus, goback);
             }
@@ -205,6 +205,7 @@ void PlayChess(void) {
             if (lastx < 8 && lasty < 8) Cursor(lastx, lasty, 1);
 
             if (testbit(Buttons, KML)) setbit(MStatus, goback);
+            if (testbit(MStatus, goback)) break;
 
             if (*player == HUMAN_PLAYER1) {
                 /* --------------------------------------------------------
@@ -268,7 +269,7 @@ void PlayChess(void) {
                  * signal; the engine writes the chosen move to input_to.
                  * -------------------------------------------------------- */
                 input_from = INF;
-                node_count = 128 << T.CHESS.level;  /* Thinking time (exponential) */
+                node_count = 127U << T.CHESS.level; /* Thinking time (exponential, max 65024) */
                 node_count += qrandom();            /* Add slight randomness       */
                 dma_display();
             }

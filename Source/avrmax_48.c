@@ -66,7 +66,7 @@ const signed char move_vectors[] PROGMEM = {
  * These are shared with chess.c (GUI layer) via extern declarations there.
  * All single-letter originals renamed for clarity.
  * ------------------------------------------------------------------------- */
-long     node_count;    /* Node counter; decremented each node, expires = time limit      */
+uint16_t node_count;    /* Node counter; counts down to 0 = time limit (max 127U<<9)      */
 signed int
          root_eval,     /* Eval score updated after each root move (passed back to GUI)   */
          input_from,    /* Human: origin square; CPU: set to INF as "computer move" flag  */
@@ -143,6 +143,16 @@ CALL:
     _.n = arg_depth;
     _.a = arg_state;
 
+    /* Time up or back button: unwind all inner nodes immediately with a score
+     * that always fails low at the caller, so aborted lines can never replace
+     * the best move; the root then wraps up and commits it.  Only during CPU
+     * thinks (input_from == INF); never at the root itself.                   */
+    if (!node_count & !_.z & input_from == INF) {
+        ++T.CHESS.MP;
+        search_result = INF + 1;
+        goto RETURN;
+    }
+
     _.q--;              /* Shrink alpha by 1: implements the delayed-loss bonus    */
     side ^= 24;         /* Flip side to move (8 XOR 24 = 16, 16 XOR 24 = 8)       */
     _.d = _.Y = 0;      /* Reset iterative-deepening depth and best destination    */
@@ -155,7 +165,7 @@ CALL:
      * ----------------------------------------------------------------------- */
     while (_.d++ < _.n || _.d < 3 ||
            (_.z & input_from == INF &&
-            (node_count >= 0 & _.d < 98 ||
+            (node_count > 0 & _.d < 98 ||
              (input_from = _.X, input_to = _.Y & ~OFF_BOARD, _.d = 3))))
     {
         _.x = _.B = _.X;        /* Start scan at the previous best-move origin     */
@@ -186,7 +196,8 @@ NULL_MOVE_RETURN:
          * or if we are in the endgame, we can prune without a full search.  *
          * Otherwise use the negated null-move score as a lower bound.       */
         _.m = (-_.P < _.l | material > 35) ? (_.d > 2 ? -INF : _.e) : -_.P;
-        --node_count;               /* Count this node toward the time budget      */
+        if (testbit(Buttons, KML)) node_count = 0;  /* Back button: abort think    */
+        else if (node_count) --node_count;  /* Count node toward budget, saturate at 0 */
 
         /* -------------------------------------------------------------------
          * Board scan: iterate over all squares looking for own pieces.
