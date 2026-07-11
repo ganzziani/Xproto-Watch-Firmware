@@ -39,6 +39,7 @@ extern unsigned char arg_ep;
 extern unsigned char arg_root;
 extern unsigned char arg_depth;
 extern unsigned char arg_state;
+extern unsigned char no_moves;
 
 /* Forward declarations */
 void PlayChess(void);
@@ -142,7 +143,7 @@ void Chess(void) {
                 clrbit(Misc, userinput);
                 if (testbit(Buttons, K1)) { p++; if (p > 3) p = 0; }
                 if (testbit(Buttons, K2)) { if (++T.CHESS.level > 9) T.CHESS.level = 1; }
-                if (testbit(Buttons, K3)) PlayChess();
+                if (testbit(Buttons, K3)) { PlayChess(); clr_display(); }
                 if (testbit(Buttons, KML)) setbit(MStatus, goback);
             }
 
@@ -165,11 +166,30 @@ void Chess(void) {
 }
 
 /* -------------------------------------------------------------------------
+ * CallEngine() — invoke the engine on the current position
+ *
+ * Set input_from beforehand: a square (human move to validate & commit),
+ * INF (CPU: search and commit the best move), or -1 (probe only: report
+ * no_moves/score without committing anything).
+ * ------------------------------------------------------------------------- */
+static void CallEngine(void) {
+    no_moves  = 0;
+    arg_alpha = -INF;
+    arg_beta  =  INF;
+    arg_eval  = root_eval;
+    arg_ep    = ep_pass;
+    arg_root  = 1;
+    arg_depth = 3;
+    arg_state = 0;
+    ChessEngine();
+}
+
+/* -------------------------------------------------------------------------
  * PlayChess() — main game loop
  *
  * Alternates between human input and engine search.  Renders the board
- * after each move.  Exits when checkmate is detected or the user presses
- * the back button.
+ * after each move.  Exits when checkmate or stalemate is detected (after
+ * showing the result) or when the user presses the back button.
  * ------------------------------------------------------------------------- */
 void PlayChess(void) {
     uint8_t newx = 0, newy = 0, oldx = 0, oldy = 0;
@@ -274,34 +294,37 @@ void PlayChess(void) {
                 dma_display();
             }
 
-            /* Call the engine */
-            arg_alpha = -INF;
-            arg_beta  =  INF;
-            arg_eval  = root_eval;
-            arg_ep    = ep_pass;
-            arg_root  = 1;
-            arg_depth = 3;
-            arg_state = 0;
-            ChessEngine();
+            CallEngine();
 
-            if (*player == HUMAN_PLAYER1) {
-                if (INF == search_result) {     /* Engine confirmed the move is legal */
-                    if (player == &T.CHESS.Player1) player = &T.CHESS.Player2;
-                    else                            player = &T.CHESS.Player1;
-                } else {
-                    ONRED();    /* Illegal move: flash red LED */
-                }
-            } else {
-                /* CPU always makes a legal move */
+            if (search_result == INF) {         /* Move committed: pass the turn */
                 if (player == &T.CHESS.Player1) player = &T.CHESS.Player2;
                 else                            player = &T.CHESS.Player1;
-            }
+                /* Record the destination square to highlight on the next frame */
+                lastx = input_to & 0x07;
+                lasty = input_to >> 4;
 
-            /* Record the destination square to highlight on the next frame */
-            lastx = input_to & 0x07;
-            lasty = input_to >> 4;
+                /* Probe: can the new side to move reply at all?  Announces
+                 * mate/stalemate right after the deciding move.               */
+                input_from = -1;
+                CallEngine();
+                if (no_moves) break;            /* Game over                    */
+            } else if (*player == HUMAN_PLAYER1) {
+                ONRED();        /* Illegal move: flash red LED */
+            }   /* else: CPU search aborted without a move; retry or exit       */
         }
 
-        if (testbit(Buttons, KML)) setbit(MStatus, goback);
+        /* Game over (unless the user quit): show result, wait for back button  */
+        if (!testbit(MStatus, goback)) {
+            printboard();
+            lcd_goto(37, 7);
+            print5x8(search_result > -INF + 1 ? PSTR("Stalemate") : PSTR("Checkmate"));
+            do {
+                dma_display();
+                WaitDisplay();
+                SLP();
+            } while (!testbit(Buttons, KML));
+            while (testbit(Buttons, KML)) SLP();    /* Wait for release so the   */
+            break;                                  /* chess menu ignores the key */
+        }
     } while (!testbit(MStatus, goback));
 }

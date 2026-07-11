@@ -11,12 +11,12 @@
  * - Iterative negamax search with alpha-beta pruning                        *
  * - All-capture MVV/LVA quiescence search                                   *
  * - Internal iterative deepening with best-move-first sorting               *
- * - Hash table storing score and best move                                  *
  * - Futility pruning and R=2 null-move pruning                              *
  * - King safety (magnetic frozen king in middle-game)                       *
- * - Repetition-draw detection                                               *
  * - LMR (Late Move Reduction) for non-pawn, non-capture moves               *
- * - Full FIDE rules (except under-promotion)                                *
+ * - FIDE rules, except: no under-promotion (always queens), no draw by      *
+ *   repetition / 50 moves / insufficient material, and castling while in    *
+ *   check from a pawn is not rejected (inherited micro-Max quirk)           *
  *****************************************************************************/
 
 #include <avr/io.h>
@@ -87,7 +87,8 @@ unsigned char
          arg_ep,        /* D() argument: en passant square                                */
          arg_root,      /* D() argument: non-zero at root node (level-1 flag)             */
          arg_depth,     /* D() argument: remaining search depth                           */
-         arg_state;     /* D() argument: which label to resume at when returning          */
+         arg_state,     /* D() argument: which label to resume at when returning          */
+         no_moves;      /* Set when the root has no legal move (mate or stalemate)        */
 
 /* Shortcut to the working-state struct (T.CHESS._ is saved/restored on the
  * simulated call stack T.CHESS.SA, so it must remain a struct member).     */
@@ -368,6 +369,9 @@ FAIL_HIGH:
         /* If best score is a mate score, no need to search deeper */
         if (_.m > INF - OFF_BOARD | _.m < OFF_BOARD - INF)
             _.d = 98;
+
+        /* Root: every move loses the king = no legal move (mate or stalemate)   */
+        if (_.z & !(_.m + INF)) no_moves = 1;
 
         /* Stalemate / checkmate: if the best move still loses the king, score 0  */
         _.m = _.m + INF | _.P == INF ? _.m : 0;
