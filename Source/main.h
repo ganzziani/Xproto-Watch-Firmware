@@ -311,7 +311,11 @@ typedef union {
             H,t,                 /* H=capture square, t=piece on capture square       */
             X,Y,                 /* X=origin, Y=target square of best move so far     */
             a;                   /* D() return address state                          */
+            unsigned short k;    /* Position-key XOR delta of the current move        */
         } _, SA[U],*MP;          /* _=working set, SA=stack array, SP=stack pointer   */
+        uint8_t hist_n;          /* Positions recorded since last irreversible move   */
+        uint16_t histk[16];      /* Repetition ring: position keys (board + side)     */
+        uint8_t  histb[16][64];  /* Repetition ring: board snapshots (valid squares)  */
         uint8_t BMPprev[16];     /* bitmap_safe() column buffer: used while drawing   */
                                  /* chess pieces and the main menu icons.             */
     } CHESS;

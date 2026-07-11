@@ -40,6 +40,7 @@ extern unsigned char arg_root;
 extern unsigned char arg_depth;
 extern unsigned char arg_state;
 extern unsigned char no_moves;
+extern uint16_t      pos_key;
 
 /* Forward declarations */
 void PlayChess(void);
@@ -188,14 +189,16 @@ static void CallEngine(void) {
  * PlayChess() — main game loop
  *
  * Alternates between human input and engine search.  Renders the board
- * after each move.  Exits when checkmate or stalemate is detected (after
- * showing the result) or when the user presses the back button.
+ * after each move.  Exits when checkmate, stalemate, or a threefold-
+ * repetition draw is detected (after showing the result) or when the
+ * user presses the back button.
  * ------------------------------------------------------------------------- */
 void PlayChess(void) {
     uint8_t newx = 0, newy = 0, oldx = 0, oldy = 0;
     uint8_t selx = 255, sely = 255;     /* Currently selected (from) square; 255 = none */
     uint8_t lastx = 255, lasty = 255;   /* Destination of the previous move              */
     uint8_t *player;
+    const char *result = PSTR("Checkmate");
 
     player = &T.CHESS.Player1;
     T.CHESS.MP = T.CHESS.SA + U;        /* Initialize engine stack pointer (empty stack) */
@@ -303,11 +306,35 @@ void PlayChess(void) {
                 lastx = input_to & 0x07;
                 lasty = input_to >> 4;
 
+                /* Threefold repetition: the engine recorded the new position;
+                 * count exact occurrences among the stored positions.         */
+                {
+                    uint8_t i, reps = 0, n = T.CHESS.hist_n;
+                    if (n > 16) n = 16;
+                    for (i = 0; i < n; i++) {
+                        if (T.CHESS.histk[i] == pos_key) {
+                            uint8_t *hb = T.CHESS.histb[i];
+                            uint8_t a = 0;
+                            reps++;
+                            do {    /* Verify with a full board comparison       */
+                                if (!(a & 8) && *hb++ != board[a]) {
+                                    reps--;
+                                    break;
+                                }
+                            } while (++a < 120);
+                        }
+                    }
+                    if (reps >= 3) { result = PSTR("   Draw  "); break; }
+                }
+
                 /* Probe: can the new side to move reply at all?  Announces
                  * mate/stalemate right after the deciding move.               */
                 input_from = -1;
                 CallEngine();
-                if (no_moves) break;            /* Game over                    */
+                if (no_moves) {                 /* Game over                    */
+                    if (search_result > -INF + 1) result = PSTR("Stalemate");
+                    break;
+                }
             } else if (*player == HUMAN_PLAYER1) {
                 ONRED();        /* Illegal move: flash red LED */
             }   /* else: CPU search aborted without a move; retry or exit       */
@@ -317,7 +344,7 @@ void PlayChess(void) {
         if (!testbit(MStatus, goback)) {
             printboard();
             lcd_goto(37, 7);
-            print5x8(search_result > -INF + 1 ? PSTR("Stalemate") : PSTR("Checkmate"));
+            print5x8(result);
             do {
                 dma_display();
                 WaitDisplay();

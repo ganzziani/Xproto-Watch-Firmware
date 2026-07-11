@@ -14,9 +14,12 @@
  * - Futility pruning and R=2 null-move pruning                              *
  * - King safety (magnetic frozen king in middle-game)                       *
  * - LMR (Late Move Reduction) for non-pawn, non-capture moves               *
+ * - Draw by threefold repetition: detected via incremental position keys,   *
+ *   scored as 0 in the search (avoids repeating when ahead, seeks it when   *
+ *   behind) and adjudicated by the GUI with exact board comparison          *
  * - FIDE rules, except: no under-promotion (always queens), no draw by      *
- *   repetition / 50 moves / insufficient material, and castling while in    *
- *   check from a pawn is not rejected (inherited micro-Max quirk)           *
+ *   50-move rule / insufficient material, and castling while in check       *
+ *   from a pawn is not rejected (inherited micro-Max quirk)                 *
  *****************************************************************************/
 
 #include <avr/io.h>
@@ -95,6 +98,26 @@ unsigned char
 #define _ T.CHESS._
 
 /* -------------------------------------------------------------------------
+ * Position hashing for repetition detection
+ *
+ * pos_key is an incremental 16-bit hash of (board, side to move), updated
+ * by XOR as moves are made and unmade.  Game positions are recorded in
+ * T.CHESS.histk/histb on every committed move; any search node matching one of
+ * them is scored as an immediate draw, and the GUI adjudicates threefold
+ * repetition by exact board comparison.  E.p. rights are not hashed (rare
+ * near-repetitions may be treated as equal by the search, never by the GUI).
+ * ------------------------------------------------------------------------- */
+uint16_t pos_key;       /* Hash of the current position + side to move       */
+#define ZSIDE 0xC96D    /* Key flip for the side to move                     */
+
+/* Pseudo-random 16-bit value per (piece, square), computed instead of tabled.
+ * noinline: called from many sites; inlining costs ~60 flash bytes each.     */
+static __attribute__((noinline)) uint16_t zkey(unsigned char piece, unsigned char sq) {
+    uint16_t h = (((uint16_t)piece << 8) | sq) * 40507U;
+    return h ^ (h >> 7);
+}
+
+/* -------------------------------------------------------------------------
  * chess_init_board() — set up the starting position in board[]
  *
  * Called by PlayChess() in chess.c to avoid exposing move_vectors[] there.
@@ -113,6 +136,11 @@ void chess_init_board(void) {
                 (tmp - 4) * (tmp - 4) +
                 (input_to + input_to - 7) * (input_to + input_to - 7) / 4;
     }
+
+    /* Starting position key (precomputed: XOR of zkey(piece, square) over
+     * the initial setup above — recompute if zkey() or the setup changes)  */
+    pos_key = 0x3CF9;
+    T.CHESS.hist_n = 0;     /* Clear the repetition history */
 }
 
 /* -------------------------------------------------------------------------
@@ -154,6 +182,20 @@ CALL:
         goto RETURN;
     }
 
+    /* Draw by repetition: a non-root position matching any game position
+     * since the last irreversible move is scored as an immediate draw, so
+     * the search avoids repetitions when ahead and seeks them when behind.  */
+    if (!_.z) {
+        unsigned char hn = T.CHESS.hist_n;
+        if (hn > 16) hn = 16;
+        while (hn--)
+            if (T.CHESS.histk[hn] == pos_key) {
+                ++T.CHESS.MP;
+                search_result = 0;
+                goto RETURN;
+            }
+    }
+
     _.q--;              /* Shrink alpha by 1: implements the delayed-loss bonus    */
     side ^= 24;         /* Flip side to move (8 XOR 24 = 16, 16 XOR 24 = 8)       */
     _.d = _.Y = 0;      /* Reset iterative-deepening depth and best destination    */
@@ -186,10 +228,12 @@ CALL:
             arg_root  = 0;
             arg_depth = _.d - 3;
             arg_state = 0;          /* Resume at NULL_MOVE_RETURN after returning  */
+            pos_key  ^= ZSIDE;      /* Null move changes only the side to move     */
             goto CALL;
 
 NULL_MOVE_RETURN:
             _ = *T.CHESS.MP;        /* Restore working state from stack            */
+            pos_key  ^= ZSIDE;
             _.P = search_result;    /* Store null-move score for pruning decisions  */
         }
 
@@ -286,6 +330,15 @@ RESUME_BEST_MOVE:   /* Re-enter here to try the direction normally after the has
                                 cap_value  += _.V;
                             }
 
+                            /* Position-key delta for this move (board[y] is the   *
+                             * final piece, including promotion / rank bonus bits); *
+                             * the same XOR undoes it, and _.k rides the frame.     */
+                            _.k = zkey(board[_.y], _.y) ^ zkey(_.u, _.x) ^ ZSIDE;
+                            if (_.t) _.k ^= zkey(_.t, _.H);
+                            if (!(_.G & OFF_BOARD))
+                                _.k ^= zkey(side + 6, _.F) ^ zkey(side + 6, _.G);
+                            pos_key ^= _.k;
+
                             _.v += _.e + cap_value;         /* Running eval total  */
                             _.V = _.m > _.q ? _.m : _.q;    /* New alpha           */
 
@@ -326,12 +379,27 @@ RECURSIVE_RETURN:
                                 root_eval  = -_.e - cap_value;
                                 ep_pass    = _.F;
                                 material  += cap_value >> 7;  /* Track material    */
+
+                                /* Repetition history: captures and pawn moves are *
+                                 * irreversible, so prior positions can't recur;   *
+                                 * then record the position just reached.          */
+                                if (_.t | _.p < 3) T.CHESS.hist_n = 0;
+                                {
+                                    uint8_t *hb = T.CHESS.histb[T.CHESS.hist_n & 15];
+                                    uint8_t  hi = 0;
+                                    T.CHESS.histk[T.CHESS.hist_n & 15] = pos_key;
+                                    do {
+                                        if (!(hi & 8)) *hb++ = board[hi];
+                                    } while (++hi < 120);
+                                    T.CHESS.hist_n++;
+                                }
                                 ++T.CHESS.MP;
                                 search_result = _.l;          /* Signal: legal     */
                                 goto RETURN;
                             }
 
                             /* Undo move */
+                            pos_key ^= _.k;
                             board[_.G] = side + 6;
                             board[_.F] = board[_.y] = 0;
                             board[_.x] = _.u;
