@@ -278,7 +278,7 @@ void fillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c) {
 
 // Toggle a triangle - Bresenham method
 // Original from http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
-// Corrected optimized triangle fill – exact output, no stuck loops
+// Corrected optimized triangle fill ï¿½ exact output, no stuck loops
 // Fill a triangle - Bresenham method
 // Original from http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
 void ToggleTriangle(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2,uint8_t x3,uint8_t y3) {
@@ -573,8 +573,11 @@ Send a run length encoded image from program memory to the LCD
 		Now 'last' is the current byte 
 	Repeat. 
 
-    BMP[0] contains width/8
-    BMP[1] contains height
+    BMP[0] contains width in pixels
+    BMP[1] contains height in pixels
+
+    The data is column-delta filtered before RLE: every column except the
+    first is XORed with the previous column (undone here while decoding).
 ----------------------------------------------------------------------------*/
 void bitmap(uint8_t x, uint8_t y, const uint8_t *BMP) {
     uint8_t *p;
@@ -596,11 +599,15 @@ void bitmap(uint8_t x, uint8_t y, const uint8_t *BMP) {
 				}
 			}
 			count--;
-            #ifdef INVERT_DISPLAY
-            *p++=~data;
-            #else
-            *p++=data;
-            #endif
+            if(col) *p=data^p[18];      // Undo column XOR delta: previous column is at p+18
+            else {
+                #ifdef INVERT_DISPLAY
+                *p=~data;
+                #else
+                *p=data;
+                #endif
+            }
+            p++;
 		}
         p-=18+height;   // Next line
 	}
@@ -623,20 +630,27 @@ Send a run length encoded image from program memory to the LCD
 		Now 'last' is the current byte 
 	Repeat. 
 
-    BMP[0] contains width/8
-    BMP[1] contains height
+    BMP[0] contains width in pixels
+    BMP[1] contains height in pixels
+
+    The data is column-delta filtered before RLE: every column except the
+    first is XORed with the previous column (undone here while decoding).
 ----------------------------------------------------------------------------*/
 void bitmap_safe(int8_t x, int8_t y, const uint8_t *BMP, uint8_t c) {
     if(BMP==0) return;
     uint8_t *p;
 	uint8_t data=0,count=0;
-    int16_t width,height;
+    uint8_t *prev=T.CHESS.BMPprev;  // Previous decoded column, to undo the column XOR delta
+    int16_t width,height;           // (scratch space borrowed from the union; max height 128)
     width=pgm_read_byte(BMP++);
     height=pgm_read_byte(BMP++)/8;
     if(width<0 || y+height<=0) return;
-    p = Disp_send.DataAddress -(x)*18 + (y);    
+    p = Disp_send.DataAddress -(x)*18 + (y);
+    for(uint8_t i=0; i<height; i++) prev[i]=0;  // First column XORs against zero
  	for (int16_t col=x ; col < x+width; col++) {
-		for (int16_t row=y; row<y+height; row++) {
+        uint8_t *pc=prev;
+        // Decode one column, undoing the XOR delta in place
+        for (uint8_t i=height; i; i--) {
 			if(count==0) {
 				data = pgm_read_byte(BMP++);
 				if(data==pgm_read_byte(BMP++)) {
@@ -648,27 +662,35 @@ void bitmap_safe(int8_t x, int8_t y, const uint8_t *BMP, uint8_t c) {
 				}
 			}
 			count--;
-            // Check if pixel stays within boundaries
-            if(col>=0 && col<128 && row>=0 && row<16) {
-                #ifdef INVERT_DISPLAY
-                if(c==0)        *p &= ~data;
-                else if(c==1)   *p |= ~data;
-                else if(c==2)   *p &= data;
-                else if(c==3)   *p |= data;
-                else if(c==4)   *p ^= ~data;
-                else            *p = ~data;                
-                #else
-                if(c==0)        *p &= data;
-                else if(c==1)   *p |= data;
-                else if(c==2)   *p &= ~data;
-                else if(c==3)   *p |= ~data;
-                else if(c==4)   *p ^= data;
-                else            *p = data;
-                #endif
-            }
-            p++;
+            *pc++ ^= data;
 		}
-        p-=18+height;   // Next line
+        // Blend the column if it stays within boundaries
+        if(col>=0 && col<128) {
+            pc=prev;
+            for (int16_t row=y; row<y+height; row++) {
+                uint8_t d=*pc++;
+                if(row>=0 && row<16) {
+                    #ifdef INVERT_DISPLAY
+                    if(c==0)        *p &= ~d;
+                    else if(c==1)   *p |= ~d;
+                    else if(c==2)   *p &= d;
+                    else if(c==3)   *p |= d;
+                    else if(c==4)   *p ^= ~d;
+                    else            *p = ~d;
+                    #else
+                    if(c==0)        *p &= d;
+                    else if(c==1)   *p |= d;
+                    else if(c==2)   *p &= ~d;
+                    else if(c==3)   *p |= ~d;
+                    else if(c==4)   *p ^= d;
+                    else            *p = d;
+                    #endif
+                }
+                p++;
+            }
+            p-=18+height;   // Next line
+        }
+        else p-=18;         // Column clipped: only decoded, nothing drawn
 	}
 }
 

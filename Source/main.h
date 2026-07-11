@@ -312,6 +312,8 @@ typedef union {
             X,Y,                 /* X=origin, Y=target square of best move so far     */
             a;                   /* D() return address state                          */
         } _, SA[U],*MP;          /* _=working set, SA=stack array, SP=stack pointer   */
+        uint8_t BMPprev[16];     /* bitmap_safe() column buffer: used while drawing   */
+                                 /* chess pieces and the main menu icons.             */
     } CHESS;
     struct {
         uint8_t display_setup[2];
