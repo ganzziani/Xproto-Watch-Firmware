@@ -39,7 +39,6 @@ void SetTimeTimer(void);
 void GetTimeTimer(void);
 void SetMinuteInterrupt(void);
 uint8_t DaysInMonth(Type_Time *timeptr);
-uint8_t CompareDate(const Type_Time *timeptr1, const Type_Time *timeptr2);
 uint32_t DaysSinceEpoch(const Type_Time *timeptr);
 uint16_t DaysDifference(const Type_Time *t1, const Type_Time *t2);
 void AddDay(Type_Time *timeptr);

@@ -68,6 +68,7 @@ typedef struct {
     uint8_t trailY[MAX_TRAIL];
     uint8_t trail_len;
     uint8_t lastDir;        // Last direction for collision avoidance
+    uint8_t freshTurn;      // 1 for the single frame after a button set the direction
 } ManStruct;
 
 // Styx structure

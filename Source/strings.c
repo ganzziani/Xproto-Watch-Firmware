@@ -3,7 +3,7 @@
 
 //#define SPANISH
 
-const char VERSION[]    PROGMEM = "FW 2.90";
+const char VERSION[]    PROGMEM = "2.91";
 
 // Strings with special characters:
 // 0x1F = delta
@@ -19,45 +19,6 @@ const char STR_Sdiv[]		    PROGMEM = { 'S', 0x1C, 0x1D, 0x1E, 0 }; // S/div
 const char STR_F1[]             PROGMEM = "F1: ";                       // 1:
 const char STR_F2[]             PROGMEM = "F2: ";                       // 2:
 
-#ifdef SPANISH
-
-const char STRS_mainmenu[][17] PROGMEM = {           // Menus:
-    "    Reloj   ",    // Watch
-    "Osciloscopio",    // Oscilloscope
-    "  -Juegos-  ",    // Games
-    "   Ajustes  ",    // Settings
-};
-
-const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
-    "Hora Calendario Astro",    // Watch
-    "Perfil  Imagen  Start",    // Oscilloscope
-    "Culebra  Qix  Ajedrez",    // Games
-    "Ajuste Diagnos. Sobre",    // Settings
-    "Facil   Normal  Peluo",    // Qyx Menu
-};
-
-const char STRS_Months[][11] PROGMEM = {             // Months
-    "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
-};
-
-const char STRS_Days[][10] PROGMEM = {               // Days of the week
-    " Domingo ", "  Lunes  ", " Martes  ", "Miercoles", " Jueves  ", " Viernes ", " Sabado  "
-};
-
-const char STR_Weekdays[] PROGMEM = "Do Lu Ma Mi Ju Vi Sa";
-
-const char STR_White[]      PROGMEM = "Blanco: ";
-const char STR_Black[]      PROGMEM = "Negro:  ";
-const char STR_Level[]      PROGMEM = "Nivel:  ";
-const char STR_Player[]     PROGMEM = "Jugador";
-const char STR_Human[]      PROGMEM = "Humano";
-const char STR_GameMenu[]   PROGMEM = "Jugadr1 Jugadr2 Start";
-const char STR_MoonMenu[]   PROGMEM = "Prev.LL Hoy  Prox.LL";
-
-const char STR_Profiles[]   PROGMEM = " Perfiles";
-
-#else   // English
-
 const char STRS_mainmenu[][17] PROGMEM = {           // Menus:
     "    Watch   ",    // Watch
     "Oscilloscope",    // Oscilloscope
@@ -67,7 +28,7 @@ const char STRS_mainmenu[][17] PROGMEM = {           // Menus:
 
 const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
     "Time  Calendar  Astro",    // Watch
-    "Profile Image   Start",    // Oscilloscope
+    "Start   Image Profile",    // Oscilloscope
     "Snake    Qix    Chess",    // Games
     "Config Diagnose About",    // Settings
     "Easy    Normal   Hard",    // Qyx Menu
@@ -85,17 +46,13 @@ const char STR_Weekdays[] PROGMEM = "Su Mo Tu We Th Fr Sa";
 
 const char STR_White[]      PROGMEM = "White: ";
 const char STR_Black[]      PROGMEM = "Black: ";
-const char STR_Level[]      PROGMEM = "Level: ";
-const char STR_Player[]     PROGMEM = "Player ";
-const char STR_Human[]      PROGMEM = "Human ";
+const char STR_Level[]      PROGMEM = "Level:";
+const char STR_Player[]     PROGMEM = "Player";
+const char STR_Human[]      PROGMEM = "Human";
 const char STR_Snake[]      PROGMEM = "Snake";
 const char STR_GameMenu1[]  PROGMEM = "Player1 Player2 Start";
 const char STR_GameMenu2[]  PROGMEM = "Players  Level  Start";
 const char STR_MoonMenu[]   PROGMEM = "Prev.FM Today Next.FM";
-
-const char STR_Profiles[]   PROGMEM = " Profiles";
-
-#endif
 
 const char STRS_MoonPhase[][16] PROGMEM = {
     "   New Moon    ",
@@ -108,12 +65,12 @@ const char STRS_MoonPhase[][16] PROGMEM = {
     "Waning Crescent",
 };
 
-const char STRS_Settings[][18] PROGMEM = {
-    " Hourly Beep     ",
-    " 24 Hour Format  ",
-    " Year at the end ",
-    " Month after day ",
-    " Show Moon icon  ",
+const char STRS_Settings[][17] PROGMEM = {
+    " Hourly Beep    ",
+    " 24 Hour Format ",
+    " Year at the end",
+    " Month after day",
+    " Show Moon icon ",
 //    " Sunrise &Sunset ",
 };
 
@@ -125,4 +82,4 @@ const char STR_P2[] PROGMEM = " 2: ";
 
 const char STR_am[] PROGMEM = "am";
 const char STR_pm[] PROGMEM = "pm";
-const char STR_Reset[] PROGMEM = "\nRST:";
+const char STR_Reset[] PROGMEM = " RST:";

@@ -91,11 +91,8 @@ void About(void) {
     lcd_goto(10,3);
     print5x8(&STRS_mainmenu[1][0]);    // STRS_mainmenu[1][0] contains the word Oscilloscope
     print5x8(&STRS_mainmenu[0][3]);    // STRS_mainmenu[0][2] contains the word Watch
-    lcd_goto(1,13);
-    print5x8(VERSION); putchar5x8(' '); printhex5x8(BUILD_NUMBER>>8); printhex5x8(BUILD_NUMBER&0x00FF);
-    putchar5x8('\n'); printN5x8(BUILD_YEAR);
-    putchar5x8('/'); printN5x8(BUILD_MONTH);
-    putchar5x8('/'); printN5x8(BUILD_DAY);
+    lcd_goto(1,15);
+    print5x8(VERSION);
     print5x8(STR_Reset); printhex5x8(RST.STATUS);    // Show reset cause
     uint8_t timeout=120;
     do {
@@ -122,8 +119,7 @@ void Profiles(void) {
     uint8_t slot=0;
     do {
         clr_display();
-        print5x8(&STRS_mainmenu[1][0]);    // STRS_mainmenu[1][0] contains the word Oscilloscope
-        print5x8(STR_Profiles);
+        print5x8(&STRS_optionmenu[1][14]);  // STRS_optionmenu[1][14] contains the word Profile
         for(uint8_t i=0; i<8; i++) {
             lcd_goto(5,i+2);
             if(i==slot) {

@@ -146,6 +146,7 @@ void QixEngine(void) {
                     T.QIX.Man.action = MAN_WALKING;
                     T.QIX.Man.trail_len = 0;
                     T.QIX.Man.idle = 0;
+                    T.QIX.Man.freshTurn = 0;
                 }
                 // Spawn animation: circle closing in toward player position
                 DrawCircle(T.QIX.Man.x, T.QIX.Man.y, 121-(StateCounter<<2));
@@ -239,47 +240,56 @@ static void HandleInput(void) {
                 if (testbit(Buttons, KBL)) motion = DIR_CCW;
                 else if (testbit(Buttons, KBR)) motion = DIR_CW;
                 else return;
-                T.QIX.Man.lastDir = motion;
-                direction = PlayerInput(motion, x, y);
-            }                    
+                // Pressing the direction he is already circling stops him (a
+                // toggle, since movement is latched); any other press moves.
+                if (direction != DIR_NONE && motion == T.QIX.Man.lastDir) {
+                    direction = DIR_NONE;
+                } else {
+                    T.QIX.Man.lastDir = motion;
+                    direction = PlayerInput(motion, x, y);
+                    T.QIX.Man.freshTurn = 1; // trust this direction for one frame
+                }
+            }
         }
     }
     T.QIX.Man.direction = direction;
 }
 
-// Find next direction based on the player's input
+// Find next direction based on the player's input.
+//
+// Scans all four cardinal directions and picks the one that continues the
+// perimeter in the requested rotation. The choice is made from the EMPTY side
+// at each candidate's DESTINATION pixel: a rectilinear boundary walk always has
+// empty playfield on one hand and filled space on the other. By convention
+// here, CW keeps empty on the LEFT and CCW keeps empty on the RIGHT (this
+// matches the rotation Perimeter_Direction produces while walking).
+//
+// Checking the destination (not the current pixel) and requiring the OPPOSITE
+// side to be filled makes this correct at corners and T-junctions, where the
+// current pixel has filled neighbors on several sides. A candidate whose two
+// perpendicular sides are BOTH empty is a thin spur (e.g. the wall the player
+// just drew, sticking into open space between two empty regions) and is skipped;
+// one with both sides filled is interior and is skipped too. Scanning all four
+// directions (rather than stopping after the first two walls) is what lets a
+// genuine 3-way junction expose both real perimeter directions.
 static uint8_t PlayerInput(uint8_t motion, uint8_t x, uint8_t y) {
-    uint8_t candidate[2];
-    uint8_t count = 0;
-    // Find the two wall-connected directions
+    uint8_t fallback = DIR_NONE;
     for (uint8_t d = 1; d <= 4; d++) {
         uint8_t nx = x + dx[d];
         uint8_t ny = y + dy[d];
-        if (is_wall(nx, ny)) {
-            candidate[count++] = d;
-            if (count == 2) break;
-        }
+        if (!is_wall(nx, ny)) continue;
+        uint8_t ld = dir_left[d];
+        uint8_t rd = dir_right[d];
+        uint8_t left_empty  = !get_pixel_buffer(nx + dx[ld], ny + dy[ld], Layer_Filled);
+        uint8_t right_empty = !get_pixel_buffer(nx + dx[rd], ny + dy[rd], Layer_Filled);
+        if (left_empty == right_empty) continue;    // spur (both empty) or interior (both filled)
+        if (fallback == DIR_NONE) fallback = d;      // first valid perimeter direction
+        if ((motion == DIR_CW) ? left_empty : right_empty) return d;
     }
-    // Guard against corners / post-fill positions with <2 wall neighbors —
-    // reading candidate[1] when count<2 is undefined (uninitialized stack).
-    if(count == 0) return T.QIX.Man.direction;
-    if(count == 1) return candidate[0];
-    uint8_t d0 = candidate[0];
-    uint8_t d1 = candidate[1];
-    // Determine which one satisfies motion rule
-    // For a given direction, check which side has FILLED
-    uint8_t test = d0;
-    uint8_t side = (motion == DIR_CW)
-        ? dir_right[test]
-        : dir_left[test];
-    uint8_t sx = x + dx[side];
-    uint8_t sy = y + dy[side];
-    if (get_pixel_buffer(sx, sy, Layer_Filled)) {
-        return d0;
-    }
-    else {
-        return d1;
-    }
+    // No direction matched the requested rotation: only one way to go (a pocket
+    // or dead-end) — take it; otherwise keep the current direction.
+    if (fallback != DIR_NONE) return fallback;
+    return T.QIX.Man.direction;
 }
 
 // Updates Man position and trail
@@ -354,7 +364,12 @@ static void MovePlayer(void) {
         }
         // Update position
         if(T.QIX.Man.direction != DIR_NONE) {
-            Perimeter_Direction(&T.QIX.Man.direction, x, y, T.QIX.Man.lastDir);
+            // On the frame a button set the direction, trust PlayerInput's
+            // choice. Re-deriving it here would turn the man toward an adjacent
+            // wall at a completion corner and flip the rotation sense. On all
+            // other frames, follow the wall normally.
+            if(T.QIX.Man.freshTurn) T.QIX.Man.freshTurn = 0;
+            else Perimeter_Direction(&T.QIX.Man.direction, x, y, T.QIX.Man.lastDir);
             uint8_t dir = T.QIX.Man.direction;
             x+=dx[dir];
             y+=dy[dir];

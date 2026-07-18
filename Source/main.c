@@ -238,13 +238,13 @@ int main(void) {
                     if(testbit(Buttons,K3)) Moon();
                 break;
                 case 2:     // Oscilloscope Menu
-                    if(testbit(Buttons,K1)) {   // Profile
+                    if(testbit(Buttons,K3)) {   // Profile
                         Profiles();
                     }
                     if(testbit(Buttons,K2)) {   // Show Screenshot
                         ShowScreenshot();
                     }
-                    if(testbit(Buttons,K3)) {   // Start Oscilloscope
+                    if(testbit(Buttons,K1)) {   // Start Oscilloscope
                         AnalogOn();
                         USB_ResetInterface();                   // Initialize USB
                         eeprom_write_block(NOW, &EE_saved_time, sizeof(Type_Time)); // Save date and time

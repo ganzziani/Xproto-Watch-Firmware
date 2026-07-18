@@ -1,17 +1,3 @@
-// TO DO: Temperature compensation:
-// f = fo (1-PPM(T-To))^2
-// RTC will lose time if the temperature is increased or decreased from the room temperature value (25°C)
-// Coefficient = ?T^2 x -0.036 ppm
-//The firmware repeats the following steps once per minute to calculate and accumulate lost time.
-// 1. The ADC is used to measure the die temperature from the on-chip temperature sensor.
-// 2. The value measured by the ADC is then used to calculate the deviation in ppm, and the result is stored in memory.
-// This indicates the number of microseconds that need to be compensated.
-//
-// At the end of a 24-hour period, the total accumulated error is added to the RTC time to complete the compensation
-// process. The temperature is assumed to not vary widely within a one-minute period.
-
-// TO DO: If there are no alarms in the next 24hrs, show the day of next alarm
-
 #include <util/delay.h>
 #include <avr/io.h>
 #include <avr/pgmspace.h>
@@ -885,7 +871,7 @@ void EditAlarms(void) {
         }        
         
     } while(!testbit(MStatus, goback) && SecTimeout);
-    eeprom_write_block(&Alarms, &EE_Alarms, 4*sizeof(Type_Alarm));
+    eeprom_write_block(&Alarms, &EE_Alarms, (TOTAL_ALARMS-1)*sizeof(Type_Alarm));
     MStatus = oldMStatus;
     SoundOff();
     FindNextAlarm();
@@ -1132,22 +1118,6 @@ void SubDay(Type_Time *timeptr) {
         day=DaysInMonth(timeptr);
     }
     timeptr->day = day;
-}
-
-// Compare dates
-uint8_t CompareDate(const Type_Time *timeptr1, const Type_Time *timeptr2) {
-    uint8_t y1 = timeptr1->year;
-    uint8_t y2 = timeptr2->year;
-    if(y2>y1) return 1;
-    if(y2<y1) return 0;
-    uint8_t m1 = timeptr1->month;
-    uint8_t m2 = timeptr2->month;
-    if(m2>m1) return 1;
-    if(m2<m1) return 0;
-    uint8_t d1 = timeptr1->day;
-    uint8_t d2 = timeptr2->day;
-    if(d2>d1) return 1;
-    return 0;
 }
 
 void PrintYear(uint8_t year) {

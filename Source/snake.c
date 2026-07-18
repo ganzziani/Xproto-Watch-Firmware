@@ -149,7 +149,9 @@ void MoveSnake(SnakeStruct *Player) {
             if((FruitDirection & Player->direction)==0) {                                   // Snake not following fruit already
                 Player->direction=FruitDirection;
             }
-        } else Player->direction=GoodDirection;                                             // Otherwise, just avoid walls
+        } else if(Player->state!=CPU_PLAYER1 || (GoodDirection & Player->direction)==0) {   // Otherwise, just avoid walls.
+            Player->direction=GoodDirection;            // CPU1 keeps going straight until forced to turn, CPU2 turns freely
+        }
         // Make sure only one direction is selected
         if(prandom()&0x01) Player->direction = pgm_read_byte(Direction1+Player->direction);
         else Player->direction = pgm_read_byte(Direction2+Player->direction);
