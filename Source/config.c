@@ -87,10 +87,11 @@ void About(void) {
     clr_display();
 // INVERT_DISPLAY uses a little bit more flash, let's recover some of that flash here 
 #ifndef INVERT_DISPLAY
+    lcd_goto(10,3);
     Sound(TuneIntro);
     print5x8(&STRS_mainmenu[1][0]);    // STRS_mainmenu[1][0] contains the word Oscilloscope
     print5x8(&STRS_mainmenu[0][3]);    // STRS_mainmenu[0][3] contains the word Watch
-    uint8_t *DisplayPointer = Disp_send.DataAddress -(30)*18 + (2);
+    uint8_t *DisplayPointer = Disp_send.DataAddress -(30)*18 + (1);
     SendBitsPData(DisplayPointer,Logo, 69);
 #endif
     lcd_goto(21,15);

@@ -27,7 +27,7 @@ const char STRS_mainmenu[][17] PROGMEM = {           // Menus:
 };
 
 const char STRS_optionmenu[][22] PROGMEM = {           // Menus:
-    "Time  Calendar  Astro",    // Watch
+    "Time  Calendar   Moon",    // Watch
     "Start   Image Profile",    // Oscilloscope
     "Snake    Qix    Chess",    // Games
     "Config Diagnose About",    // Settings
