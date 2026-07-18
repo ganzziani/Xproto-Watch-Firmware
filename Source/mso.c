@@ -130,10 +130,6 @@ const char menustxt[][35] PROGMEM = {           // Menus:
     "SW FREQ    \0  SW AMP   \0  SW DUTY ",     // 35 AWG Menu 6
     "  DOWN    \0  PINGPONG   \0  ACCEL\0",     // 36 Sweep Mode Menu, Leave last character space for icon
     " SUBTRACT \0  MULTIPLY  \0 DIFFRNTL ",     // 37 Operators
-//  " FREQUENCY \0  COUNTER \0 PUL WIDTH ",     //    Frequency counter menu
-//  " IRDA     \0   1 WIRE    \0    MIDI ",     //    More Sniffer protocols
-//  " SWEEP    \0  CV/GATE  \0 POS. RANGE",     //    Advanced Sweep Settings
-//  "CV/GATE   \0  CONTINUOUS \0   C1=1V ",     //    CV/Gate Menu
 };
 
 const char menupoint[] PROGMEM = {  // Menu text table
@@ -160,8 +156,6 @@ const char menupoint[] PROGMEM = {  // Menu text table
     33, // MAWG4 AWG Menu 4
     34, // MAWG5 AWG Menu 5
     35, // MAWG6 AWG Menu 6
-//    38, // MAWG7 AWG Menu 7
-//    39, // MCVG CV/Gate Menu
     31, // MSCOPEOPT Scope options
     32, // MTRIG2 Trigger menu 2
     18, // MTRIGMODE Trigger edge and mode
@@ -211,8 +205,6 @@ const char Next[] PROGMEM = {  // Next Menu
     MAWG2,      // MAWG4 AWG Menu 4
     Mdefault,   // MAWG5 AWG Menu 5
     MAWG5,      // MAWG6 AWG Menu 6
-//    Mdefault,   // MAWG7 AWG Menu 7
-//    Mdefault,   // MCVG CV/Gate Menu
     MMAIN3,     // MSCOPEOPT Scope options
     Mdefault,   // MTRIG2 Trigger Menu 2
     MTRIG2,     // MTRIGMODE Trigger edge and mode
@@ -284,8 +276,6 @@ const char Prev[] PROGMEM = {  // Previous Menu
     MAWG,       // MAWG4 AWG Menu 4
     MAWG6,      // MAWG5 AWG Menu 5
     MAWG2,      // MAWG6 AWG Menu 6
-//    Mdefault,   // MAWG7 AWG Menu 7
-//    Mdefault,   // MCVG CV/Gate Menu
     MMAIN3,     // MSCOPEOPT Scope options
     MMAIN2,     // MTRIG2 Trigger Menu 2
     MTRIG2,     // MTRIGMODE Trigger edge and mode
@@ -394,6 +384,8 @@ const uint16_t movetable[] PROGMEM = {
     (uint16_t)&M.CH2pos,
 };
 
+// Average of two bytes without overflow: add sets carry from the 9-bit sum,
+// ror shifts it back in as bit 7, yielding (a+b)>>1.
 static inline uint8_t average (uint8_t a, uint8_t b) {
     asm ("add  %0, %1"   "\n\t"
          "ror %0"
@@ -656,41 +648,6 @@ void MSO(void) {
                         *p2++=ch2end;
                     }
                 } while (++i);
-/*				if(testbit(Misc,autosend)) {
-                    p1=T.SCOPE.DC.CH1data;
-                    send(0x0D);
-                    send(0x0A);
-                    send('F');
-	                for(uint16_t i16=0;i16<256*3;i16++) send(*p1++);
-/*                    i=0;
-                    uint8_t onChannels=0x30;
-                    if(testbit(CH1ctrl,chon)) {
-                        onChannels +=1;
-                        do {
-                            send(*p1++);
-                        } while(++i);
-                    }
-                    if(testbit(CH2ctrl,chon)) {
-                        onChannels +=2;
-                        p1=T.SCOPE.DC.CH2data;
-                        do {
-                            send(*p1++);
-                        } while(++i);
-                    }
-                    if(testbit(CHDctrl,chon)) {
-                        onChannels +=4;
-                        p1=T.SCOPE.DC.CHDdata;
-                        do {
-                            send(*p1++);
-                        } while(++i);
-                    }
-                    send(0x0A);
-                    send(0x0D);
-                    send(onChannels);            // Send which channels are active
-                    send(0x0A);
-                    send(0x0D);
-                    send('7');
-				}*/
 				// USB - Send new data if previous transfer complete
 				if((endpoints[1].in.STATUS & USB_EP_TRNCOMPL0_bm)) {
 					endpoints[1].in.AUXDATA = 0;				// New transfer must clear AUXDATA
@@ -1402,7 +1359,7 @@ checknext:
                             clrbit(MFFT, blackman);
                         }
                     }
-                    if(testbit(Buttons,K3)) {    // Use Cosine Window
+                    if(testbit(Buttons,K3)) {    // Use Blackman Window
 						if(testbit(MFFT,blackman)) clrbit(MFFT,blackman);
                         else {
                             clrbit(MFFT, hamming);
@@ -1555,16 +1512,6 @@ checknext:
                     if(testbit(Buttons,K1)) togglebit(Sweep,SweepF);    // Toggle F sweep
                     if(testbit(Buttons,K2)) togglebit(Sweep,SweepA);    // Toggle A sweep
                     if(testbit(Buttons,K3)) togglebit(Sweep,SweepD);    // Toggle D sweep
-                break;
-/*                case MAWG7:     // AWG Menu 7
-                    if(testbit(Key,KA)) Menu = MAWG6;   // Go to Sweep menu
-                    if(testbit(Key,KB)) Menu = MCVG;    // Go to CV/Gate
-                    if(testbit(Key,KC)) togglebit(MStatus,AWGPositive);     // Positive Range
-                break;
-                case MCVG:     // CV/Gate Menu
-                    if(testbit(Key,KA)) Menu = MCVG;  // Go to CV/Gate
-                    if(testbit(Key,KB)) Menu = MAWG6;   // Go to Sweep menu
-                    togglebit(MStatus,AWGPositive);     // Positive Range*/
                 break;
                 case MSCOPEOPT:
                     if(testbit(Buttons,K1)) {   // Roll
@@ -1753,7 +1700,7 @@ checknext:
                             clrbit(CH1ctrl,submult);
                         }
                     }
-                    if(testbit(Buttons,K3)) togglebit(CH1ctrl,derivative);
+                    if(testbit(Buttons,K3)) togglebit(CH1ctrl,derivative);   // Differential
                 break;
                 case MCH2OPER:  // Channel 2 Operator
                     if(testbit(Buttons,K1)) {   // Subtract
@@ -1776,7 +1723,7 @@ checknext:
                             clrbit(CH2ctrl,submult);
                         }
                     }
-                    if(testbit(Buttons,K3)) togglebit(CH2ctrl,derivative);   // Average
+                    if(testbit(Buttons,K3)) togglebit(CH2ctrl,derivative);   // Differential
                 break;
                 case MAWG3:     // AWG Menu 3
                     if(testbit(Buttons,K1)) Menu=MAWGAMP;    // Amplitude
@@ -2101,9 +2048,6 @@ checknext:
                                 (i==1 && testbit(Sweep,SweepA)) ||
                                 (i==2 && testbit(Sweep,SweepD)) ) setbit(Misc,negative);
                         break;
-/*                        case MAWG7:
-                            if( (i==2 && testbit(MStatus,AWGPositive)) ) setbit(Misc,negative);
-                        break;*/
                         case MSCOPEOPT:
                             if( (i==0 && testbit(Mcursors, roll)) ||
                             (i==1 && testbit(Display, elastic)) ||
@@ -3155,11 +3099,11 @@ ISR(TCE1_OVF_vect) {
     sch2=(int8_t)(ch2-128); // Convert to signed char
     mul=128+FMULS8(sch1,-(int8_t)sch2);    // CH1*CH2
     if(testbit(CH1ctrl,chmath)) {
-        if(testbit(CH1ctrl,submult)) ch1=addwsat(ch1,-(int8_t)sch2);   // CH1+CH2
+        if(testbit(CH1ctrl,submult)) ch1=addwsat(ch1,-(int8_t)sch2);   // CH1-CH2
         else ch1=mul;                                                  // CH1*CH2
     }
     if(testbit(CH2ctrl,chmath)) {
-        if(testbit(CH2ctrl,submult)) ch2=addwsat(ch2,-(int8_t)sch1);   // CH1+CH2
+        if(testbit(CH2ctrl,submult)) ch2=addwsat(ch2,-(int8_t)sch1);   // CH2-CH1
         else ch2=mul;                                                  // CH1*CH2
     }
     slow_sum1+=ch1;
@@ -3180,16 +3124,6 @@ ISR(TCE1_OVF_vect) {
         T.SCOPE.DC.CH1data[Index] = ch1;
         T.SCOPE.DC.CH2data[Index] = ch2;
         T.SCOPE.DC.CHDdata[Index] = VPORT2.IN;
-/*        if(testbit(Misc,autosend)) {    // Send to PC
-            if(Index==0) {
-                send(0x0D);
-                send(0x0A);
-                send('S');
-            }
-            send(ch1);
-            send(ch2);
-            send(VPORT2.IN);
-        }*/
     }
     if(testbit(MFFT, scopemode) && !testbit(Mcursors,roll)) {  // Draw data if in scope mode
         // Draw Channel 1
@@ -3197,10 +3131,10 @@ ISR(TCE1_OVF_vect) {
             uint8_t oldch1;
             // Apply position
             ch1=addwsat(ch1,M.CH1pos);
-            ch1=ch1>>1; // Scale to LCD (128x64)
+            ch1=ch1>>1; // Scale to LCD (128x128)
             if(ch1>DISPLAY_MAX_Y) ch1=DISPLAY_MAX_Y;
             oldch1=addwsat(T.SCOPE.DC.CH1data[Index-1],M.CH1pos);
-            oldch1=oldch1>>1; // Scale to LCD (128x64)
+            oldch1=oldch1>>1; // Scale to LCD (128x128)
             if(oldch1>DISPLAY_MAX_Y) oldch1=DISPLAY_MAX_Y;
             // Draw data
             if(testbit(Display, line) && Index) {
@@ -3208,7 +3142,7 @@ ISR(TCE1_OVF_vect) {
                     if(testbit(CH1ctrl,chon)) set_line(Index>>1, ch1, (Index-1)>>1, oldch1);
             }
             else {
-                // Don't draw when data==0 or data==63, signal could be clipping
+                // Don't draw when data==0 or data==DISPLAY_MAX_Y, signal could be clipping
                 if(testbit(CH1ctrl,chon) && ch1 && ch1<DISPLAY_MAX_Y) set_pixel(Index>>1, ch1);
             }
         }
@@ -3228,7 +3162,7 @@ ISR(TCE1_OVF_vect) {
                     if(testbit(CH2ctrl,chon)) set_line(Index>>1, ch2, (Index-1)>>1, oldch2);
             }
             else {
-                // Don't draw when data==0 or data==63, signal could be clipping
+                // Don't draw when data==0 or data==DISPLAY_MAX_Y, signal could be clipping
                 if(testbit(CH2ctrl,chon) && ch2 && ch2<DISPLAY_MAX_Y) set_pixel(Index>>1, ch2);
             }
         }
@@ -3265,11 +3199,6 @@ ISR(TCE1_OVF_vect) {
         Index++;
         if(Index==0) {
             setbit(Misc,sacquired);
-/*            if(testbit(Misc,autosend)) {    // end of frame
-                send(0x0A);
-                send(0x0D);
-                send('7');
-            }*/
         }            
         if(!testbit(Mcursors,roll)) {
             if(Index==0) {

@@ -129,7 +129,7 @@ void Cursor(uint8_t x, uint8_t y, uint8_t c) {
  * Chess() — configuration menu
  *
  * Lets the user choose White/Black as Human or CPU, set the difficulty
- * level (0–15), and start the game.
+ * level (1–9), and start the game.
  * ------------------------------------------------------------------------- */
 void Chess(void) {
     uint8_t p = 2;          /* Player-type selector: bit0=White, bit1=Black CPU */

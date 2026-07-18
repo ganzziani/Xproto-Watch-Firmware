@@ -40,7 +40,7 @@ void NewFruit(void) {
         if (T.SNAKE.Fruity >= G2) T.SNAKE.Fruity -= G2;
     } while ((T.SNAKE.Fruitx >=32) || (T.SNAKE.Fruity >= 32) ||   // Out of bounds
       (T.SNAKE.board[T.SNAKE.Fruitx][T.SNAKE.Fruity]!=EMPTY)); // Occupied
-    T.SNAKE.board[T.SNAKE.Fruitx][T.SNAKE.Fruity] = FRUIT;       // New head position
+    T.SNAKE.board[T.SNAKE.Fruitx][T.SNAKE.Fruity] = FRUIT;       // New fruit position
     if(TCC0.PER>250) TCC0.PERBUF=multfix(TCC0.PER, float2fix(0.9));   // Speed up
     T.SNAKE.Fruit++;
 }
@@ -108,7 +108,7 @@ const uint8_t Direction1[16] PROGMEM = {
 };
 
 // Arrays to select only one direction, if more than one direction was selected
-// Select lefttmost bit
+// Select leftmost bit
 const uint8_t Direction2[16] PROGMEM = {
     GO_RIGHT,       // 0000
     GO_UP,          // 0001
@@ -226,7 +226,7 @@ void SnakeBoard(void) {
 
 void SnakeEngine(void) {
     PR.PRPC  &= 0b11111110;         // Enable TCC0 clock
-    TCC0.PER = 14000;               // 
+    TCC0.PER = 14000;               // Initial game speed
     TCC0.CTRLA = 5;                 // 31.25kHz clock
     InitSnake();
     NewFruit();
@@ -260,5 +260,5 @@ void SnakeEngine(void) {
     clrbit(MStatus, goback);
     setbit(MStatus, update);
     TCC0.CTRLA = 0;
-    PR.PRPC |= 0b00000001;         // Disable TCC0 TCC1C clocks
+    PR.PRPC |= 0b00000001;         // Disable TCC0 clock
 }

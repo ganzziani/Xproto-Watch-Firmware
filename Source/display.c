@@ -36,7 +36,7 @@ void clr_display(void) {
     const uint8_t cleared=0;
     #endif
     for(uint8_t i=128; i; i--) { // Erase all 2048 bytes in the buffer
-        // Unroll inner loop for speed - Clear 16 lines
+        // Unroll inner loop for speed - Clear one line's 16 bytes
         *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
         *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
         *p++=cleared; *p++=cleared; *p++=cleared; *p++=cleared;
@@ -276,11 +276,8 @@ void fillRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t c) {
     }
 }
 
-// Toggle a triangle - Bresenham method
-// Original from http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
-// Corrected optimized triangle fill � exact output, no stuck loops
-// Fill a triangle - Bresenham method
-// Original from http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
+// Toggle (XOR-fill) a triangle - Bresenham method, exact output, no stuck loops
+// Based on http://www.sunshine2k.de/coding/java/TriangleRasterization/TriangleRasterization.html
 void ToggleTriangle(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2,uint8_t x3,uint8_t y3) {
     uint8_t t1x,t2x,y,minx,maxx,t1xp,t2xp;
     uint8_t changed1 = 0;
@@ -291,6 +288,14 @@ void ToggleTriangle(uint8_t x1,uint8_t y1,uint8_t x2,uint8_t y2,uint8_t x3,uint8
     if (y1>y2) { SWAP(y1,y2); SWAP(x1,x2); }
     if (y1>y3) { SWAP(y1,y3); SWAP(x1,x3); }
     if (y2>y3) { SWAP(y2,y3); SWAP(x2,x3); }
+    // Sorted so y1<=y2<=y3. The triangle is filled as horizontal spans between
+    // two edges walked in parallel: t1x follows the short edges (v1->v2 then
+    // v2->v3), t2x follows the long edge (v1->v3). Each outer iteration steps
+    // both edges to the next scanline and fills [minx,maxx]. changed1/2 flag
+    // x-major edges (dx>dy, axes swapped) whose x-step is deferred through
+    // t1xp/t2xp so exactly one pixel row is emitted per y. The first loop covers
+    // the top half (down to y2); the code after 'next:' repeats for the bottom
+    // half (down to y3).
 
     t1x=t2x=x1; y=y1;   // Starting points
 
@@ -487,7 +492,7 @@ void print5x8(const char *ptr) {
     }
 }
 
-// Print Number 0-9999
+// Print Number 0-65535
 void print16_5x8(uint16_t Data) {
     uint8_t d=0x30,h=0x30,t=0x30, tt=0x30;
     while (Data>=10000)	{ tt++; Data-=10000; }
@@ -614,27 +619,9 @@ void bitmap(uint8_t x, uint8_t y, const uint8_t *BMP) {
 }
 
 /*----------------------------------------------------------------------------
-Send a run length encoded image from program memory to the LCD
-	Decode algorithm:
-	Get one byte, put it to the output file, and now it's the 'last' byte. 
-	Loop 
-	Get one byte 
-	Is the current byte equal to last? 
-	Yes 
-		Now get another byte, this is 'counter' 
-		Put current byte in the output file 
-		Copy 'counter' times the 'last' byte to the output file 
-		Put last copied byte in 'last' (or leave it alone) 
-	No 
-		Put current byte to the output file 
-		Now 'last' is the current byte 
-	Repeat. 
-
-    BMP[0] contains width in pixels
-    BMP[1] contains height in pixels
-
-    The data is column-delta filtered before RLE: every column except the
-    first is XORed with the previous column (undone here while decoding).
+Clipped, blended variant of bitmap(): same RLE + column-XOR encoding (see
+bitmap() above for the decode algorithm and BMP header layout). Adds signed
+x/y with off-screen clipping and a blend mode 'c' (AND/OR/XOR/copy).
 ----------------------------------------------------------------------------*/
 void bitmap_safe(int8_t x, int8_t y, const uint8_t *BMP, uint8_t c) {
     if(BMP==0) return;

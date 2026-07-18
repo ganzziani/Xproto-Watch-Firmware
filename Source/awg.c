@@ -83,6 +83,12 @@ void BuildWave(void) {
     }
     // Prepare output buffer:
     // ******** Duty cycle ********
+    // Time-warp the 256-sample source (AWGTemp1) into the output (AWGTemp2) with a
+    // phase accumulator: 'step' advances by one increment over the source's first
+    // half and another over the second, so each half occupies an output span set by
+    // AWGduty (this shifts the waveform's midpoint = duty cycle). hibyte(step) is the
+    // output index; samples are linearly interpolated unless the no-interpolation
+    // flag (bigfont) is set (e.g. square wave).
     uint16_t step=0;
 	uint16_t inc;
     i=0; inc=(256-M.AWGduty)<<1;

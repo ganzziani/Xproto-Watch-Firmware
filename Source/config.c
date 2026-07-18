@@ -79,7 +79,7 @@ void Diagnose(void) {
     LOGIC_OFF();
     TCC0.CTRLA = 0;
     TCC1.CTRLA = 0;
-    PR.PRPC  |= 0b00000011;         // Disable TCC0 TCC1C clocks
+    PR.PRPC  |= 0b00000011;         // Disable TCC0 TCC1 clocks
     setbit(MStatus, update);
 }
 
@@ -90,7 +90,7 @@ void About(void) {
     SendBitsPData(DisplayPointer,Logo, 69);
     lcd_goto(10,3);
     print5x8(&STRS_mainmenu[1][0]);    // STRS_mainmenu[1][0] contains the word Oscilloscope
-    print5x8(&STRS_mainmenu[0][3]);    // STRS_mainmenu[0][2] contains the word Watch
+    print5x8(&STRS_mainmenu[0][3]);    // STRS_mainmenu[0][3] contains the word Watch
     lcd_goto(1,15);
     print5x8(VERSION);
     print5x8(STR_Reset); printhex5x8(RST.STATUS);    // Show reset cause

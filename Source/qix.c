@@ -425,7 +425,7 @@ static void Perimeter_Direction(uint8_t *direction, uint8_t x, uint8_t y, uint8_
 
 // Find a random valid wall pixel for stuck-recovery.
 // Shared by MoveTraps and by MovePlayer (after a fill removes the player's footing).
-// Returns 1 and updates *x/*y on success, 0 if no wall found after 20 tries.
+// Returns 1 and updates *x/*y on success, 0 if no wall found after 250 tries.
 static uint8_t find_rescue_wall(uint8_t *x, uint8_t *y) {
     for(uint8_t attempt = 0; attempt < 250; attempt++) {
         uint8_t rx = qrandom() >> 1;
@@ -506,8 +506,7 @@ static void MoveTraps(void) {
         T.QIX.Traps[i].x[0] = new_x;
         T.QIX.Traps[i].y[0] = new_y;
         
-        // Grow trap at higher levels
-        // Simplified: grow if length < 8, or randomly based on level
+        // Grow trap: always until length reaches the level, then randomly (more likely at higher levels)
         uint8_t level = T.QIX.level;
         
         if ((T.QIX.Traps[i].length < level) ||      // Always grow until length reaches the level
@@ -757,7 +756,7 @@ static uint8_t is_wall(uint8_t x, uint8_t y) {
 
 // SWAR Popcount algorithm - Count set bits in a byte
 static uint8_t popcount8(uint8_t b) {
-    b -= (b >> 1) & 0x55;               // 2-bit sums  (saves one AND vs your version)
+    b -= (b >> 1) & 0x55;               // 2-bit sums
     b = (b & 0x33) + ((b >> 2) & 0x33); // 4-bit sums
     return (b + (b >> 4)) & 0x0F;       // 8-bit sum
 }
@@ -957,7 +956,7 @@ static void DoFill(void) {
     // TOTAL_FILLABLE: 14508 
     T.QIX.captureProgress = T.QIX.filled_pixels / 114;  // Max value is 127
 
-    // Level complete at ~80 % — simple comparison, no division needed
+    // Level complete at 75 % — simple comparison, no division needed
     if(T.QIX.filled_pixels >= CAPTURE_GOAL_PIXELS) {
         Sound(TuneLevelUp);
         T.QIX.gameState = STATE_DELAY;
@@ -999,14 +998,14 @@ static void DrawGame(void) {
     for(uint8_t i=0; i<T.QIX.Man.trail_len; i++) {
         set_pixel(T.QIX.Man.trailX[i], T.QIX.Man.trailY[i]);
     }
-    // Draw traps body with alternating on/off pattern (from TB.C dot_type concept)
+    // Draw traps body
     for (uint8_t i = 0; i < T.QIX.traps_active; i++) {
         if(!T.QIX.Traps[i].active) continue;
         for(uint8_t j = 0; j < T.QIX.Traps[i].length; j++) {
             uint8_t tx = T.QIX.Traps[i].x[j];
             uint8_t ty = T.QIX.Traps[i].y[j];
             if(tx >= 128 || ty >= 128) continue;
-            clr_pixel(tx, ty);  // Toggle odd-indexed segments
+            clr_pixel(tx, ty);
         } 
     }
     // Draw UI elements

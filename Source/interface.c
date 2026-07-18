@@ -247,9 +247,7 @@ uint8_t ProcessCommand(uint8_t Command, uint8_t usb) {
             p = (uint8_t *)(&T.SCOPE.MeterFreq);
             for(uint8_t i=0; i<4; i++) ep0_buf_in[i]=*p++;
             n=4;
-        break;            
-        case 'p': clrbit(Misc,autosend); break;    // Do not automatically send data to UART
-        case 'q': setbit(Misc,autosend); break;    // Automatically send data to UART
+        break;
         case 'u':   // Send settings to PC
             p=(uint8_t *)0;  for(; i<12; i++) ep0_buf_in[i]=*p++;   // GPIO
             p=(uint8_t *)&M; for(; i<44; i++) ep0_buf_in[i]=*p++;   // M

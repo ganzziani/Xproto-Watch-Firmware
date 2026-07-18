@@ -188,7 +188,7 @@ void Sniff(void) {
             else databits |= 0x20;
         }
         if(testbit(Sniffer,stopbit)) databits |= 0x08;    // Second stop bit
-        USARTC0.CTRLC = databits;       // Async, No Parity, 1 stop bit, 8 data bits
+        USARTC0.CTRLC = databits;
                 
         USARTC0.CTRLB = 0x10;       // Enable RX
         TCC1.CTRLA = 0x01;  // DIV1

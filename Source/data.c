@@ -126,7 +126,7 @@ const NVMVAR MAXM PROGMEM = {   // Flash Copy
     127,    //  Hcursor2B;      // Max cursor position
     255,    //  thold;          //
     0x7FFF, //  Tpost;          // Max Post Trigger
-    10,     //  Tsource;        // 10 Trigger sources
+    10,     //  Tsource;        // 11 Trigger sources
     252,    //  Tlevel;         // Max Trigger Level
     255,    //  Window1;        //
     255,    //  Window2;        //
@@ -139,7 +139,7 @@ const NVMVAR MAXM PROGMEM = {   // Flash Copy
     255,    //  Sweep2;         //
     127,    //  SWSpeed;        // Sweep Speed Max
     255,    //  AWGamp;         //
-    5,      //  AWGtype;        // 5 waveform type
+    5,      //  AWGtype;        // 6 waveform types
     255,    //  AWGduty;        //
     255,    //  AWGoffset;      //
     0x00BEFFFF,  //  AWGdesiredF;    // Max set to 125.17375kHz

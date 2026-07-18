@@ -19,8 +19,6 @@
 #define TRAP_MAX        2       // Maximum traps
 #define DOT_MAX         64      // Maximum trap dots
 #define MAX_TRAIL       255     // Maximum trail length
-// Capture completion: playfield interior is 124 x 117 = 14508 fillable pixels.
-// 80 % of 14508 ≈ 11607 pixels required to advance level.
 #define TOTAL_FILLABLE       14508      // (DISPLAY_MAX_X-3) * (DISPLAY_MAX_Y - UI_TOP_MARGIN - 2)
 #define CAPTURE_GOAL_PIXELS  10881      // 75 % of TOTAL_FILLABLE
 // captureProgress is on a 0–127 scale so that scaling to any bar width is a shift.

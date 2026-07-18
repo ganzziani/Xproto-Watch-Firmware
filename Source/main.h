@@ -139,7 +139,7 @@
 #define sacquired   4       // Data has been acquired (for slow sampling)
 #define slowacq     5       // Acquired one set of samples a slow sampling rates
 #define userinput   6       // Valid input received
-#define autosend    7       // Continuously send data to UART
+#define not_used    7       // unused bit
 
 // Watch Global variables, using GPIO for optimized access
 #define NOW         0       // Address of Now variables
@@ -312,7 +312,7 @@ typedef union {
             X,Y,                 /* X=origin, Y=target square of best move so far     */
             a;                   /* D() return address state                          */
             unsigned short k;    /* Position-key XOR delta of the current move        */
-        } _, SA[U],*MP;          /* _=working set, SA=stack array, SP=stack pointer   */
+        } _, SA[U],*MP;          /* _=working set, SA=stack array, MP=stack pointer   */
         uint8_t hist_n;          /* Positions recorded since last irreversible move   */
         uint16_t histk[16];      /* Repetition ring: position keys (board + side)     */
         uint8_t  histb[16][64];  /* Repetition ring: board snapshots (valid squares)  */

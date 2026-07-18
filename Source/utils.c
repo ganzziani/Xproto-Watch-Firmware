@@ -309,7 +309,7 @@ const uint16_t TuneAlarms[] PROGMEM = {
 // Dual Tone sound. CPU must be running at 2MHz
 void Sound(const uint8_t *tune) {
     TunePtr = tune;
-    PR.PRPE &= 0b11111110;          // Enable TCE1 clock (note frequencies)
+    PR.PRPE &= 0b11111110;          // Enable TCE0 clock (note frequencies)
     PR.PRPD &= 0b11111101;          // Enable TCD1 clock (note duration)
     TCE0.CTRLE = 0x02;              // Timer TCE0 Split Mode
     TCD1.CNT = 0;

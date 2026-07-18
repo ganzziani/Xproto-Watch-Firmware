@@ -39,7 +39,7 @@ Type_Time EEMEM EE_saved_time = {   // Last known time
     BUILD_DAY,                  // day      Day          [1-31]
     BUILD_MONTH,                // month    Month        [1-12]
     BUILD_YEAR+56,              // year     Year since 1944
-    0,                          // wday     Day of week  [0-6]   Saturday is 0
+    0,                          // wday     Day of week  [0-6]   Sunday is 0
 };
 
 Type_Alarm EEMEM EE_Alarms[] = {
@@ -617,7 +617,7 @@ void CountDown(void) {
                 start = !start;
             }
             if(testbit(Buttons,K1)) {
-                if(hour<23) hour++;             // 
+                if(hour<23) hour++;
             }                
             if(testbit(Buttons,K2)) minute++;
             if(minute>=60) minute=0;
@@ -1043,7 +1043,7 @@ void findweekday(void) {
     days += NowDay;                                 // Add remaining days in this month
     days -= 2;                                      // Subtract 2 so Sunday is 0
     while(days>=7) days-=7;                         // Calculate modulo to return the weekday
-    NowWeekDay = days;                              // Return week day. Saturday is 0
+    NowWeekDay = days;                              // Return week day. Sunday is 0
 }
 
 // Returns the number of days in the month in the date pointed by timeptr
@@ -1101,7 +1101,7 @@ void AddDay(Type_Time *timeptr) {
     timeptr->year = year;
 }
 
-// Add a day to a date
+// Subtract a day from a date
 void SubDay(Type_Time *timeptr) {
     uint8_t day = timeptr->day;
     uint8_t month = timeptr->month;

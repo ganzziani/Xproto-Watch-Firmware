@@ -43,7 +43,7 @@
 // M0: 'L' the module remains in Static Mode, where pixel data is retained
 
 // M1: VCOM When M1 is 'H' then VCOM = 'H' is output. If M1 is 'L' then VCOM = 'L' is output.
-// When EXTMODE = 'H', M1 value = XX (don’t care)
+// When EXTMODE = 'H', M1 value = XX (don't care)
 
 // M2 CLEAR ALL When M2 is 'L' then all flags are cleared. When a full display clearing is required,
 // set M0 and M2 = HIGH and set all display data to white.
