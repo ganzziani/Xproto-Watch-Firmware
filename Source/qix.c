@@ -34,7 +34,7 @@ static void Perimeter_Direction(uint8_t *direction, uint8_t x, uint8_t y, uint8_
 static uint8_t find_rescue_wall(uint8_t *x, uint8_t *y); // Find a random valid wall pixel (shared rescue logic)
 static void InitTraps(uint8_t level);   // Initialize Traps
 static void MoveTraps(void);            // Updates Traps positions
-static void InitStyx(void);    // Initialize Styx
+static void InitStyx(void);             // Initialize Styx
 static void NewStyxDirection(uint8_t n); // Change direction and line size
 static uint8_t CheckStyxCollision(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2);  // Check if Styx line hits wall or trail
 static void MoveStyx(void);             // Updates Styx positions
@@ -45,7 +45,7 @@ static uint8_t scanne(uint8_t x, uint8_t y, uint8_t xmax);  // Scan for non-boun
 static uint8_t scaneq(uint8_t x, uint8_t y, uint8_t xmax);  // Scan for boundary pixel
 static uint8_t popcount8(uint8_t b);     // Count set bits in a byte
 static uint8_t is_wall(uint8_t x, uint8_t y);  // Filled pixel on a region boundary
-static void DrawGame(void);             // Render display
+static void DrawGame(void);              // Render display
 
 // Precomputed direction deltas (index 0 unused)
 // dx[0]/dy[0] = center (0,0); indices 1-4 = cardinal; indices 5-8 = diagonal
@@ -397,7 +397,6 @@ static void MovePlayer(void) {
 static void Perimeter_Direction(uint8_t *direction, uint8_t x, uint8_t y, uint8_t traversal) {
     uint8_t dir = *direction;
     if (dir < 1 || dir > 4) return;
-
     // Scan order depends on traversal direction:
     // CW:  wall is on the left, scan: left -> ahead -> right -> back
     // CCW: wall is on the right, scan: right -> ahead -> left -> back
@@ -413,7 +412,6 @@ static void Perimeter_Direction(uint8_t *direction, uint8_t x, uint8_t y, uint8_
         scan[2] = dir_left[dir];
         scan[3] = dir_back[dir];
     }
-
     for (uint8_t i = 0; i < 4; i++) {
         uint8_t d = scan[i];
         if (is_wall(x + dx[d], y + dy[d])) {
@@ -515,7 +513,6 @@ static void MoveTraps(void) {
                  T.QIX.Traps[i].length++;
              }                 
         }
-     
         // Check collision with player
         uint8_t px = T.QIX.Man.x;
         uint8_t py = T.QIX.Man.y;

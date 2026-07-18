@@ -4,13 +4,8 @@
 #include <stdint.h>
 #include "hardware.h"
 
-#ifdef INVERT_DISPLAY
-#define PIXEL_CLR 255
-#define PIXEL_SET 0
-#else
 #define PIXEL_CLR 0
 #define PIXEL_SET 255
-#endif
 
 #define PIXEL_TGL 1
 

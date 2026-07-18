@@ -46,12 +46,17 @@ void clr_display(void) {
     lcd_goto(0,0);
 }
 
-// Or the BufferIn into the active display buffer
+// Merge the BufferIn layer (bit 1 = drawn pixel) into the active display buffer:
+// OR on a normal display, AND-NOT on an inverted one, where ink is a cleared bit
 void OR_display(const uint8_t *BufferIn) {
     uint8_t *p=Disp_send.SPI_Address+2;  // Locate pointer at start of active buffer;
     for(uint8_t i=128; i; i--) { // Copy all 2048 bytes in the buffer
         for(uint8_t j=16; j; j--) {
+            #ifdef INVERT_DISPLAY
+            *p++ &= ~(*BufferIn++);
+            #else
             *p++ |= *BufferIn++;
+            #endif
         }
         p+=2;           // Skip trailer bytes
         BufferIn+=2;

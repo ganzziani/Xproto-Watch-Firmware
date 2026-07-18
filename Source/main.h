@@ -164,7 +164,7 @@
 #define update      0       // Update
 #define countdwn    1       // Count Down is active
 #define alarm_on    2       // Alarm on
-//#define           3       // 
+#define temp_bit    3       // Temporary bit
 //#define           4       // 
 //#define           5       // 
 #define goback      6       // Stay in function until exit

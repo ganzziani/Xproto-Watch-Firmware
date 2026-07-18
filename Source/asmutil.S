@@ -207,7 +207,7 @@ toggle_line_body:
 .global set_pixel_buffer
 set_pixel_buffer:
     movw    r30, r20                ; Load passed pointer into Z (r30=lo, r31=hi)
-    rjmp    set_pixel_body
+    rjmp    clr_pixel_body          ; Raw SET bits (clr_pixel_body ends in las under INVERT)
 
 ; Disp_send.display_data[(uint16_t)((127-x)*18) + (y>>3)] |= (uint8_t)(0x80 >> (y & 0x07));
 .global set_pixel                   ; void setpixel(uint8_t x, uint8_t y);
@@ -240,7 +240,7 @@ set_pixel_body:
 .global clr_pixel_buffer
 clr_pixel_buffer:
     movw    r30, r20                ; Load passed pointer into Z (r30=lo, r31=hi)
-    rjmp    clr_pixel_body
+    rjmp    set_pixel_body          ; Raw CLEAR bits (set_pixel_body ends in lac under INVERT)
 
 ; Disp_send.display_data[(uint16_t)((127-x)*18) + (y>>3)] &= ~(uint8_t)(0x80 >> (y & 0x07));
 .global clr_pixel                   ; void setpixel(uint8_t x, uint8_t y);
@@ -273,14 +273,16 @@ clr_pixel_body:
 .global get_pixel_buffer
 get_pixel_buffer:
     movw    r30, r20                ; Load passed pointer into Z (r30=lo, r31=hi)
+    ldi     r20, 0                  ; r20=0: raw read
     rjmp    get_pixel_body
 
 ; uint8_t get_pixel(uint8_t x, uint8_t y);
-; Returns 0 if pixel is clear, non-zero if set
+; Returns 0 if pixel is background, non-zero if ink
 .global get_pixel
 get_pixel:
     lds     r30, Disp_send+2        ; r31:r30 = addr + 127*18
     lds     r31, Disp_send+3
+    ldi     r20, 1                  ; r20=1: inverted display, ink is a cleared bit
 get_pixel_body:
     ldi     r25, 18                 ; r25 = 18
     mul     r24, r25                ; r1:r0 = x*18
@@ -294,7 +296,9 @@ get_pixel_body:
     add     r30, r25                ; z += y>>3
     adc     r31, r1
     ; Address is ready, now read and mask
-    ld      r25, z                  ; r25 = display byte at address
+    ld      r25, z                  ; r25 = byte at address
+    sbrc    r20, 0                  ; Raw layer read (r20=0): skip the complement
+    com     r25                     ; Display read: ink is a cleared bit, so invert the byte
     andi    r22, 0x07               ; y &= 0x07
     ldi     r24, 0x80               ; r24 = 0x80
     rjmp    .+2                     ; Skip first shift
@@ -303,7 +307,6 @@ get_pixel_body:
     dec     r22
     brpl    0b                      ; repeat while y >= 0
     and     r24, r25                ; mask the bit: 0 if clear, non-zero if set
-    com     r24                     ; inverted display
     ret
 
 ; Disp_send.buffer[((uint16_t)((127-x)*18)) + (u8CursorY)] |= data;
@@ -328,13 +331,12 @@ display_or:                         ; Clear bits on display buffer
     ret
 
 ; void set_line_buffer(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t *p);
-; Parameters: r24=x1, r22=y1, r20=x2, r18=y2, r26:r27=p (X register, lo:hi)
-; Note: pointer passed in r25:r24... but r24 is x1.
 ; AVR passes pointers in pairs. With 5 params:
 ;   r24=x1, r22=y1, r20=x2, r18=y2, r17:r16=p (lo:hi)
 .global set_line_buffer
 set_line_buffer:
     movw    r30, r16                ; Load passed pointer into Z (r30=lo, r31=hi)
+    ldi     r19, 1                  ; r19=1: raw SET bits (logical layer)
     rjmp    set_line_body           ; Jump past the fixed address load
 
 ; void set_line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
@@ -351,12 +353,13 @@ set_line:
     ; r22 = y1
     ; r21 = loop counter
     ; r20 = dxabs
-    ; r19 = stepy hi
+    ; r19 = plot mode: 0 = display (lac loops), 1 = raw layer (.LB_* las loops)
     ; r18 = dyabs
 
     ; Calculate initial address: Disp_send.display_data[(127-x1)*18 + (y1>>3)]
     lds     r30, Disp_send+2        ; Load base address + 127*18
     lds     r31, Disp_send+3
+    ldi     r19, 0                  ; r19=0: CLEAR bits (display ink under INVERT_DISPLAY)
 set_line_body:
     ldi     r25, 18                 ; r25 = 18
     mul     r24, r25                ; r1:r0 = x1 * 18
@@ -381,7 +384,10 @@ set_line_body:
     dec     r22
     brpl    .L_mask_shift
     mov     r0, r27
-    lac     Z, r0                   ; Clear initial pixel at x1,y1
+    sbrc    r19, 0                  ; Buffer mode? (costs 1 cycle in display mode)
+    rjmp    .LB_first_plot          ; Buffer: set initial pixel in the las section
+    lac     Z, r0                   ; Display: clear initial pixel at x1,y1
+.LI_after_first:
 
     ; Initialize x vars
     ; Note: x is REVERSED, so positive dx means NEGATIVE step in buffer
@@ -393,17 +399,18 @@ set_line_body:
     neg     r20                     ; dxabs = -dx
     ldi     r25, 18                 ; stepx lo = 18 (negative dx means right in buffer)
     ldi     r24, 0                  ; stepx hi = 0
-    ; Initialize y vars
+    ; Initialize y vars ("stepy hi" is not needed: y stepping only shifts the
+    ; bit mask, and r19 now carries the plot-op selector through the body)
     ;sub     r18, r22               ; dy calculated previously
     ldi     r26, 1                  ; stepy lo = 1
-    ldi     r19, 0                  ; stepy hi = 0
     tst     r18                     ; test dy for zero or negative
-    brpl    .+6                     ; branch if positive
+    brpl    .+4                     ; branch if positive
     neg     r18                     ; dyabs = -dy
     ldi     r26, -1                 ; stepy lo = -1
-    ldi     r19, -1                 ; stepy hi = -1
 
     cp      r20, r18                ; if (dxabs >= dyabs)
+    sbrc    r19, 0                  ; Buffer mode? (sbrc/rjmp preserve the cp flags)
+    rjmp    .LB_orient              ; Buffer: dispatch to the las loops
     brlo    .Vertical_line
 
     ;;; Line is more horizontal ;;;
@@ -481,6 +488,88 @@ set_line_body:
     lac     Z, r0                   ; Clear bits in display data
     dec     r21
     rjmp    .Vertical_Loop
+
+; Raw layer (las) section for set_line_buffer. 
+.LB_first_plot:
+    las     Z, r0                   ; Set initial pixel at x1,y1
+    rjmp    .LI_after_first         ; Back to the shared setup
+
+.LB_orient:
+    brlo    .LB_Vertical_line       ; Flags still valid from cp r20,r18
+
+    ;;; Line is more horizontal ;;;
+    mov     r23, r20                ; e = dxabs
+    lsr     r23                     ; e >>= 1
+    mov     r21, r20                ; loop counter = dxabs
+.LB_Horizontal_Loop:
+    tst     r21                     ; counter positive?
+    brne    .+2                     ; if dxabs != 0, continue loop
+    ret                             ; if dxabs == 0, exit
+    add     r23, r18                ; e += dyabs
+    cp      r23, r20                ; if (e >= dxabs)
+    brlo    .LB_HorizontalStepx     ; Branch if lower
+    sub     r23, r20                ; e -= dxabs
+    ; Update bit mask and buffer pointer for y change
+    tst     r26                     ; check stepy sign
+    brmi    .LB_StepyNegative       ; branch if minus
+    lsr     r27                     ; stepy = 1: shift mask RIGHT, if bit 0 was set, wrap to next row
+    brcc    .LB_HorizontalStepx     ; Branch if no wrap
+    ldi     r27, 0x80               ; wrap to bit 7
+    subi    r30, -1                 ; move to next row
+    sbci    r31, -1                 ; Z = Z + 1
+    rjmp    .LB_HorizontalStepx
+.LB_StepyNegative:
+    ; stepy = -1: shift mask LEFT, if bit 7 was set, wrap to prev row
+    lsl     r27                     ; shift left
+    brcc    .LB_HorizontalStepx     ; Branch if no wrap
+    ldi     r27, 0x01               ; wrap to bit 0
+    subi    r30, 1                  ; move to previous row
+    sbci    r31, 0                  ; Z = Z - 1
+.LB_HorizontalStepx:
+    add     r30, r25                ; Z = Z + stepx
+    adc     r31, r24
+    mov     r0, r27                 ; Copy mask to r0
+    las     Z, r0                   ; Set bits in buffer
+    dec     r21
+    rjmp    .LB_Horizontal_Loop
+
+.LB_Vertical_line:
+    ;;; Line is more vertical ;;;
+    mov     r23, r18                ; e = dyabs
+    lsr     r23                     ; e >>= 1
+    mov     r21, r18                ; loop counter = dyabs
+.LB_Vertical_Loop:
+    tst     r21                     ; counter positive?
+    brne    .+2                     ; if dyabs != 0, continue loop
+    ret                             ; if dyabs == 0, exit
+    add     r23, r20                ; e += dxabs
+    cp      r23, r18                ; if (e >= dyabs)
+    brlo    .LB_VerticalStepY       ; Branch if lower
+    sub     r23, r18                ; e -= dyabs
+    add     r30, r25                ; Z = Z + stepx
+    adc     r31, r24
+.LB_VerticalStepY:
+    ; Update bit mask and buffer pointer for y change
+    tst     r26                     ; check stepy sign
+    brmi    .LB_StepyNegative2      ; branch if minus
+    lsr     r27                     ; stepy = 1: shift mask RIGHT, if bit 0 was set, wrap to next row
+    brcc    .LB_VerticalSetPixel    ; Branch if no wrap
+    ldi     r27, 0x80               ; wrap to bit 7
+    subi    r30, -1                 ; move to next row
+    sbci    r31, -1                 ; Z = Z + 1
+    rjmp    .LB_VerticalSetPixel
+.LB_StepyNegative2:
+    ; stepy = -1: shift mask LEFT, if bit 7 was set, wrap to prev row
+    lsl     r27                     ; shift left
+    brcc    .LB_VerticalSetPixel    ; Branch if no wrap
+    ldi     r27, 0x01               ; wrap to bit 0
+    subi    r30, 1                  ; move to previous row
+    sbci    r31, 0                  ; Z = Z - 1
+.LB_VerticalSetPixel:
+    mov     r0, r27                 ; Copy mask to r0
+    las     Z, r0                   ; Set bits in buffer
+    dec     r21
+    rjmp    .LB_Vertical_Loop
 
 // Black background
 #else

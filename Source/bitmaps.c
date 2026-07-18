@@ -3,6 +3,7 @@
 #include "bitmaps.h"
 #include "hardware.h"
 
+#ifndef INVERT_DISPLAY
 // Gabotronics text
 const unsigned char Logo[] PROGMEM = {
     0x7E, 0xFF, 0x81, 0x89, 0x89, 0x8F, 0x06, 0x00,
@@ -15,6 +16,7 @@ const unsigned char Logo[] PROGMEM = {
     0xBF, 0x00, 0x1E, 0x3F, 0x21, 0x21, 0x21, 0x00,
     0x19, 0x3D, 0x2D, 0x2F, 0x26,
 };
+#endif
 
 // Sprites, each byte pair represents next pixel relative position
 const int8_t TrigDown[] PROGMEM = { 0,2,  1,0, 1,1,  1,2,  1,3,  2,2, 255  }; // Falling trigger

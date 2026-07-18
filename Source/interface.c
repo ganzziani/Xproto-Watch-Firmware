@@ -161,7 +161,7 @@ uint8_t ProcessCommand(uint8_t Command, uint8_t usb) {
     OFFGRN();   // In case the LED was on
     switch(Command) {
         case 'a':   // Send firmware version
-            p = (uint8_t *)(VERSION);
+            p = (uint8_t *)(VERSION+3);
 			for(;i<4;i++) ep0_buf_in[i]=pgm_read_byte(p++); // Read from the Version string
             n=4;
         break;

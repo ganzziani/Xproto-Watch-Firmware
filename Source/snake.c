@@ -38,10 +38,10 @@ void NewFruit(void) {
         if (T.SNAKE.Fruitx >= G1) T.SNAKE.Fruitx -= G1;
         T.SNAKE.Fruity += Sincrement;
         if (T.SNAKE.Fruity >= G2) T.SNAKE.Fruity -= G2;
-    } while ((T.SNAKE.Fruitx >=32) || (T.SNAKE.Fruity >= 32) ||   // Out of bounds
-      (T.SNAKE.board[T.SNAKE.Fruitx][T.SNAKE.Fruity]!=EMPTY)); // Occupied
-    T.SNAKE.board[T.SNAKE.Fruitx][T.SNAKE.Fruity] = FRUIT;       // New fruit position
-    if(TCC0.PER>250) TCC0.PERBUF=multfix(TCC0.PER, float2fix(0.9));   // Speed up
+    } while ((T.SNAKE.Fruitx >=32) || (T.SNAKE.Fruity >= 32) ||     // Out of bounds
+      (T.SNAKE.board[T.SNAKE.Fruitx][T.SNAKE.Fruity]!=EMPTY));      // Occupied
+    T.SNAKE.board[T.SNAKE.Fruitx][T.SNAKE.Fruity] = FRUIT;          // New fruit position
+    if(TCC0.PER>250) TCC0.PERBUF=multfix(TCC0.PER, float2fix(0.9)); // Speed up
     T.SNAKE.Fruit++;
 }
 

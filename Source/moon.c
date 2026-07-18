@@ -38,33 +38,28 @@ void Moon(void) {
 	clrbit(MStatus, goback);
     do {
         if(testbit(Misc,userinput)) {
-            uint8_t Phase = CalculateMoonPhase(&date);
+            
             timeout=255;
             clrbit(Misc, userinput);
             if(testbit(Buttons,KML)) setbit(MStatus, goback);
             if(testbit(Buttons,KUR) || testbit(Buttons,KUL)) AddDay(&date);
             if(testbit(Buttons,KBR) || testbit(Buttons,KBL)) SubDay(&date);
-            if(testbit(Buttons,K1)) { // Previous full moon
-                uint8_t Phase1;
-                Phase=0;
-                do {
-                    Phase1 = Phase;
-                    SubDay(&date);
-                    Phase = CalculateMoonPhase(&date);
-                } while(!(Phase1>118 && Phase<=118)); // While not Full moon
-                newday = 0; //redraw moon
-            }
             if(testbit(Buttons,K2)) { // Today
                 date.day = NowDay;
                 date.month = NowMonth;
                 date.year = NowYear;
             }                
-            if(testbit(Buttons,K3)) { // Next full moon
-                uint8_t Phase1;
-                Phase=255;
+            if(testbit(Buttons,K1) || testbit(Buttons,K3)) { // Next or Previous full moon
+                uint8_t Phase=0, Phase1;
+                setbit(MStatus, temp_bit);      // Subtract day
+                if(testbit(Buttons,K3)) {
+                    clrbit(MStatus, temp_bit);  // Add day
+                    Phase = 255;
+                }                
                 do {
                     Phase1 = Phase;
-                    AddDay(&date);
+                    if(testbit(MStatus, temp_bit)) SubDay(&date);
+                    else AddDay(&date);
                     Phase = CalculateMoonPhase(&date);
                 } while(!(Phase1<118 && Phase>=118)); // While not Full moon
                 newday = 0; //redraw moon
@@ -72,9 +67,6 @@ void Moon(void) {
         }
         if(newday!=date.day) {
             clr_display();
-            #ifdef INVERT_DISPLAY
-            setbit(Misc,negative);
-            #endif
             newday=date.day;
             uint8_t Phase = CalculateMoonPhase(&date);
 		    lcd_goto(34,0);
@@ -160,7 +152,11 @@ void Moon(void) {
                             }
                         }
                     }
+                    #ifdef INVERT_DISPLAY
+                    *p++ = ~output;     // Inverted display: lit surface = cleared bits (black ink)
+                    #else
                     *p++ = output;
+                    #endif
                 }
                 p += 18 - 8;   // Next line
                 if(!testbit(LCD_CTRL,LCD_CS)) dma_display();    // Send new data if previous transfer ended

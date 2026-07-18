@@ -84,14 +84,16 @@ void Diagnose(void) {
 }
 
 void About(void) {
-    Sound(TuneIntro);
     clr_display();
-    uint8_t *DisplayPointer = Disp_send.DataAddress -(30)*18 + (1);
-    SendBitsPData(DisplayPointer,Logo, 69);
-    lcd_goto(10,3);
+// INVERT_DISPLAY uses a little bit more flash, let's recover some of that flash here 
+#ifndef INVERT_DISPLAY
+    Sound(TuneIntro);
     print5x8(&STRS_mainmenu[1][0]);    // STRS_mainmenu[1][0] contains the word Oscilloscope
     print5x8(&STRS_mainmenu[0][3]);    // STRS_mainmenu[0][3] contains the word Watch
-    lcd_goto(1,15);
+    uint8_t *DisplayPointer = Disp_send.DataAddress -(30)*18 + (2);
+    SendBitsPData(DisplayPointer,Logo, 69);
+#endif
+    lcd_goto(21,15);
     print5x8(VERSION);
     print5x8(STR_Reset); printhex5x8(RST.STATUS);    // Show reset cause
     uint8_t timeout=120;
