@@ -1,7 +1,5 @@
 /*****************************************************************************
-
- Xmegalab / XMultiKit Chess application, ported from:
-
+ Chess application, ported from:
  ****************************************************************************
  *                               AVR-Max,                                   *
  * A chess program smaller than 2KB (of non-blank source), by H.G. Muller   *

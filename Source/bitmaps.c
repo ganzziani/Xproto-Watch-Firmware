@@ -309,13 +309,11 @@ const unsigned char Font5x8[] PROGMEM = {
     0x10, 0x92, 0x54, 0x38, 0x10,     // 0x81: ->
 };
 
-// Bitmaps generated with the Gabotronics Image to HEX converter using:
-// Data Orientation: Vertical
-// Scan Direction: Up to Down
-// Byte Order: LSB First
-// Include Size
-// Compress
-// AVR Progmem
+// Bitmaps generated with rle_bitmap_encoder.py (project root):
+//   python rle_bitmap_encoder.py image.png ArrayName
+// Format: width, height header, then column-major bytes (8 vertical pixels
+// per byte, MSB = top pixel), each column except the first XORed with the
+// previous column, then RLE compressed. Decoded by bitmap()/bitmap_safe().
 
 const unsigned char Digit0_22x48[] PROGMEM = { 22, 48,
     '\x3f','\xff','\xfc','\x7f','\xff','\xf8','\x00','\x00', // 0x0008

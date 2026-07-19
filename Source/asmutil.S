@@ -5,7 +5,6 @@
 .extern u8CursorX
 .extern u8CursorY
 
-// Other orientations, implement in the future if needed:
 // 0 degree orientation:
 // Disp_send.display_data[(uint16_t)(y<<4) + (x>>3)] |= (uint8_t)(0x80 >> (x & 0x07));
 // 90 degree orientation
