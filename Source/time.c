@@ -19,7 +19,6 @@ static void Stopwatch(void);
 static void CountDown(void);
 static void EditAlarms(void);
 static void FindNextAlarm(void);
-static void LoadAlarm(uint8_t i);
 uint8_t firstdayofmonth(Type_Time *timeptr);
 uint8_t DaysInMonth(Type_Time *timeptr);
 void BigPrintMonth(void);
@@ -42,7 +41,7 @@ Type_Time EEMEM EE_saved_time = {   // Last known time
     0,                          // wday     Day of week  [0-6]   Sunday is 0
 };
 
-Type_Alarm EEMEM EE_Alarms[] = {
+Type_Alarm EEMEM EE_Alarms[TOTAL_ALARMS] = {
     {  8,  0, 0, 0b01111111, 0 },  // 08:00am Everyday
     {  7, 45, 0, 0b00111110, 1 },  // 07:45am Weekdays
     { 14, 30, 0, 0b00111110, 4 },  // 02:00pm Weekdays
@@ -284,7 +283,7 @@ void Watch(void) {
             } else {
                 if(testbit(MStatus, sound_on)) {
                     uint8_t index = T.TIME.AlarmIndex;
-                    if((EE_Alarms[index].active & 0b01111111) == 0) {   // Check if this was a one-time only alarm (all active days are disabled)
+                    if((eeprom_read_byte(&EE_Alarms[index].active) & 0b01111111) == 0) {   // Check if this was a one-time only alarm (all active days are disabled)
                         eeprom_write_byte(&EE_Alarms[index].active, 0); // Clear active bit
                     }
                     FindNextAlarm();                // An alarm just finished, find next alarm
@@ -465,7 +464,9 @@ void ShowMoonIcon(uint8_t row, uint8_t col) {
 // Show bell character when alarm is armed, blinking when sound is playing
 static void ShowBellIcon(void) {
     if(testbit(MStatus,alarm_on) &&
-       (NowSecond&0x01 || !testbit(MStatus, sound_on))) putchar5x8(CHAR_BELL);
+       (NowSecond&0x01 || !testbit(MStatus, sound_on))) {
+           putchar5x8(CHAR_BELL);
+   }           
     else putchar5x8(' ');
 }
 
@@ -817,7 +818,7 @@ void EditAlarms(void) {
             clrbit(Misc, redraw);
             clr_display();
             lcd_goto(4,15); print5x8(PSTR("<-      Next      ->"));
-            for(uint8_t i=0, j=0; i<TOTAL_ALARMS-1; i++, j+=4) {    // Print all alarms
+            for(uint8_t i=0, j=0; i<TOTAL_ALARMS-1; i++, j+=4) {    // Print all alarms (minus countdown alarm)
                 lcd_goto(4,j); print5x8(PSTR("Alarm ")); putchar5x8('1'+i); putchar5x8(':');
                 if(Alarms[i].active & 0x80) fillRectangle(2, i*32, 45,6+(i)*32,PIXEL_TGL);
                 setbit(MStatus, alarm_on);
@@ -882,6 +883,9 @@ void EditAlarms(void) {
 // Finds the next alarm within 24 hours by converting each candidate to
 // "minutes from now" (0–1440) and picking the minimum.
 void FindNextAlarm(void) {
+    Type_Alarm Alarms[TOTAL_ALARMS];
+    eeprom_read_block(&Alarms, &EE_Alarms, TOTAL_ALARMS*sizeof(Type_Alarm));
+
     uint8_t Tomorrow = NowWeekDay + 1;
     if(Tomorrow >= 7) Tomorrow = 0;
     uint8_t Todaybit    = 0x40 >> NowWeekDay;
@@ -895,9 +899,9 @@ void FindNextAlarm(void) {
     setbit(WatchBits, hourChanged);
 
     for(uint8_t i = 0; i < TOTAL_ALARMS; i++) {
-        if(!(EE_Alarms[i].active & 0x80)) continue;
+        if(!(Alarms[i].active & 0x80)) continue;
 
-        uint16_t alarmMin = (uint16_t)EE_Alarms[i].hour * 60 + EE_Alarms[i].minute;
+        uint16_t alarmMin = (uint16_t)Alarms[i].hour * 60 + Alarms[i].minute;
 
         // Minutes from now (handles day wrap: if alarm < now, it's tomorrow)
         uint16_t delta = (alarmMin >= nowMin)
@@ -905,29 +909,25 @@ void FindNextAlarm(void) {
                         : (1440 - nowMin + alarmMin);   // Tomorrow (wraps midnight)
 
         // Check if this alarm is active for today
-        if((EE_Alarms[i].active & Todaybit) && delta < bestDelta) {
+        if((Alarms[i].active & Todaybit) && delta < bestDelta) {
             bestDelta = delta;
             bestIdx   = i;
         }
         // Check if this alarm is active for tomorrow (only valid when alarmMin < nowMin)
-        if((EE_Alarms[i].active & Tomorrowbit) && alarmMin < nowMin && delta < bestDelta) {
+        if((Alarms[i].active & Tomorrowbit) && alarmMin < nowMin && delta < bestDelta) {
             bestDelta = delta;
             bestIdx   = i;
         }
     }
 
-    if(bestIdx != 0xFF) {
+    if(bestIdx != 0xFF) {                       // Load the next alarm to fire
         setbit(MStatus, alarm_on);
-        LoadAlarm(bestIdx);
+        AlarmHour          = Alarms[bestIdx].hour;
+        AlarmMinute        = Alarms[bestIdx].minute;
+        T.TIME.AlarmSecond = Alarms[bestIdx].second;
+        T.TIME.AlarmTune   = Alarms[bestIdx].tune;
+        T.TIME.AlarmIndex  = bestIdx;
     }
-}
-
-void LoadAlarm(uint8_t i) {
-    AlarmHour   = EE_Alarms[i].hour;
-    AlarmMinute = EE_Alarms[i].minute;
-    T.TIME.AlarmSecond = EE_Alarms[i].second;
-    T.TIME.AlarmTune = EE_Alarms[i].tune;
-    T.TIME.AlarmIndex = i;
 }
 
 void Calendar(void) {

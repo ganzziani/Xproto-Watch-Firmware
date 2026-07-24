@@ -93,16 +93,18 @@ void About(void) {
     print5x8(&STRS_mainmenu[0][3]);    // STRS_mainmenu[0][3] contains the word Watch
     uint8_t *DisplayPointer = Disp_send.DataAddress -(30)*18 + (1);
     SendBitsPData(DisplayPointer,Logo, 69);
-#endif
     lcd_goto(21,15);
+#endif
     print5x8(VERSION);
     print5x8(STR_Reset); printhex5x8(RST.STATUS);    // Show reset cause
     uint8_t timeout=120;
     do {
         ANALOG_ON();        // Turn on analog circuits to be ready to read Vref
+#ifndef INVERT_DISPLAY
         GetTimeTimer();     // Sync variables from TCF0
         PrintDate(34,6,0);
         PrintTime(34,7);
+#endif        
         dma_display();
         WaitDisplay();
         int16_t Vref = MeasureIntV(MEASURE_VREF);
