@@ -267,7 +267,7 @@ const char Prev[] PROGMEM = {  // Previous Menu
     MCH1,       // MCH1OPT 1 Channel 1
     MCH2,       // MCH2OPT 2 Channel 2
     MCHD,       // MCHDOPT1 3 Logic
-    Mdefault,      // MMAIN1 Menu Select 1 - Channel
+    Mdefault,   // MMAIN1 Menu Select 1 - Channel
     MMAIN1,     // MMAIN2 Menu Select 2 - Trigger
     MMAIN2,     // MMAIN3 Menu Select 3 - Mode
     MMAIN3,     // MMAIN4 Menu Select 4 - FFT
@@ -2452,9 +2452,9 @@ checknext:
                         }
                         else if(testbit(Trigger, slope)) {
                             uint8_t trigy;
-                            trigy=M.Tlevel>>2;
+                            trigy=M.Tlevel>>1;
                             set_line(trigpos,trigy,trigpos+2,trigy);
-                            trigy=(uint8_t)(-M.Tlevel)>>2;
+                            trigy=(uint8_t)(-M.Tlevel)>>1;
                             set_line(trigpos,trigy,trigpos+2,trigy);
                         }
                         else if(testbit(Trigger, edge)) {
