@@ -1,7 +1,7 @@
 #include <avr/pgmspace.h>
 #include "main.h"
 
-const char VERSION[]    PROGMEM = "FW 2.95";
+const char VERSION[]    PROGMEM = "FW 2.96";
 
 // Strings with special characters:
 // 0x1F = delta

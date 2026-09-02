@@ -50,18 +50,16 @@ void Moon(void) {
                 date.year = NowYear;
             }                
             if(testbit(Buttons,K1) || testbit(Buttons,K3)) { // Next or Previous full moon
-                uint8_t Phase=0, Phase1;
+                uint8_t Phase, Phase1;
                 setbit(MStatus, temp_bit);      // Subtract day
-                if(testbit(Buttons,K3)) {
-                    clrbit(MStatus, temp_bit);  // Add day
-                    Phase = 255;
-                }                
+                if(testbit(Buttons,K3)) clrbit(MStatus, temp_bit);  // Add day
+                Phase = CalculateMoonPhase(&date);
                 do {
                     Phase1 = Phase;
                     if(testbit(MStatus, temp_bit)) SubDay(&date);
                     else AddDay(&date);
                     Phase = CalculateMoonPhase(&date);
-                } while(!(Phase1<118 && Phase>=118)); // While not Full moon
+                } while(!(testbit(MStatus, temp_bit) ? (Phase1>=118 && Phase<118) : (Phase1<118 && Phase>=118))); // While not Full moon
                 newday = 0; //redraw moon
             }
         }
@@ -85,70 +83,61 @@ void Moon(void) {
             uint8_t const *b = MoonBMP;
             uint8_t data;
             uint8_t *p = &Disp_send.DataAddress[(uint16_t)((-96)*18)+4];
-            for (int8_t x = -32; x < 32; x++) {
+            for (int8_t x = -31; x < 32; x++) {
                 for (uint8_t row = 0; row < 8; row++) {
                     data = pgm_read_byte(b++);
                     uint8_t output = 0;
-        
-                    for (uint8_t bit = 0; bit < 8; bit++) {
-                        int8_t y = (row * 8) + bit - 32;  // y coordinate relative to moon center
+                    if (Phase == 118) {      // Full moon: use texture as-is
+                        output = data;
+                    } else if (Phase != 0) { // Shaded phases (New moon stays black)
+                        for (uint8_t bit = 0; bit < 8; bit++) {
+                            int8_t y = (row * 8) + bit - 31;  // y coordinate relative to moon center
             
-                        if (data & (0x80 >> bit)) {
-                            // Pixel is part of the moon circle
-                            uint8_t lit = 0;
-                
-                            // Calculate distance from center
-                            int16_t r_squared = (int16_t)x * x + (int16_t)y * y;
-                
-                            if (r_squared <= 1024) {  // Within moon circle (32^2 = 1024)
-                                if (Phase == 118) {
-                                    lit = 1;  // Full moon
-                                } else if (Phase == 0) {
-                                    lit = 0;  // New moon
+                            if (data & (0x80 >> bit)) {
+                                // Pixel is part of the moon circle
+                                uint8_t lit = 0;
+                                uint8_t phase_dist;
+                                uint8_t waxing;
+                    
+                                if (Phase < 118) {
+                                    phase_dist = 118 - Phase;  // Waxing: 0-30 (0=full, 30=new)
+                                    waxing = 0;
                                 } else {
-                                    uint8_t phase_dist;
-                                    uint8_t waxing;
-                        
-                                    if (Phase < 118) {
-                                        phase_dist = 118 - Phase;  // Waxing: 0-30 (0=full, 30=new)
-                                        waxing = 0;
-                                    } else {
-                                        phase_dist = Phase - 118;   // Waning: 0-30 (0=full, 30=new)
-                                        waxing = 1;
-                                    }
-                        
-                                    int8_t shadow_x = Cosine60(phase_dist>>2, 32);  // Calculate terminator scale
-
-                                    // Calculate ellipse_x for this y-coordinate
-                                    int8_t ellipse_x;
-                                    if (shadow_x == 0) {
-                                        ellipse_x = 0;
-                                    } else {
-                                        // ellipse_x_squared = (1024-y^2) * x^2 / 1024
-                                        int16_t y2 = (int16_t)y * y;                  // 0..1024
-                                        int16_t sx2 = (int16_t)shadow_x * shadow_x;   // 0..1024
-                                        int16_t ellipse_x_squared = sx2 - (((uint32_t)y2 * sx2) >> 10);
-                                        ellipse_x = isqrt16(ellipse_x_squared);
-                                    }
-
-                                    // Calculate terminator_position based on shadow_x sign
-                                    int8_t terminator_position = 0;
-                                    if (shadow_x > 0) {
-                                        terminator_position = ellipse_x;        // Positive: right side
-                                    } else if (shadow_x < 0) {
-                                        terminator_position = -ellipse_x;       // Negative: left side
-                                    }
-
-                                    // Apply lighting condition based on phase direction
-                                    if (waxing) {
-                                        lit = (x >= -terminator_position);    // Waxing: right-side lit
-                                    } else {
-                                        lit = (x <= terminator_position);     // Waning: left-side lit
-                                    }
+                                    phase_dist = Phase - 118;   // Waning: 0-30 (0=full, 30=new)
+                                    waxing = 1;
                                 }
-                            }
-                            if (lit) {
-                                output |= (0x80 >> bit);
+                    
+                                int8_t shadow_x = Cosine60(phase_dist>>2, 32);  // Calculate terminator scale
+
+                                // Calculate ellipse_x for this y-coordinate
+                                int8_t ellipse_x;
+                                if (shadow_x == 0) {
+                                    ellipse_x = 0;
+                                } else {
+                                    // ellipse_x_squared = (1024-y^2) * x^2 / 1024
+                                    int16_t y2 = (int16_t)y * y;                  // 0..1024
+                                    int16_t sx2 = (int16_t)shadow_x * shadow_x;   // 0..1024
+                                    int16_t ellipse_x_squared = sx2 - (((uint32_t)y2 * sx2) >> 10);
+                                    ellipse_x = isqrt16(ellipse_x_squared);
+                                }
+
+                                // Calculate terminator_position based on shadow_x sign
+                                int8_t terminator_position = 0;
+                                if (shadow_x > 0) {
+                                    terminator_position = ellipse_x;        // Positive: right side
+                                } else if (shadow_x < 0) {
+                                    terminator_position = -ellipse_x;       // Negative: left side
+                                }
+
+                                // Apply lighting condition based on phase direction
+                                if (waxing) {
+                                    lit = (x >= -terminator_position);    // Waxing: right-side lit
+                                } else {
+                                    lit = (x <= terminator_position);     // Waning: left-side lit
+                                }
+                                if (lit) {
+                                    output |= (0x80 >> bit);
+                                }
                             }
                         }
                     }
