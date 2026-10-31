@@ -697,6 +697,30 @@ display_or:                         ; Set bits on display buffer
     las     z, r24                  ; Set bits in display data
     ret
 
+; Grid vertical dots: same as set_pixel(x,16), set_pixel(x,32), ... set_pixel(x,112)
+; Rows 16, 32, ... 112 are bit 7 (0x80) of bytes 2, 4, ... 14 of line x
+.global vertical_dots               ; void vertical_dots(uint8_t x);
+vertical_dots:
+    lds     r30, Disp_send+2        ; r31:r30 = Buffer address + 127*18
+    lds     r31, Disp_send+3
+    ldi     r25, 18                 ; r25 = 18
+    mul     r24, r25                ; r1:r0 = x*18
+    sub     r30, r0                 ; r31:r30 = addr + 127*18 - x*18
+    sbc     r31, r1
+    clr     r1                      ; r1 = 0 gcc needs r1 cleared
+    ldi     r25, 7                  ; 7 dots
+0:
+    adiw    r30, 2                  ; Move 16 pixels down (2 bytes)
+    ldi     r24, 0x80               ; Reload mask (las/lac overwrite it)
+#ifdef INVERT_DISPLAY
+    lac     z, r24                  ; Clear bits in display data
+#else
+    las     z, r24                  ; Set bits in display data
+#endif
+    dec     r25
+    brne    0b
+    ret
+
 ; void set_line_buffer(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t *p);
 ; Parameters: r24=x1, r22=y1, r20=x2, r18=y2, r26:r27=p (X register, lo:hi)
 ; Note: pointer passed in r25:r24... but r24 is x1.

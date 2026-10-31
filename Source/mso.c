@@ -457,6 +457,7 @@ void MSO(void) {
             SaveEE();
             Sniff();
             Apply();    // Recover settings, particularly PORTC.PIN7CTRL
+            SaveEE();   // Remember that we are now out of sniffer mode
         }
         if(testbit(Misc,keyrep)) {  // Repeat key or long press
             if(testbit(Buttons,K1) && testbit(MStatus,stop)) AutoSet();     // Long press KA -> Autoset
@@ -846,13 +847,12 @@ void MSO(void) {
                                     chdpostext=chdpos>>3;
                                     lcd_goto(0,chdpostext);
                                     putchar3x6('0'+bitn);     // Channel number
-                                    if(M.Tsource-2==bitn && chdtrigpos<126) {     // Current bit is trigger source
-                                        if(testbit(Trigger, normal) || testbit(Trigger, autotrg)) {
-                                            lcd_goto(chdtrigpos,chdpostext);
-                                            if(testbit(Trigger, trigdir)) putchar3x6(0x19);
-                                            else putchar3x6(0x18);
-                                        }
-                                    }                                    
+                                    if((testbit(Trigger, normal) || testbit(Trigger, autotrg)) &&
+                                       M.Tsource-2==bitn && chdtrigpos<126) { // Current bit is trigger source
+                                        lcd_goto(chdtrigpos,chdpostext);
+                                        if(testbit(Trigger, trigdir)) putchar3x6(0x19);
+                                        else putchar3x6(0x18);
+                                    }
                                 }
                                 if(chddata&bitpos) set_pixel(i, chdpos);
                                 else {
@@ -940,16 +940,7 @@ void MSO(void) {
                 }
                 if(testbit(MFFT,iqfft)) {   // Display new FFT data
                     if(Display&0x03) {              // Grid
-                        // Set dots at: (64,16), (64,32), (64,48), (64,64), (64,80), (64,96), (64,112)
-                        uint8_t *p=Disp_send.DataAddress-(M.HPos*18)+(16/8);  // Locate pointer at (64,16)
-                        for(uint8_t i=7; i; i--) {
-                            #ifdef INVERT_DISPLAY
-                            *p&=~0x80;  // AND one pixel
-                            #else
-                            *p|=0x80;   // OR one pixel
-                            #endif
-                            p+=2;       // Move 2 bars below
-                        }
+                        vertical_dots(M.HPos);      // Vertical dots at 16, 32, ... 112
 			        }
                     fft_stuff(NULL);
                     for(uint8_t i=0; i<FFT_N/2; i++) {
@@ -2294,17 +2285,7 @@ checknext:
                 }
                 switch(Display&0x03) {
                     case 1: // Vertical dots
-                        {   // Set dots at: (64,16), (64,32), (64,48), (64,64), (64,80), (64,96), (64,112)
-                            uint8_t *p=Disp_send.DataAddress-(64*18)+(16/8);  // Locate pointer at (64,16)
-                            for(uint8_t i=7; i; i--) {
-                                #ifdef INVERT_DISPLAY
-                                *p&=~0x80;  // AND one pixel
-                                #else
-                                *p|=0x80;   // OR one pixel
-                                #endif
-                                p+=2;       // Move 2 bars below
-                            }
-                        }
+                        vertical_dots(64);
                     case 2:
                         for(uint8_t i=16; i<=112; i+=16) {
                             if(testbit(CH1ctrl,chon)) set_pixel(i,ch1gnd);          // CH1 ground
@@ -2425,16 +2406,7 @@ checknext:
                     chdtrigpos=trigpos;
                     if(trigpos<126 && M.Tsource<=1) {
                         if((Display&0x03)==2) {     // Grid Vertical dots follow trigger
-                            // Set dots at: (64,16), (64,32), (64,48), (64,64), (64,80), (64,96), (64,112)
-                            uint8_t *p=Disp_send.DataAddress-(trigpos*18)+(16/8);  // Locate pointer at (64,16)
-                            for(uint8_t i=7; i; i--) {
-                                #ifdef INVERT_DISPLAY
-                                *p&=~0x80;  // AND one pixel
-                                #else
-                                *p|=0x80;   // OR one pixel
-                                #endif
-                                p+=2;       // Move 2 bars below
-                            }
+                            vertical_dots(trigpos);
                         }
                         if(testbit(Trigger, window)) {
                             if(trig1<=(DISPLAY_MAX_Y-3) && testbit(Misc, bigfont)) { // up
@@ -2518,7 +2490,7 @@ void AutoSet(void) {
     clrbit(Trigger, normal);    // Clear Normal trigger
     clrbit(Trigger, single);    // Clear Single trigger
     clrbit(Trigger, autotrg);   // Clear Auto trigger
-    T.SCOPE.adjusting=7;                // First adjusting step
+    T.SCOPE.adjusting=7;        // First adjusting step
     Menu=Mdefault;
     Buttons=0;
 }
@@ -2556,40 +2528,43 @@ void GoingtoMeter(void) {
 }
 
 uint8_t fft_stuff(uint8_t *p) {
-	const int8_t *windowp;                              // Pointer to window table
+    const int8_t *windowp;                              // Pointer to window table
     if(testbit(MFFT, hamming)) windowp=Hamming;         // Apply Hamming window
     else if(testbit(MFFT, hann)) windowp=Hann;          // Apply Hann window
     else if(testbit(MFFT, blackman)) windowp=Blackman;  // Apply Blackman window
-	else setbit(Misc, bigfont);		// Temporally use this bit for "no window"
-	if(testbit(MFFT,iqfft)) {
+    else {
+        windowp=Blackman;           // Assign valid pointer (at no flash cost)
+        setbit(Misc, bigfont);		// Temporally use this bit for "no window"
+    }
+    if(testbit(MFFT,iqfft)) {
         const uint8_t *p1 = T.SCOPE.DC.CH1data;             // Pointer to ch1 data
         const uint8_t *p2 = T.SCOPE.DC.CH2data;		        // Pointer to ch2 data
         uint8_t i=0;
         do {
             uint8_t ch1,ch2;
-		    uint8_t w=pgm_read_byte_near(windowp);  // Get window data
+            uint8_t w=pgm_read_byte_near(windowp);  // Get window data
 		    if(testbit(Misc,bigfont)) w=127;        // No window
 		    if(i<127) windowp++;                    // Window symmetry
-		    if(i>127) windowp--;                    // (only stored half of window)
+            if(i>127) windowp--;                    // (only stored half of window)
             ch1=(int8_t)((*p1++)-128);              // Convert to signed char
             ch2=(int8_t)((*p2++)-128);              // Convert to signed char
             T.SCOPE.FFT.bfly[i].r=FMULS(ch1, w);
 		    T.SCOPE.FFT.bfly[i].i=FMULS(ch2, w);
         } while (++i);
-	}
-	else {
+    }
+    else {
         uint8_t i=0;
         do {
             uint8_t ch;
-		    uint8_t w=pgm_read_byte_near(windowp);  // Get window data
+            uint8_t w=pgm_read_byte_near(windowp);  // Get window data
 		    if(testbit(Misc,bigfont)) w=127;        // No window
 		    if(i<127) windowp++;                    // Window symmetry
 		    if(i>127) windowp--;                    // (only stored half of window)
             ch=(int8_t)((*p++)-128);                // Convert to signed char
             T.SCOPE.FFT.bfly[i].r=T.SCOPE.FFT.bfly[i].i=(signed int)(FMULS8(ch, w)*256);
         } while (++i);
-	}
-	clrbit(Misc,bigfont);
+    }
+    clrbit(Misc,bigfont);
     fft_execute(T.SCOPE.FFT.bfly);
     fft_output(T.SCOPE.FFT.bfly, T.SCOPE.FFT.magn);
     // Find maximum frequency
@@ -2610,8 +2585,10 @@ uint8_t fft_stuff(uint8_t *p) {
 // Automatically set vertical cursors
 void AutoCursorV(void) {
     uint8_t mid, *p, samples;
+    uint8_t hpos = M.HPos;
     if(Srate>=11) { // Slow sampling rates (below 50mS/div) use 2 samples per vertical line
         samples = 255;
+        hpos = 0;
     }
     else samples = 127;
     if(testbit(MFFT, fftmode)) {
@@ -2626,15 +2603,16 @@ void AutoCursorV(void) {
         // Decide which channel to use for vertical cursors
         if((testbit(CH1ctrl,chon) && !testbit(CH2ctrl,chon)) ||               // CH2 off, use CH1
         (testbit(CH1ctrl,chon) && (T.SCOPE.CH1.vpp > T.SCOPE.CH2.vpp)) ) { // CH1 has more amplitude
-            p = T.SCOPE.DC.CH1data+M.HPos;
+            p = T.SCOPE.DC.CH1data;
             mid = T.SCOPE.CH1.min + T.SCOPE.CH1.vpp/2;
             if(T.SCOPE.CH1.vpp<8) goto end_scan;    // Signal too small
         }
         else {                              // Use CH2
-            p = T.SCOPE.DC.CH2data+M.HPos;
+            p = T.SCOPE.DC.CH2data;
             mid = T.SCOPE.CH2.min + T.SCOPE.CH2.vpp/2;
             if(T.SCOPE.CH2.vpp<8) goto end_scan;    // Signal too small
         }
+        p += hpos;                  // fast sampling starts at HPos; slow mode starts at the buffer base
         uint8_t i=0;
         if(p[0]<mid) {
             // Find first cross
@@ -2660,7 +2638,7 @@ void AutoCursorV(void) {
         }
     }
 end_scan:
-    if(Srate>=11) { // Slow sampling rates (below 50mS/div) use 2 samples per vertical line
+    if(samples==255) { // Slow sampling rates (below 50mS/div) use 2 samples per vertical line
         M.VcursorA=M.VcursorA>>1;
         M.VcursorB=M.VcursorB>>1;
     }
@@ -2795,7 +2773,7 @@ cancelvdc:
 cancelfreq:
         // End
         if(!testbit(MStatus,vdc)) {
-            T.SCOPE.adjusting=7;                // First adjusting step
+            T.SCOPE.adjusting=7;        // First adjusting step
             setbit(MStatus, updatemso); // Frequency measure mode, reset MSO
         }
     }
@@ -2877,8 +2855,15 @@ static inline void ShowCursorH(void) {
 		HcursorA<<=1;
 		HcursorB<<=1;
 		if(testbit(Mcursors,track)) {
-   			HcursorA=data[M.VcursorA+M.HPos];
-    		HcursorB=data[M.VcursorB+M.HPos];
+                if(Srate>=11) {
+                    uint8_t ring = testbit(Mcursors,roll) ? (Index&0xFE)+1 : 0;
+                    HcursorA=data[(uint8_t)(ring + (M.VcursorA<<1))];
+                    HcursorB=data[(uint8_t)(ring + (M.VcursorB<<1))];
+                }
+                else {
+                    HcursorA=data[M.VcursorA+M.HPos];
+                    HcursorB=data[M.VcursorB+M.HPos];
+                }
 		}
 		else if(testbit(Mcursors,autocur)) {
             HcursorA=CH->max;
@@ -3252,12 +3237,12 @@ static void SetupDMACh(DMA_CH_t *ch, uint8_t trigsrc, volatile void *src, volati
 }
 
 void StartDMAs(void) {
-    SetupDMACh(&DMA.CH0, 0x10, &ADCA.CH0.RESL, T.SCOPE.TempCH1); // ADC CH0 → CH1 buf
+    SetupDMACh(&DMA.CH0, 0x10, &ADCA.CH0.RESL, T.SCOPE.TempCH1); // ADC CH0 -> CH1 buf
     if(testbit(CHDctrl,digchon)) {
         WaitDisplay();                          // Let display finish using DMA
-        SetupDMACh(&DMA.CH2, 0x10, &VPORT2.IN, T.SCOPE.TempCHD); // logic → CHD buf
+        SetupDMACh(&DMA.CH2, 0x10, &VPORT2.IN, T.SCOPE.TempCHD); // Logic -> CHD buf
     }
-    SetupDMACh(&DMA.CH1, 0x10, &ADCB.CH0.RESL, T.SCOPE.TempCH2); // ADC CH1 → CH2 buf (ADCB trigger has a bug, use 0x10)
+    SetupDMACh(&DMA.CH1, 0x10, &ADCB.CH0.RESL, T.SCOPE.TempCH2); // ADC CH1 -> CH2 buf (ADCB trigger has a bug, use 0x10)
     // Start DMAs
     if(testbit(CHDctrl,digchon)) setbit(DMA.CH2.CTRLA, 7);
     setbit(DMA.CH0.CTRLA, 7);           

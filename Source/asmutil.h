@@ -8,6 +8,7 @@
 // void    toggle_line_buffer(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t *p);
 void    set_pixel_buffer(uint8_t x, uint8_t y, uint8_t *p);
 void    set_pixel(uint8_t x, uint8_t y);
+void    vertical_dots(uint8_t x);            // Dots at (x,16), (x,32), ... (x,112)
 void    clr_pixel(uint8_t x, uint8_t y);
 void    clr_pixel_buffer(uint8_t x, uint8_t y, uint8_t *p);
 uint8_t get_pixel(uint8_t x, uint8_t y);

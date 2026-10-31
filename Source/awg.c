@@ -7,11 +7,14 @@
 uint8_t AWGBuffer[BUFFER_AWG]; // AWG Output Buffer
 uint8_t cycles;         // Cycles in AWG buffer
 
+// Move or shortcut the AWG frequency.
+// M.AWGdesiredF==0 is not guarded in moveF: the search ends with i=0, so add=1 and the decrement wraps
+// to 0xFFFFFFFF. BuildWave() repairs 0 back to 1 (0.01Hz) and CheckMax() clamps the wrapped value.
 void moveF(void) {
     uint8_t i=6;        // Start checking at 10KHz
 	do {                // Find frequency range
         if(M.AWGdesiredF>=pgm_read_dword_near(Powersof10+i)) break;
-    } while(i--);
+    } while(i-- >1);
     uint16_t add;
     if(i>=2) add=pgm_read_dword_near(Powersof10+i-2);
     else add=1;
