@@ -23,7 +23,7 @@
     Events:
 	    CH0 TCE1 overflow used for ADC
 	    CH1 ADCA CH0 conversion complete
-        CH2 Input pin for frequency measuring
+        CH2 Input pin for frequency measuring / PC3 edges for UART sniffer
         CH3 TCD1 overflow used for DAC
         CH4 RTC overflow -> every 1 sec. Used for Time and freq. measuring
         CH5 TCE0 overflow used for freq. measuring
@@ -52,7 +52,7 @@
         TCE1:           High        Slow Sampling
         PORTC_INT1      High        SPI sniffer
         PORTC INT0      High        I2C sniffer
-        TCC1            High        UART sniffer
+        TCC1 CCA        High        UART sniffer
         USB BUSEVENT    Medium      USB Bus Event
         USB_TRNCOMPL    Medium      USB Transaction Complete
         PORTA INT0:     Medium      keys
