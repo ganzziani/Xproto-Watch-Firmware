@@ -2561,7 +2561,8 @@ uint8_t fft_stuff(uint8_t *p) {
 		    if(i<127) windowp++;                    // Window symmetry
 		    if(i>127) windowp--;                    // (only stored half of window)
             ch=(int8_t)((*p++)-128);                // Convert to signed char
-            T.SCOPE.FFT.bfly[i].r=T.SCOPE.FFT.bfly[i].i=(signed int)(FMULS8(ch, w)*256);
+            T.SCOPE.FFT.bfly[i].r=(signed int)(FMULS8(ch, w)*256);
+            T.SCOPE.FFT.bfly[i].i=0;                // Real input only
         } while (++i);
     }
     clrbit(Misc,bigfont);
