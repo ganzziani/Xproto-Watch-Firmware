@@ -2856,15 +2856,15 @@ static inline void ShowCursorH(void) {
 		HcursorA<<=1;
 		HcursorB<<=1;
 		if(testbit(Mcursors,track)) {
-                if(Srate>=11) {
-                    uint8_t ring = testbit(Mcursors,roll) ? (Index&0xFE)+1 : 0;
-                    HcursorA=data[(uint8_t)(ring + (M.VcursorA<<1))];
-                    HcursorB=data[(uint8_t)(ring + (M.VcursorB<<1))];
-                }
-                else {
-                    HcursorA=data[M.VcursorA+M.HPos];
-                    HcursorB=data[M.VcursorB+M.HPos];
-                }
+            if(Srate>=11) {
+                uint8_t ring = testbit(Mcursors,roll) ? (Index&0xFE)+1 : 0;
+                HcursorA=data[(uint8_t)(ring + (M.VcursorA<<1))];
+                HcursorB=data[(uint8_t)(ring + (M.VcursorB<<1))];
+            }
+            else {
+                HcursorA=data[M.VcursorA+M.HPos];
+                HcursorB=data[M.VcursorB+M.HPos];
+            }
 		}
 		else if(testbit(Mcursors,autocur)) {
             HcursorA=CH->max;
@@ -2923,11 +2923,11 @@ static inline void ShowCursorH(void) {
 }
 
 // Check variables
-extern const NVMVAR MAXM;
+extern const uint8_t MAXM[];
 void CheckMax(void) {
     uint8_t *p=&M.CH1gain;
-    for(uint8_t i=0; i<sizeof(NVMVAR); i++) {
-        uint8_t max=pgm_read_byte(&MAXM.CH1gain+i);
+    for(uint8_t i=0; i<offsetof(NVMVAR, AWGdesiredF); i++) {   // AWGdesiredF is checked in BuildWave()
+        uint8_t max=pgm_read_byte(&MAXM[i]);
         if(*p>=max) *p=max;
         p++;
     }

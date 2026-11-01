@@ -185,6 +185,7 @@ uint8_t ProcessCommand(uint8_t Command, uint8_t usb) {
                 setbit(MStatus, updatemso);		// Settings are changing
             }
             if(index>=36) setbit(MStatus, updateawg);
+            if(index==8) T.SCOPE.adjusting=0;   // Mode change: cancel auto setup (as RestorefromMeter does)
             if(index<12) p=(uint8_t *)index;	    // Accessing GPIO
             else {
                 index-=12;

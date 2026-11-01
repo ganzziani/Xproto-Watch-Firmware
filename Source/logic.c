@@ -235,6 +235,7 @@ void Sniff(void) {
 ////////////////////////////////////////////////////////////////////////////////////
 // DISPLAY
 ////////////////////////////////////////////////////////////////////////////////////
+    uint8_t stopped=0;              // MSO() cleared MStatus.stop before calling Sniff()
     do {
         clr_display();
         OFFGRN();
@@ -339,31 +340,33 @@ void Sniff(void) {
         if(testbit(Misc, userinput)) {
             clrbit(Misc, userinput);
             if (testbit(Buttons,K2) && testbit(Buttons,K3)) togglebit(CHDctrl,ascii);
-            if (testbit(Buttons,K1)) {
-                togglebit(MStatus, stop);
-                if(testbit(MStatus, stop)) {    // Stop sniffer
-                    USARTC0.CTRLB = 0x00;       // Disable RX
-                    clrbit(SPIC.CTRL,6);        // Disable SPI
-                    if(M.CHDdecode==i2c) PORTC.INTCTRL = 0x00;   // Disable PORTC interrupts
-                }
-                else {                          // Restart Sniffer
-                    if(M.CHDdecode==i2c) {
-                        PORTC.INTCTRL   = 0x03;     // Enable PortC INT 0, High Priority
-                    }
-                    else if(M.CHDdecode==rs232) {
-                        USARTC0.CTRLB = 0x10;       // Enable RX
-                    }
-                    else if(M.CHDdecode==spi) {
-                        setbit(SPIC.CTRL,6);        // Enable SPI
-                    }
-                    if(testbit(Mcursors, singlesniff)) {
-                        ConfigLogicDMA();
-                    }
-                }
-            }
+            if (testbit(Buttons,K1)) togglebit(MStatus, stop);
             if (testbit(Buttons,K2)) if(page)    page--;
             if (testbit(Buttons,K3)) if(page<15) page++;
             if (testbit(Buttons,KML)) clrbit(MStatus,gosniffer);  // Exit sniffer
+        }
+        // Act on any change of MStatus.stop: K1, 'f'/'g' from USB or UART, single sniff complete
+        if((MStatus ^ stopped) & _BV(stop)) {
+            stopped ^= _BV(stop);
+            if(stopped) {                   // Stop sniffer
+                USARTC0.CTRLB = 0x00;       // Disable RX
+                clrbit(SPIC.CTRL,6);        // Disable SPI
+                if(M.CHDdecode==i2c) PORTC.INTCTRL = 0x00;   // Disable PORTC interrupts
+            }
+            else {                          // Restart Sniffer
+                if(M.CHDdecode==i2c) {
+                    PORTC.INTCTRL   = 0x03;     // Enable PortC INT 0, High Priority
+                }
+                else if(M.CHDdecode==rs232) {
+                    USARTC0.CTRLB = 0x10;       // Enable RX
+                }
+                else if(M.CHDdecode==spi) {
+                    setbit(SPIC.CTRL,6);        // Enable SPI
+                }
+                if(testbit(Mcursors, singlesniff)) {
+                    ConfigLogicDMA();
+                }
+            }
         }
     } while (testbit(MStatus,gosniffer));
 exitSniffer:
@@ -586,6 +589,9 @@ ISR(TCC1_CCA_vect) {
 
     // Start Bit: low in the middle of a bit
     if(testbit(VPORT2.IN, 3)) return;
+    // A start edge right after the compare (during the interrupt entry) also restarted TCC1:
+    // this is the beginning of the start bit, wait for its middle (CCA >= 138 at 115200)
+    if(TCC1.CNT < 128) return;
 
     // Data bits
     for(i=0; i<T.LOGIC.databits; i++) {
