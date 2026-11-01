@@ -12,6 +12,7 @@
 #include "usb_xmega.h"
 #include "..\mso.h"
 #include "..\interface.h"
+#include "Descriptors.h"
 
 // Volatile?
 uint8_t ep0_buf_in[USB_EP0SIZE];
@@ -81,8 +82,8 @@ static inline void USB_handleGetDescriptor(USB_Request_Header_t* req) {
 		if (DescriptorSize > req->wLength) DescriptorSize=req->wLength;
 		USB_ep0_send_progmem(DescriptorPointer, DescriptorSize);
 	}
-	/* Error -> Stall endpoint */
-	//return false;
+	// Unknown descriptor, e.g. the DEVICE_QUALIFIER a host asks a USB 2.0 device for: STALL the data stage
+	else endpoints[0].in.CTRL |= USB_EP_STALL_bm;
 }
 
 static inline void USB_handleSetConfiguration(USB_Request_Header_t* req) {
@@ -157,6 +158,7 @@ ISR(USB_BUSEVENT_vect) {
 ISR(USB_TRNCOMPL_vect) {
     ONRED();
 	if (endpoints[0].out.STATUS & USB_EP_SETUP_bm) {	// Setup transaction complete
+		endpoints[0].in.CTRL &= ~USB_EP_STALL_bm;		// A new request ends the STALL of the previous one
 	    USB_Request_Header_t* req = (void *) ep0_buf_out;
 	    if ((req->bmRequestType & CONTROL_REQTYPE_TYPE) == REQTYPE_STANDARD) {
 		    switch (req->bRequest) {    // Check for standard requests
@@ -193,6 +195,15 @@ ISR(USB_TRNCOMPL_vect) {
 static inline void EVENT_USB_Device_ControlRequest(void) {
     USB_Request_Header_t* req = (void *) ep0_buf_out;
 	if ((req->bmRequestType & CONTROL_REQTYPE_TYPE) == REQTYPE_VENDOR) {
+        if(req->bRequest==MS_VENDOR_CODE) {     // Microsoft OS descriptor request
+            uint8_t n=0;
+            if(req->wIndex==0x0004) {           // Extended Compat ID
+                n=sizeof(XmegaScope_MSCompatID);
+                if(n>req->wLength) n=req->wLength;
+            }
+            USB_ep0_send_progmem(XmegaScope_MSCompatID, n);
+            return;
+        }
         uint8_t n=ProcessCommand(req->bRequest, 1);    // Process command
         USB_ep0_in_start(n);                // Send response
 	}
