@@ -10,147 +10,36 @@
 #include "usb\usb_xmega.h"
 #include "config.h"
 
-#define SOH     0x01    // start of heading
-#define STX     0x02    // start of text
-#define EOT     0x04    // end of transmission
-#define ACK     0x06    // acknowledge
-#define NAK     0x15    // negative acknowledge
-#define CAN     0x18    // cancel
-
-// Monochrome 128x64 bitmap header
+// Monochrome 128x128 bitmap header for the LS013B7DH03 display
 const uint8_t BMP[62] PROGMEM = {
-    0x42,0x4D,0x3E,0x04,0x00,0x00,0x00,0x00,0x00,0x00,0x3E,0x00,0x00,0x00,0x28,0x00,
-    0x00,0x00,0x80,0x00,0x00,0x00,0x40,0x00,0x00,0x00,0x01,0x00,0x01,0x00,0x00,0x00,
-    0x00,0x00,0x00,0x04,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+    0x42,0x4D,0x3E,0x08,0x00,0x00,0x00,0x00,0x00,0x00,0x3E,0x00,0x00,0x00,0x28,0x00,
+    0x00,0x00,0x80,0x00,0x00,0x00,0x80,0x00,0x00,0x00,0x01,0x00,0x01,0x00,0x00,0x00,
+    0x00,0x00,0x00,0x08,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xff,0xff,0xff,0x00 };
 
-static inline void SendBMP(void);
+// The screenshot as a byte stream: the 62 byte BMP header, then the display
+// transposed into 128 rows of 16 bytes, bottom row first (BMP order).
+// The Watch has no external serial interface, so the stream is only read over USB.
+#define BMP_SIZE    (62 + 2048)
 
-static uint8_t read(void);
-
-typedef struct _fifo {
-    uint8_t	idx_w;      // write index
-    uint8_t	idx_r;      // read index
-    uint8_t	count;
-    uint8_t buff[8];
-} FIFO;
-
-static volatile FIFO txfifo;
-
-// Waits for a character from the serial port for a certain time, 
-// If no character is received, it returns 0
-static uint8_t read(void) {
-    uint16_t timeout=25000; // 250 ms
-    while(!testbit(USARTE0.STATUS,USART_RXCIF_bp)) {
-        _delay_us(10);
-        if(--timeout==0) return 0;
+// Pixel (x,y) of the active display buffer is at
+// DataAddress - x*18 + (y>>3),   bit 0x80 >> (y&7)
+static uint8_t bmp_byte(uint16_t o, uint8_t *base) {
+    if(o < 62) return pgm_read_byte_near(BMP + o);
+    o -= 62;
+    uint8_t y = 127 - (uint8_t)(o >> 4);                // Display y of this BMP row
+    uint8_t mask = 0x80 >> (y & 0x07);                  // Bit of y inside its byte
+    uint8_t *p = base - (uint8_t)(o & 0x0F)*8*18 + (y >> 3);
+    uint8_t data = 0;
+    for(uint8_t i=0; i<8; i++) {
+        data <<= 1;
+        if(*p & mask) data |= 1;
+        p -= 18;                                        // x++, one line further
     }
-    return USARTE0.DATA;
-}
-
-// Test pixel on display buffer
-static inline uint8_t test_pixel(uint8_t x, uint8_t y) {
-    if(Disp_send.DataAddress[((uint16_t)(y<<4)&0xFF80) + x] & (uint8_t)(0x01 << (y & 0x07))) return 0;
-    return 1;
-}
-
-static inline uint8_t transpose(uint8_t x, uint8_t y) {
-    uint8_t data=0;
-	for(uint8_t i=0; i<8; i++) {
-		data=data<<1;
-        data  |= test_pixel(x+i,y); 
-	}
+    #ifdef INVERT_DISPLAY
+    data = ~data;       // Ink is a cleared bit on an inverted display
+    #endif
     return data;
-}
-
-// Send data from LCD to PC via RS-232 using the XMODEM protocol
-// The CRC module's CRC-16 is CRC-16/XMODEM (poly 0x1021, MSB first)
-static inline void SendBMP(void) {
-    uint8_t rx,data,Packet=1, n=0,i,j;
-    CRC.CTRL = CRC_RESET_RESET0_gc;     // CHECKSUM = 0
-    CRC.CTRL = CRC_SOURCE_IO_gc;        // CRC on data written to DATAIN
-
-    // First Block
-    send(SOH);
-    send(1);		// Send Packet number
-    send(254);		// Send Packet number 1's complement
-    // Send BMP Header
-    for(i=0; i<62; i++) {
-        n++;
-        data = pgm_read_byte_near(BMP+i);
-        CRC.DATAIN = data;
-        send(data);
-    }
-
-    // Send LCD data, 64 lines
-    for(i=63; i!=255; i--) {
-        // Each LCD line consists of 16 bytes
-        for(j=0; j<16; j++) {
-            data=transpose(j*8,i);
-            CRC.DATAIN = data;
-            send(data);
-            n++;
-            if(n==128)  {   // end of 128byte block
-                n=0;
-                send(CRC.CHECKSUM1);
-                send(CRC.CHECKSUM0);
-                // Wait for ACK
-                rx = read();
-                if(rx!=ACK) return; // Error -> cancel transmission
-                Packet++;
-                send(SOH);
-                send(Packet);		// Send Packet number
-                send(255-Packet);	// Send Packet number 1's complement
-                CRC.CTRL = CRC_RESET_RESET0_gc;
-                CRC.CTRL = CRC_SOURCE_IO_gc;
-            }
-        }
-    }
-
-    // End of last block
-    for(; n<128; n++) { // send remainder of block
-        data= 0x1A;     // pad with 0x1A which marks the end of file
-        CRC.DATAIN = data;
-        send(data);
-    }
-    send(CRC.CHECKSUM1);
-    send(CRC.CHECKSUM0);
-    rx = read();
-    if(rx!=ACK) return;
-    send(EOT);
-    rx = read();
-    if(rx!=NAK) return;
-    send(EOT);
-    rx = read();
-    if(rx!=ACK) return;
-}
-
-// Put a character in the transmit queue
-void send (uint8_t d) {
-    uint8_t i = txfifo.idx_w;
-    // Check if buffer is full, if so wait...
-    while(txfifo.count >= sizeof(txfifo.buff));
-    txfifo.buff[i++] = d;
-    cli();
-    txfifo.count++;
-    USARTE0.CTRLA = USART_RXCINTLVL0_bm | USART_DREINTLVL_gm;  // Enable DRE high level interrupt
-    sei();
-    if(i >= sizeof(txfifo.buff)) i = 0;
-    txfifo.idx_w = i;
-}
-
-// UART UDRE interrupt
-ISR(USARTE0_DRE_vect) {
-    uint8_t n;
-    n = txfifo.count;
-    if(n) {
-        txfifo.count = --n;
-        uint8_t i = txfifo.idx_r;
-        USARTE0.DATA = txfifo.buff[i++];
-        if(i >= sizeof(txfifo.buff)) i = 0;
-        txfifo.idx_r = i;
-    }
-    else USARTE0.CTRLA = USART_RXCINTLVL0_bm;  // All data sent, disable DREIF interrupt
 }
 
 // Returns the amount of data that needs to be sent from the ep0 buffer
@@ -159,23 +48,49 @@ uint8_t ProcessCommand(uint8_t Command, uint8_t usb) {
 	uint8_t i=0,n=0;
     uint8_t index,value;
     const USB_Request_Header_t* req = (void *) ep0_buf_out;
-    RTC.CNT=0;  // Clear screen saver timer    
     OFFGRN();   // In case the LED was on
+   if(usb) { 
+        if(Command=='K') {
+            if(!(req->wValue & 0x0100)) KeyInput(lobyte(req->wValue));
+            p=(uint8_t *)&Misc; for(; i<4; i++) ep0_buf_in[i]=*p++;   // GPIOC..F
+            return 4;
+        }
+        if(Command=='r' || Command=='R') {
+            uint16_t a = req->wIndex;
+            n = lobyte(req->wValue);
+            if(n > sizeof(ep0_buf_in)) n = sizeof(ep0_buf_in);
+            for(; i<n; i++, a++)
+                ep0_buf_in[i] = (Command=='r') ? *(uint8_t *)a : eeprom_read_byte((const uint8_t *)a);
+            return n;
+        }
+    }
     switch(Command) {
         case 'a':   // Send firmware version
             p = (uint8_t *)(VERSION+3);
 			for(;i<4;i++) ep0_buf_in[i]=pgm_read_byte(p++); // Read from the Version string
             n=4;
         break;
+        case 'C':   // Send BMP
+            if(usb) {
+                // The BMP stream is read in 64 byte blocks
+                uint16_t o = req->wIndex * 64;
+				// Check which buffer needs to be sent
+                uint8_t *base = Disp_send.DataAddress;
+                if(Srate<11 && MFFT>=0x20 && !testbit(MStatus,gosniffer)) {
+                    if(base == Disp_send.display_data1+127*18) base = Disp_send.display_data2+127*18;
+                    else base = Disp_send.display_data1+127*18;
+                }
+                for(; i<64 && o<BMP_SIZE; i++, o++) ep0_buf_in[i] = bmp_byte(o, base);
+                n = i;
+            }
+        break;
 		case 'b':	// Write byte to GPIO or M
             if(usb) {
                 index=lobyte(req->wIndex);
                 value=lobyte(req->wValue);
             }
-		    else {
-                index=read();   // Read index
-		        value=read();   // Read value
-            }
+            // Check index range: index selects GPIO0..11 and then M[0..sizeof(M)-1];
+            if(index >= 12 + sizeof(NVMVAR)) break;
             // Write to the corresponding register
             if(index==0 && Srate>10) clrbit(MStatus, triggered);    // prevents bad wave when changing from 20 to 10ms/div
             if(index<=5 || index==35 || index==38 || index==12 || index==13 ||
@@ -201,7 +116,7 @@ uint8_t ProcessCommand(uint8_t Command, uint8_t usb) {
 				*p++=hibyte(req->wIndex);
 				*p++=lobyte(req->wValue);
 				*p++=hibyte(req->wValue);
-            } else for(;i<4;i++) *p++=read();
+            }
 			setbit(MStatus, updateawg);
         break;
 		case 'd':   // Store settings
@@ -233,10 +148,7 @@ uint8_t ProcessCommand(uint8_t Command, uint8_t usb) {
             if(usb) {
                 *p++=lobyte(req->wValue);
                 *p++=hibyte(req->wValue);
-            } else {
-		        *p++=read();
-		        *p++=read();
-            }                
+            }            
             CheckPost();    // Check Post trigger value
             setbit(MStatus,update);
 		break;
@@ -245,7 +157,7 @@ uint8_t ProcessCommand(uint8_t Command, uint8_t usb) {
             setbit(MStatus,update);
             setbit(MStatus, updatemso);     // Apply settings
             setbit(MStatus, updateawg);     // Generate wave                       
-        break;        
+        break;
         case 'm':   // Send METER measurement
             p = (uint8_t *)(&T.SCOPE.MeterFreq);
             for(uint8_t i=0; i<4; i++) ep0_buf_in[i]=*p++;
@@ -256,16 +168,6 @@ uint8_t ProcessCommand(uint8_t Command, uint8_t usb) {
             p=(uint8_t *)&M; for(; i<44; i++) ep0_buf_in[i]=*p++;   // M
             n=44;
         break;
-        case 'w':   // Send waveform stored in EE
-            do { send(eeprom_read_byte(EEwave+i)); } while(++i);
-        break;
-        case 'x':   // Read data and store in AWG buffer
-            send('G');   // confirmation
-            p=AWGBuffer;
-            do { *p++ = read(); } while(++i);
-            send('T');   // confirmation
-        break;
-        case 'C': SendBMP(); break; // Send BMP
 		case 0xBB: // disconnect from USB, jump to bootloader
             if(usb) {
                 //USB_ep0_wait_for_complete();

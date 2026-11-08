@@ -15,15 +15,17 @@ static uint32_t slow_sum1, slow_sum2;
 
 // Function prototypes
 static void Reduce(void);
-static void RestorefromMeter(void);		        // Restores srate and gains
-static void GoingtoMeter(void);			        // Saves srate and gains
+static void RestorefromMeter(void);		    // Restores srate and gains
+static void GoingtoMeter(void);			    // Saves srate and gains
 static uint8_t fft_stuff(uint8_t *p);
-static void AutoCursorV(void);                     // Automatically set vertical the cursors
+static void AutoCursorV(void);              // Automatically set vertical the cursors
 static inline void Measurements(void);      // Measurements for Meter Mode
 static inline void ShowCursorV(void);       // Display Vertical Cursor
 static inline void ShowCursorH(void);       // Display Horizontal Cursor
-static void CheckMax(void);                        // Check variables
+static void CheckMax(void);                 // Check variables
 static inline void LoadEE(void);            // Load settings from EEPROM
+static void EP1Hold(void) __attribute__((noinline));   // Keep a pending USB frame whole
+static void SlowSamplingOn(void);           // Enable the slow sampling interrupt (CR-053)
 
 uint8_t EEMEM EECHREF1[256] = {0};  // Reference waveform CH1
 uint8_t EEMEM EECHREF2[256] = {0};  // Reference waveform CH2
@@ -42,7 +44,7 @@ const uint16_t slowcnt[11] PROGMEM = { 1,2,4,8,20,40,80,200,400,800,2000 };
 
 /* Clock Timer table:
 // TCE1 freq = fPER / (N(CCA+1)) = 32M / (2(CCA+1))
-// Slow sampling: TCE1 = 640Hz, rate = 32*slowcnt/640
+// Slow sampling: TCE1 = 1600 Hz (Srate 11) or 1280 Hz, sample rate = TCE0 freq / slowcnt
 rate SCOPE SETTING  Min. F      Max.F     S/s  Oversample ADCCLK  PRESCALE TCE1 slowcnt  Method
 0       8 uS/div   7812.50Hz     1 MHz     2M      x1     2 MHz     16     x     x       DMA ADC free run
 1      16 uS/div   3906.25Hz   500 kHz     1M      x2     2 MHz     16     x     x       DMA ADC free run
@@ -69,7 +71,8 @@ rate SCOPE SETTING  Min. F      Max.F     S/s  Oversample ADCCLK  PRESCALE TCE1 
 
 // milivolts or volts per pixels * 100000 / 32
 // Range                      5.12V 2.56V 1.28V 0.64V  320mV  160mV   80mV
-const int16_t milivolts[7] = { 1000,  500,  250,  125, 62500, 31250, 15625 };
+// In PROGMEM: this table is 14 bytes, which used to be the whole .data section (SRAM)
+const uint16_t milivolts[7] PROGMEM = { 1000,  500,  250,  125, 62500, 31250, 15625 };
 
 // Maximum Frequency * 100000
 const uint32_t freqval[22] PROGMEM = {
@@ -400,8 +403,9 @@ void MSO(void) {
     T.SCOPE.shortcuti = 0;      // shortcut index
         
     uint16_t Tpost;
-    int16_t AWGsweepi;          // AWG sweep counter
-    uint8_t AWGspeed;           // AWG sweep increment
+    int16_t AWGsweepi = 0;      // AWG sweep counter; the range check brings it to Sweep1..Sweep2
+    uint8_t AWGspeed = 0;       // AWG sweep increment (M.SWSpeed, or accelerated from it)
+    uint8_t lastSWSpeed = 0;    // M.SWSpeed when AWGspeed was last loaded from it
     uint8_t chdtrigpos;         // Digital channel trigger position
 
     LoadEE();                   // Load settings
@@ -661,9 +665,9 @@ void MSO(void) {
             else {
                 if(testbit(Mcursors,roll)) {
                     clrbit(MStatus, triggered);
-                    if(!testbit(MStatus,stop)) TCE1.INTCTRLA = TC_OVFINTLVL_MED_gc;    // Enable sampling interrupt
+                    if(!testbit(MStatus,stop)) SlowSamplingOn();
                 }
-                else if(!testbit(Misc,sacquired)) TCE1.INTCTRLA = TC_OVFINTLVL_MED_gc;  // Enable sampling interrupt
+                else if(!testbit(Misc,sacquired)) SlowSamplingOn();
                 else {    // Acquired complete buffer
                     clrbit(Misc, sacquired);
                     clrbit(MStatus, triggered);
@@ -717,7 +721,7 @@ void MSO(void) {
             if(testbit(Sweep,SweepD)) M.AWGduty   =  (uint8_t)(AWGsweepi>>4);
             int16_t sweepmin, sweepmax;
             int8_t sweepinc;
-            if(AWGspeed==0) AWGspeed = M.SWSpeed;
+            if(M.SWSpeed != lastSWSpeed) AWGspeed = lastSWSpeed = M.SWSpeed;    // Apply new M.SWSpeed
             if(!testbit(Sweep,swdown)) sweepinc=AWGspeed; else sweepinc=-AWGspeed;
             sweepmin = (uint16_t)M.Sweep1*16;
             sweepmax = (uint16_t)M.Sweep2*16;
@@ -812,7 +816,7 @@ void MSO(void) {
                         ox=ox>>1;
                     }
                     if(testbit(Display, line)) {
-                        if(i==0) continue;
+                        if(i==0) continue;      // no previous point
                         if(testbit(CH1ctrl,chon)) set_line(nx, ny1, ox, oy1);
                         if(testbit(CH2ctrl,chon)) set_line(nx, ny2, ox, oy2);
                     }
@@ -821,8 +825,7 @@ void MSO(void) {
                         if(testbit(CH2ctrl,chon)) set_pixel(nx, ny2);
                     }
                     if(Srate<11 && i>=127) break;
-                    j++;
-                } while(++i);
+                } while(++i, ++j);      // j advances on the i==0 pass too (CR-021)
             }            
             if(Srate<11 || testbit(Mcursors,roll)) {
                 uint8_t k=0, prev=0;
@@ -1036,10 +1039,10 @@ void MSO(void) {
 // Send single point data
         if(testbit(Misc,slowacq)) {
             clrbit(Misc,slowacq);
+            T.SCOPE.DC.index = Index;
 			// USB - Send new data if previous transfer complete
 			if((endpoints[1].in.STATUS & USB_EP_TRNCOMPL0_bm)) {
                 //RTC.CNT = 0;    // Prevent going to sleep if connected to USB
-                T.SCOPE.DC.index = Index;
 				endpoints[1].in.AUXDATA = 0;				// New transfer must clear AUXDATA
 				endpoints[1].in.CNT = 770 | USB_EP_ZLP_bm;	// Send 256*3 bytes + frame, enable Auto Zero Length Packet
 				endpoints[1].in.STATUS &= ~(USB_EP_TRNCOMPL0_bm | USB_EP_BUSNACK0_bm | USB_EP_OVF_bm);
@@ -2224,7 +2227,7 @@ checknext:
                         uint8_t mtlevel;
                         mtlevel=0x80-M.Tlevel;
                         if(mtlevel>=128) mtlevel=-mtlevel;
-                        printF(0,TEXT_LAST_LINE,((int32_t)mtlevel)*((int32_t)milivolts[tempGain]*6400/(pgm_read_word_near(timeval+Srate))));
+                        printF(0,TEXT_LAST_LINE,((int32_t)mtlevel)*((int32_t)pgm_read_word_near(milivolts+tempGain)*6400/(pgm_read_word_near(timeval+Srate))));
                         print3x6(textV_Unit);  // Display V or mV
                         putchar3x6('/');
                         if(Srate<=6) putchar3x6(0x17);    // micro
@@ -2370,30 +2373,23 @@ checknext:
             if((testbit(Trigger, normal) || testbit(Trigger, autotrg)) && testbit(MFFT, scopemode)) {
                 chdtrigpos = 255;
                 if(Srate>=11 || hibyte(M.Tpost)==0) {
-                    uint8_t trig1, trig2;
-                    if(testbit(Trigger, window)) trig1=M.Window1;
+                    uint8_t trig1, trig2=M.Window2, down=1;  // down: the mark at trig1 points down
+                    if(testbit(Trigger, window)) trig1=M.Window1;   // window: down at Window1, up at Window2
                     else {
                         trig1=M.Tlevel;
-                        if(testbit(Trigger,trigdir)) setbit(Misc,bigfont);
+                        if(!testbit(Trigger,trigdir)) down=0;       // edge: down for a falling edge
                     }
-                    trig2=M.Window2;
-                    if(M.Tsource==0) {                      // Adjust position relative to CH1
-                        if(testbit(CH1ctrl,chinvert)) {
+                    if(M.Tsource<=1) {                      // Adjust position relative to CH1 or CH2
+                        uint8_t ctrl=CH1ctrl;
+                        int8_t pos=M.CH1pos;
+                        if(M.Tsource) { ctrl=CH2ctrl; pos=M.CH2pos; }
+                        if(testbit(ctrl,chinvert)) {        // the channel is drawn upside down
                             trig1=255-trig1;
                             trig2=255-trig2;
-                            togglebit(Misc, bigfont);
+                            down^=1;
                         }
-                        trig1+=M.CH1pos;
-                        trig2+=M.CH1pos;
-                    }
-                    else if(M.Tsource==1) {                 // Adjust position relative to CH2
-                        if(testbit(CH2ctrl,chinvert)) {
-                            trig1=255-trig1;
-                            trig2=255-trig2;
-                            togglebit(Misc, bigfont);
-                        }
-                        trig1+=M.CH2pos;
-                        trig2+=M.CH2pos;
+                        trig1+=pos;
+                        trig2+=pos;
                     }
                     trig1=trig1>>1; // Trigger or Window Trigger 1
                     trig2=trig2>>1; // Window Trigger 2
@@ -2408,40 +2404,20 @@ checknext:
                         if((Display&0x03)==2) {     // Grid Vertical dots follow trigger
                             vertical_dots(trigpos);
                         }
-                        if(testbit(Trigger, window)) {
-                            if(trig1<=(DISPLAY_MAX_Y-3) && testbit(Misc, bigfont)) { // up
-                                sprite(trigpos, trig1, TrigUp);
-                            }
-                            else if(trig1>=3 && trig1<=DISPLAY_MAX_Y && !testbit(Misc, bigfont)) { // down
-                                sprite(trigpos, trig1, TrigDown);
-                            }
-                            if(trig2<=(DISPLAY_MAX_Y-3) && testbit(Misc, bigfont)) { // down
-                                sprite(trigpos, trig2, TrigDown);
-                            }
-                            else if(trig2>=3 && trig2<=DISPLAY_MAX_Y && !testbit(Misc, bigfont)) { // up
-                                sprite(trigpos, trig2, TrigUp);
-                            }
-                        }
-                        else if(testbit(Trigger, slope)) {
+                        // Same priority as the trigger itself: window, slope, edge, dual edge
+                        if(!testbit(Trigger, window) && testbit(Trigger, slope)) {
                             uint8_t trigy;
                             trigy=M.Tlevel>>1;
                             set_line(trigpos,trigy,trigpos+2,trigy);
                             trigy=(uint8_t)(-M.Tlevel)>>1;
                             set_line(trigpos,trigy,trigpos+2,trigy);
                         }
-                        else if(testbit(Trigger, edge)) {
-                            if(trig1<=(DISPLAY_MAX_Y-3) && testbit(Misc, bigfont)) { // down
-                                sprite(trigpos, trig1, TrigDown);
-                            }
-                            else if(trig1>=3 && trig1<=DISPLAY_MAX_Y && !testbit(Misc, bigfont)) { // up
-                                sprite(trigpos, trig1, TrigUp);
-                            }
+                        else if(testbit(Trigger, window) || testbit(Trigger, edge)) {   // sprite() skips a mark that does not fit
+                            sprite(trigpos, trig1, down ? TrigDown : TrigUp);
+                            if(testbit(Trigger, window)) sprite(trigpos, trig2, down ? TrigUp : TrigDown);
                         }
-                        else if(trig1>=3 && trig1<=(DISPLAY_MAX_Y-3)) {  // Dual edge trigger
-                            sprite(trigpos, trig1, TrigDual);
-                        }
+                        else sprite(trigpos, trig1, TrigDual);  // Dual edge trigger
                     }
-                    clrbit(Misc,bigfont);
                 }
             }
         }
@@ -2682,8 +2658,8 @@ static inline void Measurements(void) {
         avrg2+=calibrate;
 		//calibrate=(int8_t)eeprom_read_byte((int8_t *)&gain8CH2);            // CH2 Gain Calibration
 		//avrg2=avrg2*(2048+calibrate)/2048;                                  // +/- 6.25% gain variation
-        T.SCOPE.MeterVDC1= avrg1>>5; // Exp. average: ((avrg1>>5)+Temp.IN.METER.VDC1)/2;
-        T.SCOPE.MeterVDC2= avrg2>>5; // Exp. average: ((avrg2>>5)+Temp.IN.METER.VDC2)/2;
+        T.SCOPE.Vdc[0]= avrg1>>5; // Exp. average: ((avrg1>>5)+Temp.IN.METER.Vdc[0])/2;
+        T.SCOPE.Vdc[1]= avrg2>>5; // Exp. average: ((avrg2>>5)+Temp.IN.METER.Vdc[1])/2;
         ADCB.CH0.CTRL = oldch1;
         ADCA.CH0.CTRL = oldch0;
         ADCA.PRESCALER = oldprescalea;
@@ -2691,11 +2667,13 @@ static inline void Measurements(void) {
         ADCB.PRESCALER = oldprescaleb;
         ADCB.CTRLB = oldctrlbb;
 cancelvdc:
-        printV(T.SCOPE.MeterVDC1,0, CH1ctrl);
+        printV(T.SCOPE.Vdc[0],0, CH1ctrl);
         lcd_goto(64,2);
-        printV(T.SCOPE.MeterVDC2,0, CH2ctrl);
+        printV(T.SCOPE.Vdc[1],0, CH2ctrl);
     }
     else if(testbit(MStatus,vp_p) && !testbit(MStatus,vdc)) {   // Display VPP
+        T.SCOPE.Vdc[0]=(int16_t)T.SCOPE.CH1.vpp*128;
+        T.SCOPE.Vdc[1]=(int16_t)T.SCOPE.CH2.vpp*128;
                         printV((int16_t)T.SCOPE.CH1.vpp*128, M.CH1gain, CH1ctrl);
         lcd_goto(64,2); printV((int16_t)T.SCOPE.CH2.vpp*128, M.CH2gain, CH2ctrl);
     }
@@ -2871,7 +2849,7 @@ static inline void ShowCursorH(void) {
             HcursorB=CH->min;
 		}
         if(testbit(MFFT,xymode)) {
-            dispHA=128-(HcursorA>>1);
+            dispHA=DISPLAY_MAX_X-(HcursorA>>1);
 			dispHB=(HcursorB-M.HPos)>>1;
             for(uint8_t i=1; i<=(DISPLAY_MAX_X-1); i+=4) {
                 if(i<=DISPLAY_MAX_Y) set_pixel(dispHA,i);				// Vertical Line for HcursorA
@@ -2931,8 +2909,6 @@ void CheckMax(void) {
         if(*p>=max) *p=max;
         p++;
     }
-//    if(M.CH1pos>=0)     M.CH1pos=-2;    // Position must be negative
-//    if(M.CH2pos>=0)     M.CH2pos=-2;    // Position must be negative
     if(M.Sweep1>M.Sweep2) M.Sweep1=M.Sweep2;
     if(M.SWSpeed==0)    M.SWSpeed=1;    // Minimum sweep speed
     if(M.Tlevel<3)      M.Tlevel=3;     // Minimum Trigger Level
@@ -2973,7 +2949,7 @@ void Apply(void) {
     if(MFFT>=0x20 ||                                       // Not in Meter mode, or
     ((testbit(MStatus,vdc) && !testbit(MStatus,vp_p)) ||  // VDC or VPP, but not both
     (!testbit(MStatus,vdc) &&  testbit(MStatus,vp_p)))) { // Don't modify during frequency counter
-        TCC0.CTRLA = 0x0F;      // Event CH7: 0.04096mS period - 24.4140625 Hz
+        TCC0.CTRLA = 0x0F;      // Event CH7: 40.96 ms period - 24.4140625 Hz
         TCC0.CTRLE = 0x02;      // Timer TCC0 Split Mode
         TCC0.PERH = 24;         // Auto Key Timeout is 1.024 second
         TCC0.PERL = M.Ttimeout;
@@ -3066,6 +3042,13 @@ void Apply(void) {
 	clrbit(MStatus, updatemso);
     PMIC.CTRL = 0x07;   // Enable all interrupts
  }
+
+// Prevents starting a frame with a duplicated sample because of a pending interrupt
+static void SlowSamplingOn(void) {
+    if(TCE1.INTCTRLA) return;             // Only on the way from off to on
+    TCE1.INTFLAGS = TC0_OVFIF_bm;         // Clear any pending interrupts
+    TCE1.INTCTRLA = TC_OVFINTLVL_MED_gc;  // Enable the slow sampling interrupt
+}
 
 // Slow sampling control - 640Hz or 1600Hz
 ISR(TCE1_OVF_vect) {
@@ -3222,7 +3205,24 @@ ISR(TCC2_LUNF_vect) {
     TCC0.INTCTRLA &= ~TC2_LUNFINTLVL_LO_gc;         // Disable Trigger timeout interrupt
     setbit(MStatus, update);
     setbit(MStatus, triggered);
-    setbit(Display, trgtimeout);
+}
+
+// Wait until the transmission ends before writing new data to the buffer
+static void EP1Hold(void) {
+    volatile uint8_t *st = &endpoints[1].in.STATUS;
+    uint8_t m;
+    if(*st & USB_EP_TRNCOMPL0_bm) return;       // nothing pending (the usual case)
+    m = USB_EP_BUSNACK0_bm;
+    asm volatile("las Z, %0" : "+r"(m) : "z"(st) : "memory");
+    _delay_us(50);
+    if(endpoints[1].in.AUXDATA) {               // the host is reading it
+        m = USB_EP_BUSNACK0_bm;
+        asm volatile("lac Z, %0" : "+r"(m) : "z"(st) : "memory");
+        uint16_t t=6400;                        // ~2 ms at ~10 cycles per pass
+        while(!(*st & USB_EP_TRNCOMPL0_bm) && --t);
+    }
+    m = USB_EP_BUSNACK0_bm | USB_EP_TRNCOMPL0_bm;
+    asm volatile("las Z, %0" : "+r"(m) : "z"(st) : "memory");
 }
 
 static void SetupDMACh(DMA_CH_t *ch, uint8_t trigsrc, volatile void *src, volatile void *dest) {

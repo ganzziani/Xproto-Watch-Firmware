@@ -20,6 +20,7 @@ typedef struct {
 
 extern Disp_data Disp_send;
 extern uint8_t u8CursorX, u8CursorY;
+extern const uint16_t milivolts[7] PROGMEM;    // mV per pixel * 100000 / 32, indexed by gain
 
 #define lcd_goto(x,y) do { u8CursorX=(x); u8CursorY=(y); } while(0)
 
@@ -52,6 +53,7 @@ void clearRectangle(uint8_t x, uint8_t y, uint8_t width, uint8_t height);
 void bitmap(uint8_t x, uint8_t y, const uint8_t *BMP);
 void bitmap_safe(int8_t x, int8_t y, const uint8_t *BMP, uint8_t c);
 
+void delay_ms(uint8_t n);
 void GLCD_LcdInit(void);
 void LCD_PrepareBuffers(void);
 void dma_display(void);

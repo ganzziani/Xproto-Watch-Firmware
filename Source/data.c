@@ -24,7 +24,7 @@ const uint8_t FLGPIO[12] PROGMEM = {
     _BV(edge),                              // GPIO5 Trigger:   Edge trigger
     0x00,                                   // GPIO6 Mcursors:  Cursors off
     _BV(line)|_BV(showset)|_BV(grid0),      // GPIO7 Display:   Show settings, line, Normal grid
-    _BV(hamming)|_BV(uselog)|_BV(scopemode),// GPIO8 MFFT:      Hamming window, no log, scope mode
+    _BV(hamming)|_BV(uselog)|_BV(scopemode),// GPIO8 MFFT:      Hamming window, log, scope mode
     0x00,                                   // GPIO9 Sweep:     No Sweep
     0x1C,                                   // GPIOA Sniffer:   Off, UART: 8 Data bits, 19200 bps
 	_BV(vdc),                               // GPIOB MStatus
@@ -40,7 +40,7 @@ uint8_t EEMEM EEGPIO[12] = {
     _BV(edge),                              // GPIO5 Trigger:   Edge trigger
     0x00,                                   // GPIO6 Mcursors:  Cursors off
     _BV(line)|_BV(showset)|_BV(grid0),      // GPIO7 Display:   Show settings, line, Normal grid
-    _BV(hamming)|_BV(uselog)|_BV(scopemode),// GPIO8 MFFT:      Hamming window, no log, scope mode
+    _BV(hamming)|_BV(uselog)|_BV(scopemode),// GPIO8 MFFT:      Hamming window, log, scope mode
     0x00,                                   // GPIO9 Sweep:     No Sweep
     0x1C,                                   // GPIOA Sniffer:   Off, UART: 8 Data bits, 19200 bps
     _BV(vdc),                               // GPIOB MStatus
@@ -71,7 +71,7 @@ const NVMVAR FLM PROGMEM = {    // Flash Copy
     1,      //  Sweep1;         // Sweep Start Frequency
     255,    //  Sweep2;         // Sweep End Frequency
     16,     //  SWSpeed;        // Sweep Speed
-    -128,   //  AWGamp;         // Amplitude  4V
+    -124,   //  AWGamp;         // Amplitude 3.88V
     1,      //  AWGtype;        // Waveform type Sinewave
     128,    //  AWGduty;        // Duty cycle range: 50%
     0,      //  AWGoffset;      // Offset 0V
@@ -103,7 +103,7 @@ NVMVAR EEMEM EEM = {            // EEMEM Copy
     1,      //  Sweep1;         // Sweep Start Frequency
     255,    //  Sweep2;         // Sweep End Frequency
     16,     //  SWSpeed;        // Sweep Speed
-    -128,   //  AWGamp;         // Amplitude  4V
+    -124,   //  AWGamp;         // Amplitude 3.88V
     1,      //  AWGtype;        // Waveform type Sinewave
     128,    //  AWGduty;        // Duty cycle range: 50%
     0,      //  AWGoffset;      // Offset 0V

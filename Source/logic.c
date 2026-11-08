@@ -17,8 +17,8 @@ void DisplayData(uint8_t side, uint8_t page);
 //
 // Display the HEX value of the digital stream
 void HEXSerial(void) {
-    int8_t start,end;
-    int16_t increment;
+    uint8_t start,end;
+    uint16_t increment;
     // The vertical cursors define the section to decode
     start = M.VcursorA;
     end   = M.VcursorB;
@@ -27,7 +27,7 @@ void HEXSerial(void) {
         start = 0;
         end   = 127;
     }
-    increment = (end-start);
+    increment = (uint16_t)(end-start);
 	increment<<=3;
     if(Srate>=11) {
         increment*=2;
@@ -37,8 +37,8 @@ void HEXSerial(void) {
     uint8_t data,bit=0,yPos,mask;
     yPos = M.CHDpos>>3;
     for(mask=0x80; mask; mask=mask>>1) {	// Loop 8 digital channels
-        int16_t index = (start<<8);
-        if(Srate<11) index+=(M.HPos<<8);
+        uint16_t index = (uint16_t)start<<8;
+        if(Srate<11) index+=(uint16_t)M.HPos<<8;
         index+=increment;
         if(CHDmask&mask) {					// Is this channel on?
             for(uint8_t i=1; i<=32; i++) {	// Scan buffer
@@ -151,16 +151,13 @@ void ConfigLogicDMA(void) {
 
 // Protocol Sniffer
 void Sniff(void) {
-    uint16_t i=0;
-    uint8_t n,addrdata, ack, data;
     uint8_t page=0; // 16 pages to display 1024 bytes of data
                     // one page has 8 lines, each line will display
                     // 8 bytes in this format: "FF+ "
     WaitDisplay();      // Finish last transmission
     clr_display();
     uint8_t *p=T.LOGIC.data.decoded;
-    for(; i<BUFFER_SERIAL*2+2; i++) *p++=0;   // Erase buffers and index
-    T.LOGIC.indrx=0; T.LOGIC.indtx=0;
+    for(uint16_t i=0; i<sizeof(T.LOGIC.data)+2*sizeof(uint16_t); i++) *p++=0;  // Erase the data union and both uint16_t indices
     if(testbit(Trigger, round)) page=0x0F;  // Go to last page
     // Setup
     PR.PRPC  = 0x00;        // Enable PORTC peripherals
@@ -201,32 +198,36 @@ void Sniff(void) {
         TCC1.INTCTRLB = 0x03;           // Enable TCC1 CCA interrupt, High Priority
     }
     else if(M.CHDdecode==spi) {
-        uint8_t pin7ctrl=1;   // Sense rising edge
+        uint8_t inv = testbit(CHDctrl,digchinvert) ? PORT_INVEN_bm : 0;
+        uint8_t pin7ctrl=inv+1;   // Sense rising edge
         print5x8(PSTR("SPI SNIFFER\nBIT4:/SS\nBIT5:MOSI\nBIT6:MISO\nBIT7:SCK"));
         if(testbit(Sniffer,CPOL)) {    // CPOL == 1
-            pin7ctrl = PORT_INVEN_bm+1;   // Invert SCK, Sense rising edge
+            pin7ctrl ^= PORT_INVEN_bm;    // Invert SCK
         }
         if(testbit(Sniffer,CPHA)) {
             spictrl=0x04;  // CPHA == 1
         }
         PORTC.PIN7CTRL = pin7ctrl;
         if(testbit(Sniffer,SSINV)) {    // Invert Slave select
-            PORTC.PIN4CTRL = PORT_INVEN_bm;
+            PORTC.PIN4CTRL = PORT_INVEN_bm^inv;
         }
     }
     ConfigLogicDMA();
     dma_display(); WaitDisplay();
+    uint8_t armed=0;
     while((T.LOGIC.indrx==0) && (T.LOGIC.indtx==0)) {
         WDR();
         if(M.CHDdecode!=i2c) {
             T.LOGIC.indrx=BUFFER_SERIAL-DMA.CH0.TRFCNT;
             T.LOGIC.indtx=BUFFER_SERIAL-DMA.CH1.TRFCNT;            
         }            
-        if(M.CHDdecode==spi) {
+        // Arm once, while SS is not asserted
+        if(M.CHDdecode==spi && !armed) {
             if(testbit(VPORT2.IN, 4)) {     // SS not asserted
                 SPIC.CTRL = 0b01000000 + spictrl;       // Enable SPI, Slave mode
-                PORTC.INTFLAGS = 0x03;  // Clear flags
-                PORTC.INTCTRL   = 0x0C; // Enable PortC INT 1, High Priority
+                PORTC.INTFLAGS = 0x03;      // Clear flags
+                PORTC.INTCTRL   = 0x0C;     // Enable PortC INT 1, High Priority
+                armed=1;
             }                
         }
         if(!testbit(MStatus,gosniffer)) goto exitSniffer;
@@ -235,6 +236,7 @@ void Sniff(void) {
 ////////////////////////////////////////////////////////////////////////////////////
 // DISPLAY
 ////////////////////////////////////////////////////////////////////////////////////
+    uint16_t i=0;
     uint8_t stopped=0;              // MSO() cleared MStatus.stop before calling Sniff()
     do {
         clr_display();
@@ -268,15 +270,15 @@ void Sniff(void) {
             else {
                 i=(uint16_t)page*DATA_IN_PAGE_I2C;
             }
-            for(n=0; n<DATA_IN_PAGE_I2C; n++) {
+            for(uint8_t n=0; n<DATA_IN_PAGE_I2C; n++) {
                 if(!testbit(Trigger, round)) {
                     if(i>=T.LOGIC.indrx) break;
                 }
                 uint8_t shift;
                 shift = (i&0x0003)*2;
-                data=T.LOGIC.data.I2C.decoded[i];
-                addrdata=T.LOGIC.data.I2C.addr_ack[i/4];
-                ack=      (addrdata<<(shift+1))&0x80;
+                uint8_t data = T.LOGIC.data.I2C.decoded[i];
+                uint8_t addrdata = T.LOGIC.data.I2C.addr_ack[i/4];
+                uint8_t ack = (addrdata<<(shift+1))&0x80;
                 addrdata= (addrdata<<shift)&0x80;
                 if(addrdata) {  // Address
                     printhex3x6(data>>1);

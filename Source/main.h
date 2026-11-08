@@ -201,11 +201,11 @@
 #define KUL         7       // Button Upper Left pressed
 
 void CPU_Fast(void);
+void KeyInput(uint8_t in);          // Decode a key pattern, as the key ISR does
 void CPU_Slow(void);
 void MSO(void);
 void CalibrateOffset(void);
 uint8_t ReadCalibrationByte(uint8_t location);	// Read out calibration byte
-void delay_ms(uint8_t n);
 void CCPWrite( volatile uint8_t * address, uint8_t value );
 int16_t MeasureVin(uint8_t scale);
 
@@ -231,7 +231,7 @@ typedef struct {
     uint8_t CHDdata[256];       // CHD Samples
     uint8_t frame;              // Frame number
     uint8_t index;              // Index number
-} DATA;
+} SCOPE_DATA;
 
 // Big buffer to store large but temporary data
 typedef union {
@@ -246,8 +246,7 @@ typedef union {
                 int8_t      TempCH2[2048];		// CH2 Temp data
                 uint8_t     TempCHD[2048];      // CHD Temp data
                 union {
-                    int16_t MeterVDC1;          // Channel 1 VDC
-                    int16_t MeterVDC2;          // Channel 2 VDC
+                    int16_t Vdc[2];         // Channel 1 and Channel 2 DC
                     uint32_t MeterFreq;
                 };
             };
@@ -257,28 +256,30 @@ typedef union {
         uint8_t old_s, old_g1, old_g2;      // sampling, gains before entering meter mode
         uint8_t shortcuti;                  // shortcut index
         ACHANNEL CH1,CH2;                   // Analog Channel 1, Channel 2
-        DATA DC;                            // Data samples
+        SCOPE_DATA DC;                      // Data samples
     } SCOPE;
     struct {
         int8_t AWGTemp1[BUFFER_AWG];
         int8_t AWGTemp2[BUFFER_AWG];
     } AWGDATA;
     struct {
-        union {
-            struct {
-                uint8_t RX[BUFFER_SERIAL];
-                uint8_t TX[BUFFER_SERIAL];
-            } Serial;
-            struct {
-                uint8_t decoded[BUFFER_I2C];
-                uint8_t addr_ack[BUFFER_I2C/4+1];
-            } I2C;
-            struct {
-                uint8_t decoded[BUFFER_SERIAL*2];
-            };
-        } data;
-        volatile uint16_t indrx;    // RX index
-        volatile uint16_t indtx;    // TX index
+        struct {
+            union {
+                struct {
+                    uint8_t RX[BUFFER_SERIAL];
+                    uint8_t TX[BUFFER_SERIAL];
+                } Serial;
+                struct {
+                    uint8_t decoded[BUFFER_I2C];
+                    uint8_t addr_ack[BUFFER_I2C/4+1];
+                } I2C;
+                struct {
+                    uint8_t decoded[BUFFER_SERIAL*2];
+                };
+            } data;
+            volatile uint16_t indrx;    // RX index
+            volatile uint16_t indtx;    // TX index
+        };
         uint8_t databits;           // UART Data bits
         uint8_t *addr_ack_ptr;      // pointer to address or data (packed bits)
         uint8_t *data_ptr;
@@ -332,6 +333,7 @@ typedef union {
 
 // Variables that need to be stored in NVM
 
+// Currently, only these are implemented: (0: SPI; 1: I2C; 2: RS232)
 enum protocols { spi, i2c, rs232, irda, onewire, midi };
 
 typedef struct {

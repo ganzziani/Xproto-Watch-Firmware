@@ -4,6 +4,8 @@
 #ifndef HARDWARE_H
 #define HARDWARE_H
 
+#define DEVICE_CODE         0x20        // USB bcdDevice low byte: Oscilloscope Watch (Descriptors.c)
+
 //#define INVERT_DISPLAY
 
 #include "LS013B7DH03.h"

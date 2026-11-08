@@ -6,6 +6,7 @@
 #include "main.h"
 #include "mso.h"
 #include "utils.h"
+#include "bitmaps.h"
 
 Disp_data Disp_send;
 uint8_t   u8CursorX, u8CursorY;
@@ -66,6 +67,8 @@ void OR_display(const uint8_t *BufferIn) {
 // Sprites, each byte pair represents next pixel relative position
 void sprite(uint8_t x, uint8_t y, const int8_t *ptr) {
     int8_t a=0, b=0;
+    if(ptr!=TrigUp && y>DISPLAY_MAX_Y-3) return;                // reaches down
+    if(ptr!=TrigDown && (y<3 || y>DISPLAY_MAX_Y)) return;       // reaches up
     do {
         set_pixel(x+a,y+b);
         a=pgm_read_byte(ptr++);  // Get next x
@@ -132,13 +135,17 @@ void printhex3x6(uint8_t n) {
     temp = n&0x0F; putchar3x6(NibbleToChar(temp));
 }
 
-extern const uint16_t milivolts[];
-
 // Print Voltage, multiply by 10 if using the x10 probe
 void printV(int16_t Data, uint8_t gain, uint8_t CHCtrl) {
-    int32_t Data32 = (int32_t)Data*milivolts[gain];
-    if(testbit(CHCtrl,chx10)) Data32*=10;
-    printF(u8CursorX,u8CursorY,Data32/8);
+    int32_t Data32 = (int32_t)Data*pgm_read_word_near(milivolts+gain)/8;
+    if(testbit(CHCtrl,chx10)) {
+        // Saturate to +- 0x8000000 to avoid overflow,
+        // anything larger is past printF's four digits anyway
+        if(Data32 > 134217727L || Data32 < -134217727L)
+            Data32 = (Data32 < 0) ? -134217728L : 134217728L;
+        Data32*=10;
+    }
+    printF(u8CursorX,u8CursorY,Data32);
 }    
 
 // Print Fixed point Number with 5 digits

@@ -68,7 +68,7 @@ toggle_line:
     ; r22 = y1
     ; r21 = loop counter
     ; r20 = dxabs
-    ; r19 = stepy hi
+    ; (no stepy high byte: the y step is done with the 16-bit stepx/stepy adds below)
     ; r18 = dyabs
 
     ; Calculate initial address: Disp_send.display_data[(127-x1)*18 + (y1>>3)]
@@ -113,12 +113,10 @@ toggle_line_body:
     ; Initialize y vars
     ;sub     r18, r22               ; dy calculated previously
     ldi     r26, 1                  ; stepy lo = 1
-    ldi     r19, 0                  ; stepy hi = 0
     tst     r18                     ; test dy for zero or negative
-    brpl    .+6                     ; branch if positive
+    brpl    .+4                     ; branch if positive (skip neg + ldi)
     neg     r18                     ; dyabs = -dy
     ldi     r26, -1                 ; stepy lo = -1
-    ldi     r19, -1                 ; stepy hi = -1
 
     cp      r20, r18                ; if (dxabs >= dyabs)
     brlo    .TVertical_line
@@ -745,7 +743,7 @@ set_line:
     ; r22 = y1
     ; r21 = loop counter
     ; r20 = dxabs
-    ; r19 = stepy hi
+    ; (no stepy high byte: the y step is done with the 16-bit stepx/stepy adds below)
     ; r18 = dyabs
 
     ; Calculate initial address: Disp_send.display_data[(127-x1)*18 + (y1>>3)]
@@ -790,12 +788,10 @@ set_line_body:
     ; Initialize y vars
     ;sub     r18, r22               ; dy calculated previously
     ldi     r26, 1                  ; stepy lo = 1
-    ldi     r19, 0                  ; stepy hi = 0
     tst     r18                     ; test dy for zero or negative
-    brpl    .+6                     ; branch if positive
+    brpl    .+4                     ; branch if positive (skip neg + ldi)
     neg     r18                     ; dyabs = -dy
     ldi     r26, -1                 ; stepy lo = -1
-    ldi     r19, -1                 ; stepy hi = -1
 
     cp      r20, r18                ; if (dxabs >= dyabs)
     brlo    .Vertical_line
@@ -1483,7 +1479,7 @@ slopedownCH1:
     sub     r0,r23          ; 1 cycle ; determine difference
     cp      r24,r0          ; 1 cycle ; compare with triggervalue
     mov     r0,r23          ; 1 cycle ; copy new to old
-    brge    3f              ; 1 cycle ; tlevelo < data ?
+    brge    3f              ; 1 cycle ; trigger if tlevelo >= slope
     sbis    0x000B,0        ; 1 cycle ; Status update? (GPIOB)
     rjmp    2b              ; 2 cycles
     pop     r23
@@ -1517,13 +1513,14 @@ slopeupCH1:
     sub     r0,r23          ; 1 cycle ; determine difference
     cp      r0,r24          ; 1 cycle ; compare with triggervalue
     mov     r0,r23          ; 1 cycle ; copy new to old
-    brge    3f              ; 1 cycle ; tlevelo < data ?
+    brge    3f              ; 1 cycle ; trigger if tlevelo >= slope
     sbis    0x000B,0        ; 1 cycle ; Status update? (GPIOB)
     rjmp    2b              ; 2 cycles
     pop     r23
     ret
-3:  pop     r23
-4:  rjmp    post
+; Shared exit tail for the four slope detectors and the two window detectors.
+3:  pop     r23           ; 3: = leave the loop, restoring r23 (the slope detectors push it)
+4:  rjmp    post           ; 4: = leave the loop without restoring (the window detectors do not push)
 .endfunc
 
 ; negative slope trigger detect on CH2
@@ -1553,7 +1550,7 @@ slopedownCH2:
     sub     r0,r23          ; 1 cycle ; determine difference
     cp      r24,r0          ; 1 cycle ; compare with triggervalue
     mov     r0,r23          ; 1 cycle ; copy new to old
-    brge    3b              ; 1 cycle ; tlevelo < data ?
+    brge    3b              ; 1 cycle ; trigger if tlevelo >= slope
     sbis    0x000B,0        ; 1 cycle ; Status update? (GPIOB)
     rjmp    2b              ; 2 cycles
     pop     r23
@@ -1587,7 +1584,7 @@ slopeupCH2:
     sub     r0,r23          ; 1 cycle ; determine difference
     cp      r0,r24          ; 1 cycle ; compare with triggervalue
     mov     r0,r23          ; 1 cycle ; copy new to old
-    brge    3b              ; 1 cycle ; tlevelo < data ?
+    brge    3b              ; 1 cycle ; trigger if tlevelo >= slope
     sbis    0x000B,0        ; 1 cycle ; Status update? (GPIOB)
     rjmp    2b              ; 2 cycles
     pop     r23
@@ -1596,20 +1593,22 @@ slopeupCH2:
 
 ; window trigger detect on CH1
 ;----------------------------------------------------------------------------;
-; r22 contains window1, r24 contains window2
+; r24 contains window1 (high level), r22 contains window2 (low level):
+; CheckMax() keeps window1 >= window2.  The signal is followed while it stays
+; inside the window and the trigger fires as soon as it leaves it.
 .global windowCH1
 .func windowCH1
 windowCH1:
     subi    r24, 0x80       ; Transform [0x00, 0xff] -> [0x80, 0x7f]
     subi    r22, 0x80       ; Transform [0x00, 0xff] -> [0x80, 0x7f]
 0:
-    lds     r0, CH1ADC      ; 2 cycle : r21 = CH1ADC
+    lds     r0, CH1ADC      ; 2 cycle : r0 = CH1ADC
     cp      r24, r0         ; 1 cycle ; compare window1 with data
-    brlt    4b              ; 1 cycle ; continue if window1 >= data
-    cp      r0,r22          ; 1 cycle ; compare window2 with data
-    brlt    4b              ; 1 cycle ; continue if window2 < data
+    brlt    4b              ; 1 cycle ; data above window1 -> left the window
+    cp      r0,r22          ; 1 cycle ; compare data with window2
+    brlt    4b              ; 1 cycle ; data below window2 -> left the window
     sbis    0x000B,0        ; 1 cycle ; Status update? (GPIOB)
-    rjmp    0b              ; 2 cycles
+    rjmp    0b              ; 2 cycles ; still inside the window, keep watching
                             ; 17 cycles
     ret
 
@@ -1617,7 +1616,7 @@ windowCH1:
 
 ; window trigger detect on CH2
 ;----------------------------------------------------------------------------;
-
+; r24 contains window1 (high level), r22 contains window2 (low level)
 .global windowCH2
 .func windowCH2
 windowCH2:
@@ -1626,11 +1625,11 @@ windowCH2:
 0:
     lds     r0, CH2ADC      ; 2 cycle : r0 = CH2ADC
     cp      r24, r0         ; 1 cycle ; compare window1 with data
-    brlt    4b              ; 1 cycle ; continue if window1 >= data
-    cp      r0,r22          ; 1 cycle ; compare window2 with data
-    brlt    4b              ; 1 cycle ; continue if window2 < data
+    brlt    4b              ; 1 cycle ; data above window1 -> left the window
+    cp      r0,r22          ; 1 cycle ; compare data with window2
+    brlt    4b              ; 1 cycle ; data below window2 -> left the window
     sbis    0x000B,0        ; 1 cycle ; Status update? (GPIOB)
-    rjmp    0b              ; 2 cycles
+    rjmp    0b              ; 2 cycles ; still inside the window, keep watching
                             ; 17 cycles
     ret
 .endfunc

@@ -34,9 +34,10 @@ void moveF(void) {
 // Low periods have poor Freq resolution
 // High cycles have poor Amp resolution
 void BuildWave(void) {
+    clrbit(MStatus, updateawg);             // Clear bit early in case another request to change settings arrives
     if(M.AWGamp>0)      M.AWGamp=0;         // AWGAmp must be negative
     if(M.AWGduty==0)    M.AWGduty=1;        // Zero is invalid
-    uint8_t *pf = (uint8_t *)&M.AWGdesiredF;           // Get address of M.AWGdesiredF
+    uint8_t *pf = (uint8_t *)&M.AWGdesiredF;// Get address of M.AWGdesiredF
     pf[3]=0; if(pf[2]>0xBE) pf[2]=0xBE;     // Maximum Freq= 0x00BEFFFF (125.17375kHz), checked byte by byte
     if(M.AWGdesiredF==0)  *pf = 1;          // Minimum Freq= 0.01Hz (only need to access lower byte of M.AWGdesiredF)
 
@@ -69,7 +70,7 @@ void BuildWave(void) {
             do { *p++ = Sin(i+64); } while(++i);
         break;
         case 2: // Square
-            setbit(Misc,bigfont);    // No interpolation
+            setbit(Misc,bigfont);    // bigfont doubles as "no interpolation" setting
             do { *p++ = (i<128)?-127:127; } while(++i);
         break;
         case 3: // Triangle
@@ -123,14 +124,15 @@ void BuildWave(void) {
     }        
     // Avoid discontinuity when changing frequency by writing to PERBUF
     TCD1.PERBUF = (Numerator / Denominator) -1;  // Set Period
-    i=0;
+    uint8_t *dst=AWGBuffer;
+    uint8_t idx=0, n=0;
     do {
     // ******** Multiply by Gain ********
-        uint8_t j=FMULS8(M.AWGamp,T.AWGDATA.AWGTemp2[(uint8_t)(i*cycles)]); // Keep index < 256
+        uint8_t j=FMULS8(M.AWGamp,T.AWGDATA.AWGTemp2[idx]);   // idx = n*cycles, mod 256
     // ******** Add Offset ********
-        AWGBuffer[i]=saddwsat(j,M.AWGoffset);
-    } while(++i);
-    clrbit(MStatus, updateawg);
+        *dst++=saddwsat(j,M.AWGoffset);
+        idx+=cycles;
+    } while(++n);
     clrbit(Misc,bigfont);    // default value
     PMIC.CTRL = 0x07; // Enable all interrupts
 }

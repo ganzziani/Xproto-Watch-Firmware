@@ -321,11 +321,19 @@ ISR(PORTF_INT0_vect) {
 		in = PORTF.IN;              // Read port
 		if(j!=in) { j=in; i=10; }   // Value changed
 	}
-    Buttons = in;
-    if(testbit(Buttons,KUL) && testbit(Buttons, KUR) && testbit(Buttons,KML)) { // Enter bootloader
+    if(testbit(in,KUL) && testbit(in, KUR) && testbit(in,KML)) { // Enter bootloader
         eeprom_write_block(NOW, &EE_saved_time, sizeof(Type_Time));             // Save current time
         ProcessCommand(0xBB, 0);  // Enter bootloader
     }
+    KeyInput(in);
+}
+
+// Act on a debounced key pattern (PORTF.IN, inverted: bit set = pressed) exactly as
+// a key press does: Buttons, userinput, update and the auto repeat timer. Shared with
+// the test fixture's simulated key press ('K', interface.c, TESTFIXTURE builds only),
+// which therefore cannot reach the bootloader combination checked above.
+void KeyInput(uint8_t in) {
+    Buttons = in;
     if(Buttons) {
         setbit(MStatus, update);         // Valid key
         setbit(Misc, userinput);
@@ -542,7 +550,7 @@ void CalibrateOffset(void) {
         avrg1=0;
         avrg2=0;
         ADCA.CTRLB = 0x10;          // signed mode, no free run, 12 bit right adjusted
-        ADCA.PRESCALER = 0x07;      // Prescaler 512 (500kHZ ADC clock)
+        ADCA.PRESCALER = 0x07;      // Prescaler 512 (62.5kHZ ADC clock)
         ADCB.CTRLB = 0x10;          // signed mode, no free run, 12 bit right adjusted
         ADCB.PRESCALER = 0x07;      // Prescaler 512 (500kHZ ADC clock)
         i=0;
