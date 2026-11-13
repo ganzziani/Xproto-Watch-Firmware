@@ -168,10 +168,18 @@ int main(void) {
     PMIC.CTRL = 0x07;               // Enable High, Medium and Low level interrupts
 
     Randomize(TCF0.CNT);            // Randomize random number generator with current time
+#ifdef BOOTMSO
+    // Bench build (make EXTRAFLAGS=-DBOOTMSO) to start in the oscilloscope mode
+    RST.STATUS = 0x3F;              // Clear Reset flags
+    Menu = 2;                       // Oscilloscope menu
+    Buttons = _BV(K1);              // "Start Oscilloscope"
+    setbit(Misc, userinput);
+#else
     About();                        // Go to About on startup
     RST.STATUS = 0x3F;              // Clear Reset flags
     clrbit(Misc, userinput);
     Watch();
+#endif
     uint8_t old_menu=1;
     for(;;) {
         LowPower();                 // Analog off, Slow CPU

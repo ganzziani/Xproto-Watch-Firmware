@@ -238,22 +238,17 @@ void Sniff(void) {
 ////////////////////////////////////////////////////////////////////////////////////
     uint16_t i=0;
     uint8_t stopped=0;              // MSO() cleared MStatus.stop before calling Sniff()
+    uint8_t part=0;                 // USB stream: which quarter of T.LOGIC goes next
     do {
         clr_display();
         OFFGRN();
 		// USB - Send new data if previous transfer complete
 		if((endpoints[1].in.STATUS & USB_EP_TRNCOMPL0_bm)) {
     		endpoints[1].in.AUXDATA = 0;				// New transfer must clear AUXDATA
-            if(!testbit(Misc,sacquired)) {
-               	endpoints[1].in.DATAPTR = (uint16_t)T.LOGIC.data.decoded;
-        		endpoints[1].in.CNT = 640;	    // Send first half
-            }
-            else {
-               	endpoints[1].in.DATAPTR = (uint16_t)T.LOGIC.data.decoded+640;
-        		endpoints[1].in.CNT = 649;	    // Send second half
-            }
+           	endpoints[1].in.DATAPTR = (uint16_t)T.LOGIC.data.decoded + 640*part;
+    		endpoints[1].in.CNT = (part<3) ? 640 : 649;
     		endpoints[1].in.STATUS &= ~(USB_EP_TRNCOMPL0_bm | USB_EP_BUSNACK0_bm | USB_EP_OVF_bm);
-            togglebit(Misc,sacquired);
+            part = (part+1) & 3;
 		}
         // Display I2C data
         if(M.CHDdecode==i2c) {
@@ -447,8 +442,8 @@ void DisplayData(uint8_t side, uint8_t page) {
 #define SDA (unsigned char) (VPORT2.IN & _BV(SDA_PIN))
 
 // Decode I2C (TWI) protocol
-// Temp.LOGIC.data.I2C.decoded[1024] holds data
-// Temp.LOGIC.data.I2C.addr_ack[257] hold if the byte is address or data and if the byte had an ack
+// Temp.LOGIC.data.I2C.decoded[BUFFER_I2C] holds data
+// Temp.LOGIC.data.I2C.addr_ack[BUFFER_I2C/4+1] hold if the byte is address or data and if the byte had an ack
 // Interrupt on falling edge of SDA
 ISR(PORTC_INT0_vect) {
     uint8_t data;       // byte to accumulate data information
@@ -457,7 +452,7 @@ ISR(PORTC_INT0_vect) {
     uint8_t *dataptr=T.LOGIC.data_ptr;           // temp data pointer
     uint8_t *bitsptr=T.LOGIC.addr_ack_ptr;       // temp bits pointer
     uint8_t current_pos=T.LOGIC.addr_ack_pos;    // Current bit position in byte
-    const uint8_t *queue_max=T.LOGIC.data.I2C.decoded+1024;
+    const uint8_t *queue_max=T.LOGIC.data.I2C.decoded+BUFFER_I2C;
     TCC0.CNTL = 24;     // 1.024 second timeout
     setbit(TCC0.INTFLAGS, TC2_LUNFIF_bp);    // Clear trigger timeout interrupt
     ONGRN();

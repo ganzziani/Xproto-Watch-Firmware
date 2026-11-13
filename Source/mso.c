@@ -573,6 +573,7 @@ void MSO(void) {
                 TCE1.CTRLA = 0;
                 ADCA.CTRLB = 0x14;          // signed mode, no free run, 8 bit
                 ADCB.CTRLB = 0x14;          // signed mode, no free run, 8 bit
+                EP1Hold();                  // Avoid torn buffer during ongoing transmission
                 // capture one last sample set
                 T.SCOPE.DC.frame++;                 // Increase frame counter
                 _delay_us(80);              // Wait to process ADC pipeline
