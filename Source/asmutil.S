@@ -11,10 +11,6 @@
 // y=127-y;
 // Disp_send.display_data[(uint16_t)(x<<4) + (y>>3)] |= (uint8_t)(0x80 >> (y & 0x07));
 
-.global toggle_pixel_buffer
-toggle_pixel_buffer:
-    movw    r30, r20                ; Load passed pointer into Z (r30=lo, r31=hi)
-    rjmp    toggle_pixel_body
 
 ; Disp_send.display_data[(uint16_t)((127-x)*18) + (y>>3)] |= (uint8_t)(0x80 >> (y & 0x07));
 .global toggle_pixel                ; void setpixel(uint8_t x, uint8_t y);
@@ -43,161 +39,6 @@ toggle_pixel_body:
     brpl    0b                      ; repeat while y >= 0
     lat     z, r24                  ; Toggle bits in display data
     ret
-#if 0   // toggle_line is unused — wrap in #if 0 to exclude from build
-; void toggle_line_buffer(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t *p);
-; Parameters: r24=x1, r22=y1, r20=x2, r18=y2, r26:r27=p (X register, lo:hi)
-; Note: pointer passed in r25:r24... but r24 is x1.
-; AVR passes pointers in pairs. With 5 params:
-;   r24=x1, r22=y1, r20=x2, r18=y2, r17:r16=p (lo:hi)
-.global toggle_line_buffer
-toggle_line_buffer:
-    movw    r30, r16                ; Load passed pointer into Z (r30=lo, r31=hi)
-    rjmp    toggle_line_body           ; Jump past the fixed address load
-
-; void toggle_line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2)
-; Parameters: r24=x1, r22=y1, r20=x2, r18=y2
-.global toggle_line
-toggle_line:
-    ; Register allocation (all call-clobbered):
-    ; r31:r30 (Z) = buffer pointer
-    ; r27 = current bit mask
-    ; r26 = stepy (-1 or 1)
-    ; r25 = stepx (-18 or 18) - note: reversed x direction
-    ; r24 = stepx hi
-    ; r23 = error accumulator
-    ; r22 = y1
-    ; r21 = loop counter
-    ; r20 = dxabs
-    ; (no stepy high byte: the y step is done with the 16-bit stepx/stepy adds below)
-    ; r18 = dyabs
-
-    ; Calculate initial address: Disp_send.display_data[(127-x1)*18 + (y1>>3)]
-    lds     r30, Disp_send+2        ; Load base address + 127*18
-    lds     r31, Disp_send+3
-toggle_line_body:
-    ldi     r25, 18                 ; r25 = 18
-    mul     r24, r25                ; r1:r0 = x1 * 18
-    sub     r30, r0                 ; Z = base + 127*18 - x1*18
-    sbc     r31, r1
-    clr     r1                      ; Clear r1 for gcc
-    
-    mov     r26, r22                ; r26 = y1 (save for later)
-    lsr     r26                     ; y1 >> 1
-    lsr     r26                     ; y1 >> 2
-    lsr     r26                     ; y1 >> 3
-    add     r30, r26                ; Z += (y1 >> 3)
-    adc     r31, r1
-
-    ; Calculate initial bit mask: 0x80 >> (y1 & 0x07)
-    sub     r18, r22                ; Calculate dy before modyfying y1: r18 = dy = y2 - y1
-    andi    r22, 0x07               ; y1 &= 0x07
-    ldi     r27, 0x80               ; bit mask = 0x80
-    rjmp    .+2                     ; Skip first shift
-.TL_mask_shift:
-    lsr     r27                     ; mask >>= 1
-    dec     r22
-    brpl    .TL_mask_shift
-    mov     r0, r27
-    lat     Z, r0                   ; Toggle initial pixel at x1,y1
-    
-    ; Initialize x vars
-    ; Note: x is REVERSED, so positive dx means NEGATIVE step in buffer
-    sub     r20, r24                ; r20 = dx = x2 - x1
-    ldi     r25, -18                ; stepx lo = -18 (positive dx means left in buffer)
-    ldi     r24, -1                 ; stepx hi = -1
-    tst     r20                     ; test dx for zero or negative
-    brpl    .+6                     ; branch if positive
-    neg     r20                     ; dxabs = -dx
-    ldi     r25, 18                 ; stepx lo = 18 (negative dx means right in buffer)
-    ldi     r24, 0                  ; stepx hi = 0
-    ; Initialize y vars
-    ;sub     r18, r22               ; dy calculated previously
-    ldi     r26, 1                  ; stepy lo = 1
-    tst     r18                     ; test dy for zero or negative
-    brpl    .+4                     ; branch if positive (skip neg + ldi)
-    neg     r18                     ; dyabs = -dy
-    ldi     r26, -1                 ; stepy lo = -1
-
-    cp      r20, r18                ; if (dxabs >= dyabs)
-    brlo    .TVertical_line
-
-    ;;; Line is more horizontal ;;;
-    mov     r23, r20                ; e = dxabs
-    lsr     r23                     ; e >>= 1
-    mov     r21, r20                ; loop counter = dxabs
-.THorizontal_Loop:
-    tst     r21                     ; counter positive?
-    brne    .+2                     ; if dxabs != 0, continue loop
-    ret                             ; if dxabs == 0, exit
-    add     r23, r18                ; e += dyabs
-    cp      r23, r20                ; if (e >= dxabs)
-    brlo    .THorizontalStepx        ; Branch if lower
-    sub     r23, r20                ; e -= dxabs
-    ; Update bit mask and buffer pointer for y change
-    tst     r26                     ; check stepy sign
-    brmi    .TStepyNegative          ; branch if minus
-.TStepYPositive:
-    lsr     r27                     ; stepy = 1: shift mask RIGHT, if bit 0 was set, wrap to next row
-    brcc    .THorizontalStepx        ; Branch if no wrap
-    ldi     r27, 0x80               ; wrap to bit 7
-    subi    r30, -1                 ; move to next row
-    sbci    r31, -1                 ; Z = Z + 1
-    rjmp    .THorizontalStepx
-.TStepyNegative:
-    ; stepy = -1: shift mask LEFT, if bit 7 was set, wrap to prev row
-    lsl     r27                     ; shift left
-    brcc    .THorizontalStepx        ; Branch if no wrap
-    ldi     r27, 0x01               ; wrap to bit 0
-    subi    r30, 1                  ; move to previous row
-    sbci    r31, 0                  ; Z = Z - 1
-.THorizontalStepx:
-    add     r30, r25                ; Z = Z + stepx
-    adc     r31, r24
-    mov     r0, r27                 ; Copy mask to r0
-    las     Z, r0                   ; Set bits in display data
-    dec     r21
-    rjmp    .THorizontal_Loop
-
-.TVertical_line:
-    ;;; Line is more vertical ;;;
-    mov     r23, r18                ; e = dyabs
-    lsr     r23                     ; e >>= 1
-    mov     r21, r18                ; loop counter = dyabs
-.TVertical_Loop:
-    tst     r21                     ; counter positive?
-    brne    .+2                     ; if dyabs != 0, continue loop
-    ret                             ; if dyabs == 0, exit
-    add     r23, r20                ; e += dxabs
-    cp      r23, r18                ; if (e >= dyabs)
-    brlo    .TVerticalStepY          ; Branch if lower
-    sub     r23, r18                ; e -= dyabs
-    add     r30, r25                ; Z = Z + stepx
-    adc     r31, r24
-.TVerticalStepY:
-    ; Update bit mask and buffer pointer for y change
-    tst     r26                     ; check stepy sign
-    brmi    .TStepyNegative2         ; branch if minus
-.TStepYPositive2:
-    lsr     r27                     ; stepy = 1: shift mask RIGHT, if bit 0 was set, wrap to next row
-    brcc    .TVerticalSetPixel       ; Branch if no wrap
-    ldi     r27, 0x80               ; wrap to bit 7
-    subi    r30, -1                 ; move to next row
-    sbci    r31, -1                 ; Z = Z + 1
-    rjmp    .TVerticalSetPixel
-.TStepyNegative2:
-    ; stepy = -1: shift mask LEFT, if bit 7 was set, wrap to prev row
-    lsl     r27                     ; shift left
-    brcc    .TVerticalSetPixel       ; Branch if no wrap
-    ldi     r27, 0x01               ; wrap to bit 0
-    subi    r30, 1                  ; move to previous row
-    sbci    r31, 0                  ; Z = Z - 1
-.TVerticalSetPixel:
-    mov     r0, r27                 ; Copy mask to r0
-    lat     Z, r0                   ; Toggle bits in display data
-    dec     r21
-    rjmp    .TVertical_Loop
-#endif  // #if 0 — end of unused toggle functions
-
 // White background
 #ifdef INVERT_DISPLAY
 
@@ -234,10 +75,6 @@ set_pixel_body:
     lac     z, r24                  ; Clear bits in display data
     ret
 
-.global clr_pixel_buffer
-clr_pixel_buffer:
-    movw    r30, r20                ; Load passed pointer into Z (r30=lo, r31=hi)
-    rjmp    set_pixel_body          ; Raw CLEAR bits (set_pixel_body ends in lac under INVERT)
 
 ; Disp_send.display_data[(uint16_t)((127-x)*18) + (y>>3)] &= ~(uint8_t)(0x80 >> (y & 0x07));
 .global clr_pixel                   ; void setpixel(uint8_t x, uint8_t y);
@@ -275,11 +112,6 @@ get_pixel_buffer:
 
 ; uint8_t get_pixel(uint8_t x, uint8_t y);
 ; Returns 0 if pixel is background, non-zero if ink
-.global get_pixel
-get_pixel:
-    lds     r30, Disp_send+2        ; r31:r30 = addr + 127*18
-    lds     r31, Disp_send+3
-    ldi     r20, 1                  ; r20=1: inverted display, ink is a cleared bit
 get_pixel_body:
     ldi     r25, 18                 ; r25 = 18
     mul     r24, r25                ; r1:r0 = x*18
@@ -605,11 +437,6 @@ set_pixel_body:
     las     z, r24                  ; Set bits in display data
     ret
 
-.global clr_pixel_buffer
-clr_pixel_buffer:
-    movw    r30, r20                ; Load passed pointer into Z (r30=lo, r31=hi)
-    rjmp    clr_pixel_body
-
 ; LS013B7DH03 128x128 memory LCD
 ; Disp_send.display_data[(uint16_t)((127-x)*18) + (y>>3)] &= ~(uint8_t)(0x80 >> (y & 0x07));
 .global clr_pixel                   ; void setpixel(uint8_t x, uint8_t y);
@@ -646,10 +473,6 @@ get_pixel_buffer:
 
 ; uint8_t get_pixel(uint8_t x, uint8_t y);
 ; Returns 0 if pixel is clear, non-zero if set
-.global get_pixel
-get_pixel:
-    lds     r30, Disp_send+2        ; r31:r30 = addr + 127*18
-    lds     r31, Disp_send+3
 get_pixel_body:
     ldi     r25, 18                 ; r25 = 18
     mul     r24, r25                ; r1:r0 = x*18

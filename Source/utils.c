@@ -115,7 +115,7 @@ int8_t Cosine60(uint8_t angle, int8_t scale) {
 
 // Tunes: Duration, Note
 
-uint8_t *TunePtr;  // Pointer to current tune note
+const uint8_t *TunePtr;  // Pointer to current tune note
 
 const unsigned char TuneIntro[] PROGMEM = {
     20, NOTE_C8, 10, NOTE_OFF,

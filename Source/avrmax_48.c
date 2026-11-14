@@ -451,7 +451,7 @@ FAIL_HIGH:
 RETURN:
     /* Simulated function return: dispatch to caller's resume label using the
      * callee's arg_state (set before the goto CALL that created this frame).  */
-    if (T.CHESS.MP != T.CHESS.SA + U) {
+    if (T.CHESS.MP != T.CHESS.SA + CHESS_U) {
         switch (_.a) {
             case 0: goto NULL_MOVE_RETURN;
             case 1: goto RECURSIVE_RETURN;

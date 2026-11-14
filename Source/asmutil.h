@@ -1,17 +1,11 @@
 #ifndef _ASMUTIL_H
 #define _ASMUTIL_H
 
-// toggle_pixel / toggle_line functions are currently unused (asm code wrapped in #if 0)
- void    toggle_pixel_buffer(uint8_t x, uint8_t y, uint8_t *p);
  void    toggle_pixel(uint8_t x, uint8_t y);
-// void    toggle_line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2);
-// void    toggle_line_buffer(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t *p);
 void    set_pixel_buffer(uint8_t x, uint8_t y, uint8_t *p);
 void    set_pixel(uint8_t x, uint8_t y);
 void    vertical_dots(uint8_t x);            // Dots at (x,16), (x,32), ... (x,112)
 void    clr_pixel(uint8_t x, uint8_t y);
-void    clr_pixel_buffer(uint8_t x, uint8_t y, uint8_t *p);
-uint8_t get_pixel(uint8_t x, uint8_t y);
 uint8_t get_pixel_buffer(uint8_t x, uint8_t y, uint8_t *p);
 void	display_or(uint8_t data);           // OR data with display buffer
 void    set_line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2);

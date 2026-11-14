@@ -19,6 +19,7 @@ static void Stopwatch(void);
 static void CountDown(void);
 static void EditAlarms(void);
 static void FindNextAlarm(void);
+static void ClearCountdown(void);
 uint8_t firstdayofmonth(Type_Time *timeptr);
 uint8_t DaysInMonth(Type_Time *timeptr);
 void BigPrintMonth(void);
@@ -78,8 +79,9 @@ ISR(TCF0_OVF_vect, ISR_NAKED) {
 
 // TCF0 Compare Interrupt (every minute), disabled during oscilloscope mode
 ISR(TCF0_CCA_vect) {
-    TCF0.CCA+=60;                           // Prepare next interrupt on next minute
-    if(TCF0.CCA>43199) TCF0.CCA=59;
+    uint16_t next = TCF0.CCA+60;
+    if(next>43199) next=59;
+    TCF0.CCA = next;
     NowSecond=0;
     NowMinute++;                            // Update minute
     if(BattLevel==0) {
@@ -192,6 +194,15 @@ void Watch(void) {
     setbit(WatchBits, hourChanged);
     CPU_Slow();    
     do {                                    // Loop cycle time is 0.5 seconds
+        // A one-time alarm (Countdown) must fire on its exact second. The RTC wakes
+        // us every half second, so check it here rather than redrawing every second.
+        if(!testbit(MStatus, sound_on) && testbit(MStatus, alarm_on) && testbit(MStatus, countdwn)) {
+            GetTimeTimer();
+            if(AlarmHour==NowHour && AlarmMinute==NowMinute && NowSecond==T.TIME.AlarmSecond) {
+                eeprom_write_byte(&EE_Alarms[T.TIME.AlarmIndex].active, 0);   // One-time alarm is consumed
+                setbit(MStatus, sound_on);
+            }
+        }
         // Check user input
         if(testbit(Misc, userinput)) {
             SecTimeout = 60;                    // Show seconds display for one minute
@@ -275,17 +286,14 @@ void Watch(void) {
                 }
             }
             if(AlarmHour==NowHour && AlarmMinute==NowMinute && testbit(MStatus, alarm_on)) {
-                if(NowSecond<=1) setbit(MStatus, sound_on);   // Make sound until user cancels
+                // One-time alarms are started by the second-accurate check above
+                if(!testbit(MStatus, countdwn) && NowSecond<=1) setbit(MStatus, sound_on);
                 if(testbit(MStatus, sound_on) && TCD1.CTRLA==0) { // Sound enabled and no tune active
                     Sound((uint8_t *)pgm_read_word(TuneAlarms+T.TIME.AlarmTune));
                 }
                 SecTimeout = 60;    // Show seconds during alarm
             } else {
                 if(testbit(MStatus, sound_on)) {
-                    uint8_t index = T.TIME.AlarmIndex;
-                    if((eeprom_read_byte(&EE_Alarms[index].active) & 0b01111111) == 0) {   // Check if this was a one-time only alarm (all active days are disabled)
-                        eeprom_write_byte(&EE_Alarms[index].active, 0); // Clear active bit
-                    }
                     FindNextAlarm();                // An alarm just finished, find next alarm
                     clrbit(MStatus, sound_on);
                 }
@@ -604,26 +612,70 @@ void ShowAlarmTime(uint8_t col, uint8_t row) {
     } else print5x8(PSTR("       "));
 }    
 
+// Disarm the CountDown one-time alarm and refresh the next alarm
+static void ClearCountdown(void) {
+    eeprom_write_byte(&EE_Alarms[TOTAL_ALARMS-1].active, 0);
+    GetTimeTimer();
+    FindNextAlarm();
+}
+
 void CountDown(void) {
     uint8_t hour=0,minute=0,second=0;
     uint8_t lapl=2, lap=0;
     uint8_t start=0, clock=0, clear=1;
     uint8_t timeout=240;
     clrbit(MStatus, goback);
+    GetTimeTimer();                         // Current time for the countdown target
+    if(eeprom_read_byte(&EE_Alarms[TOTAL_ALARMS-1].active) == 0x80) {
+        // Resume a countdown that was left running when the mode was exited
+        int8_t s = (int8_t)eeprom_read_byte(&EE_Alarms[TOTAL_ALARMS-1].second) - NowSecond;
+        int8_t m = (int8_t)eeprom_read_byte(&EE_Alarms[TOTAL_ALARMS-1].minute) - NowMinute;
+        int8_t h = (int8_t)eeprom_read_byte(&EE_Alarms[TOTAL_ALARMS-1].hour)   - NowHour;
+        if(s < 0) { s += 60; m--; }
+        if(m < 0) { m += 60; h--; }
+        if(h < 0) h += 24;
+        hour = h; minute = m; second = s;
+        if(hour | minute | second) {
+            start = 1;
+            clock = 1;                          // First tick on the next second boundary
+        } else {                            // Expired while we were away
+            ClearCountdown();
+        }
+    }
     do {
         if(testbit(Misc,userinput)) {
             clrbit(Misc, userinput);
             timeout=240;
             if(testbit(Buttons,KUR)) {          // START / STOP
-                start = !start;
+                if(start) {                     // Stop and cancel the countdown alarm
+                    start = 0;
+                    ClearCountdown();
+                } else if(hour | minute | second) {  // Start
+                    GetTimeTimer();
+                    uint8_t s = NowSecond + second;
+                    uint8_t carry = (s >= 60);
+                    if(carry) s -= 60;
+                    uint8_t m = NowMinute + minute + carry;
+                    carry = (m >= 60);
+                    if(carry) m -= 60;
+                    uint8_t h = NowHour + hour + carry;
+                    if(h >= 24) h -= 24;
+                    Type_Alarm a = { h, m, s, 0x80, 0 };
+                    eeprom_write_block(&a, &EE_Alarms[TOTAL_ALARMS-1], sizeof(Type_Alarm));
+                    FindNextAlarm();
+                    start = 1;
+                    clock = 1;                          // Count down on the next second boundary
+                }
             }
-            if(testbit(Buttons,K1)) {
-                if(hour<23) hour++;
-            }                
-            if(testbit(Buttons,K2)) minute++;
-            if(minute>=60) minute=0;
-            if(testbit(Buttons,K3)) second++;
-            if(second>=60) second=0;
+            if(!start) {                        // Only adjust the duration while stopped
+                if(testbit(Buttons,K1)) {
+                    if(hour<23) hour++;
+                }
+                if(testbit(Buttons,K2)) minute++;
+                if(minute>=60) minute=0;
+                if(testbit(Buttons,K3)) second++;
+                if(second>=60) second=0;
+            }
             if(testbit(Buttons,KBR)) {
                 if(start) {    // LAP
                     lap++;
@@ -638,24 +690,25 @@ void CountDown(void) {
             if(testbit(Buttons,KML)) setbit(MStatus, goback);
         }
         if(start) {
-            if(SECPULSE() && clock==0) clock=1;
-            else if(!SECPULSE() && clock==1) {
-                clock=0;            
-                second--;
-                if(second==255) {
-                    second=59;
-                    minute--;
-                    if(minute==255) {
-                        minute=59;
-                        if(hour) hour--;
-                        else {  // Reached zero
-                            Sound(TuneAlarm0);   // Beep
-                            second=0;
-                            minute=0;
-                        }                            
+            if(SECPULSE()) {
+                if(!clock) {        // One tick per second, on the RTC second boundary
+                    clock=1;
+                    second--;
+                    if(second==255) {
+                        second=59;
+                        minute--;
+                        if(minute==255) {
+                            minute=59;
+                            if(hour) hour--;
+                        }
+                    }
+                    if(!hour && !minute && !second) {    // Countdown expired
+                        ClearCountdown();
+                        Sound(TuneAlarm0);              // Beep
+                        start = 0;
                     }
                 }
-            }
+            } else clock=0;
         } else {
             if(--timeout==0) setbit(MStatus, goback);
         }
@@ -881,7 +934,9 @@ void EditAlarms(void) {
 }
 
 // Finds the next alarm within 24 hours by converting each candidate to
-// "minutes from now" (0–1440) and picking the minimum.
+// "minutes from now" (0-1440) and picking the minimum. An alarm with the
+// active bit set but no weekday bits is a one-time alarm: it rings at the
+// nearest occurrence of its time, on any day.
 void FindNextAlarm(void) {
     Type_Alarm Alarms[TOTAL_ALARMS];
     eeprom_read_block(&Alarms, &EE_Alarms, TOTAL_ALARMS*sizeof(Type_Alarm));
@@ -891,11 +946,12 @@ void FindNextAlarm(void) {
     uint8_t Todaybit    = 0x40 >> NowWeekDay;
     uint8_t Tomorrowbit = 0x40 >> Tomorrow;
 
-    uint16_t nowMin  = (uint16_t)NowHour * 60 + NowMinute;
+    uint16_t nowMin    = (uint16_t)NowHour * 60 + NowMinute;
     uint16_t bestDelta = 1441;   // Larger than any valid delta (max is 1439)
     uint8_t  bestIdx   = 0xFF;
 
     clrbit(MStatus, alarm_on);
+    clrbit(MStatus, countdwn);
     setbit(WatchBits, hourChanged);
 
     for(uint8_t i = 0; i < TOTAL_ALARMS; i++) {
@@ -904,17 +960,20 @@ void FindNextAlarm(void) {
         uint16_t alarmMin = (uint16_t)Alarms[i].hour * 60 + Alarms[i].minute;
 
         // Minutes from now (handles day wrap: if alarm < now, it's tomorrow)
-        uint16_t delta = (alarmMin >= nowMin)
-                        ? (alarmMin - nowMin)           // Today
-                        : (1440 - nowMin + alarmMin);   // Tomorrow (wraps midnight)
-
-        // Check if this alarm is active for today
-        if((Alarms[i].active & Todaybit) && delta < bestDelta) {
-            bestDelta = delta;
-            bestIdx   = i;
+        uint16_t delta;
+        uint8_t  daybit;
+        if(alarmMin >= nowMin) {
+            delta  = alarmMin - nowMin;
+            daybit = Todaybit;
+        } else {
+            delta  = 1440 - nowMin + alarmMin;
+            daybit = Tomorrowbit;
         }
-        // Check if this alarm is active for tomorrow (only valid when alarmMin < nowMin)
-        if((Alarms[i].active & Tomorrowbit) && alarmMin < nowMin && delta < bestDelta) {
+
+        // A one-time alarm rings on the nearest occurrence, whatever the weekday.
+        // Prefer it on a tie so a regular alarm in the same minute cannot shadow it.
+        if((Alarms[i].active == 0x80 || (Alarms[i].active & daybit)) &&
+           (delta < bestDelta || (delta == bestDelta && Alarms[i].active == 0x80))) {
             bestDelta = delta;
             bestIdx   = i;
         }
@@ -922,6 +981,7 @@ void FindNextAlarm(void) {
 
     if(bestIdx != 0xFF) {                       // Load the next alarm to fire
         setbit(MStatus, alarm_on);
+        if(Alarms[bestIdx].active == 0x80) setbit(MStatus, countdwn);
         AlarmHour          = Alarms[bestIdx].hour;
         AlarmMinute        = Alarms[bestIdx].minute;
         T.TIME.AlarmSecond = Alarms[bestIdx].second;

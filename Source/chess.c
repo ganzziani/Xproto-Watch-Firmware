@@ -201,7 +201,7 @@ void PlayChess(void) {
     const char *result = PSTR("Checkmate");
 
     player = &T.CHESS.Player1;
-    T.CHESS.MP = T.CHESS.SA + U;        /* Initialize engine stack pointer (empty stack) */
+    T.CHESS.MP = T.CHESS.SA + CHESS_U;        /* Initialize engine stack pointer (empty stack) */
     clrbit(MStatus, goback);
 
     /* Reset engine state */

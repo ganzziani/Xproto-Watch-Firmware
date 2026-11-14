@@ -169,21 +169,24 @@ void MoveSnake(SnakeStruct *Player) {
             case GO_LEFT:  Player->x[0]--; break;
             case GO_RIGHT: Player->x[0]++; break;
         }
-        if(T.SNAKE.board[Player->x[0]][Player->y[0]]>=OBSTACLE ||        // New position is an obstacle or a body
-            Player->x[0]>=32 || Player->y[0]>=32) {                         // Out of boundaries
+        if(Player->x[0]>=32 || Player->y[0]>=32 ||                      // Out of boundaries (checked first: no out-of-range index)
+            T.SNAKE.board[Player->x[0]][Player->y[0]]>=OBSTACLE) {      // New position is an obstacle or a body
             Player->state = 0;                                              // Died
             return;
         }            
         T.SNAKE.board[Player->x[0]][Player->y[0]] = Player->state;       // New head position
         if(T.SNAKE.Fruitx==Player->x[0] && T.SNAKE.Fruity==Player->y[0]) {  // Got Fruit!
-            if(Player->size<=(32*32)) {
+            // Fruit counts the fruits spawned so far and is also the growth of this
+            // bite, so the last cell written is size+Fruit-1: reserve room for the
+            // largest one a uint8_t can ask for (x[]/y[] only hold BOARD_SIZE cells)
+            if(Player->size<=BOARD_SIZE-255) {
                 for(uint8_t i=0; i<T.SNAKE.Fruit; i++) {
                     Player->x[Player->size+i]=Player->x[Player->size-1];          // Extend tail
                     Player->y[Player->size+i]=Player->y[Player->size-1];
                 }                    
                 Player->size+=T.SNAKE.Fruit;
-                NewFruit();
-            }                
+            }
+            NewFruit();     // Even when the snake is at its maximum length
         }
     } else {
         if(Player->size>3) {    // Shrink if dead

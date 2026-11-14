@@ -205,7 +205,6 @@ void KeyInput(uint8_t in);          // Decode a key pattern, as the key ISR does
 void CPU_Slow(void);
 void MSO(void);
 void CalibrateOffset(void);
-uint8_t ReadCalibrationByte(uint8_t location);	// Read out calibration byte
 void CCPWrite( volatile uint8_t * address, uint8_t value );
 int16_t MeasureVin(uint8_t scale);
 
@@ -295,7 +294,7 @@ typedef union {
     struct {
         uint8_t level;            // Level (Sets thinking time)
         uint8_t Player1, Player2;
-        #define U 128             /* D() Stack array size (think depth), 4minimum */
+        #define CHESS_U 128       /* D() Stack array size (think depth), 4minimum */
         struct {
             short q,l,e;          /* Args: (q,l)=window, e=current eval. score         */
             short m,v,            /* m=value of best move so far, v=current evaluation */
@@ -313,7 +312,7 @@ typedef union {
             X,Y,                 /* X=origin, Y=target square of best move so far     */
             a;                   /* D() return address state                          */
             unsigned short k;    /* Position-key XOR delta of the current move        */
-        } _, SA[U],*MP;          /* _=working set, SA=stack array, MP=stack pointer   */
+        } _, SA[CHESS_U],*MP;    /* _=working set, SA=stack array, MP=stack pointer   */
         uint8_t hist_n;          /* Positions recorded since last irreversible move   */
         uint16_t histk[16];      /* Repetition ring: position keys (board + side)     */
         uint8_t  histb[16][64];  /* Repetition ring: board snapshots (valid squares)  */

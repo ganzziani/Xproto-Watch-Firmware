@@ -36,9 +36,9 @@ void Diagnose(void) {
         print5x8(PSTR("\nLOGI ")); printhex5x8(VPORT2.IN);      // Shows the logic input data
         print5x8(PSTR("\nVIN  ")); print16_5x8(MeasureVin(1));
         cli();
-        SecTimeout = SREG;  // MeasureVCC alters the T bit!
+        uint8_t sreg = SREG;    // MeasureVCC alters the T bit!
         print5x8(PSTR("\nVCC  ")); print16_5x8(MeasureIntV(MEASURE_VCC));
-        SREG = SecTimeout;
+        SREG = sreg;
         sei();
         print5x8(PSTR("\nVREF ")); print16_5x8(MeasureIntV(MEASURE_VREF));
         print5x8(PSTR("\nCLK  ")); printhex5x8(CLK.CTRL); printhex5x8(OSC.CTRL); printhex5x8(OSC.STATUS); printhex5x8(OSC.XOSCFAIL);
@@ -138,6 +138,7 @@ void Profiles(void) {
             clrbit(Misc, userinput);
             if(testbit(Buttons,KBR) || testbit(Buttons,KBL)) slot++;
             if(testbit(Buttons,KUR) || testbit(Buttons,KUL)) slot--;
+            if(slot>=8) slot=0;
             if(testbit(Buttons,KML)) setbit(MStatus, goback);
             if(testbit(Buttons,K1)) {   // Restore Default Settings
                 LoadProfile(0);
@@ -148,7 +149,6 @@ void Profiles(void) {
             if(testbit(Buttons,K3)) {   // Save Profile
                 SaveProfile(slot);
             }
-            if(slot>=8) slot=0;
         }
         dma_display();
         WaitDisplay();
@@ -246,11 +246,11 @@ void OWSettings(void) {
             timeout = 255;
             if(testbit(Buttons,KBR) || testbit(Buttons,KBL)) select++;
             if(testbit(Buttons,KUR) || testbit(Buttons,KUL)) select--;
+            if(select>=5) select=0;
             if(testbit(Buttons,KML)) setbit(MStatus, goback);
             if(testbit(Buttons,K1)) {   // Toggle
                 WSettings ^= (1 << pgm_read_byte(&settings_bits[select]));
             }
-            if(select>=5) select=0;
         }
         dma_display();
         WaitDisplay();

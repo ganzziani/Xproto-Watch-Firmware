@@ -640,10 +640,10 @@ void bitmap_safe(int8_t x, int8_t y, const uint8_t *BMP, uint8_t c) {
     uint8_t *p;
 	uint8_t data=0,count=0;
     uint8_t *prev=T.CHESS.BMPprev;  // Previous decoded column, to undo the column XOR delta
-    int16_t width,height;           // (scratch space borrowed from the union; max height 128)
+    uint8_t width,height;           // (scratch space borrowed from the union; max height 16)
     width=pgm_read_byte(BMP++);
     height=pgm_read_byte(BMP++)/8;
-    if(width<0 || y+height<=0) return;
+    if(y+height<=0) return;
     p = Disp_send.DataAddress -(x)*18 + (y);
     for(uint8_t i=0; i<height; i++) prev[i]=0;  // First column XORs against zero
  	for (int16_t col=x ; col < x+width; col++) {
