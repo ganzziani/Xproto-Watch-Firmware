@@ -10,9 +10,6 @@
 #include "utils.h"
 #include "config.h"
 
-static uint16_t slow_count;
-static uint32_t slow_sum1, slow_sum2;
-
 // Function prototypes
 static void Reduce(void);
 static void RestorefromMeter(void);		    // Restores srate and gains
@@ -2943,7 +2940,9 @@ void Apply(void) {
     TCE1.CTRLA = 0;		    // TCE1 controls Interrupt ADC, srate: 6, 7, 8, 9, 10 and fixed value for slow sampling
     TCE1.CTRLB = 0;
     TCE1.INTCTRLA = 0;
-    slow_count = 0; slow_sum1 = 0; slow_sum2 = 0;
+    T.SCOPE.slow_count = 0;
+    T.SCOPE.slow_sum1 = 0;
+    T.SCOPE.slow_sum2 = 0;
     TCC1.CTRLA = 0;
     TCC1.CTRLB = 0;
     // TCC0 controls the auto trigger and auto key repeat
@@ -3058,9 +3057,23 @@ ISR(TCE1_OVF_vect) {
 
     ou8CursorX = u8CursorX;
     ou8CursorY = u8CursorY;
-    // Get and apply offset
-    ch1 = ADCA.CH0.RESL; ch1 = saddwsat(ch1,T.SCOPE.CH1.offset);
-    ch2 = ADCB.CH0.RESL; ch2 = saddwsat(ch2,T.SCOPE.CH2.offset);
+    // Acquire
+    ch1 = ADCA.CH0.RESL;
+    ch2 = ADCB.CH0.RESL;
+    // Derivative
+    if(testbit(CH1ctrl,derivative)) {
+        uint8_t prev=ch1;
+        ch1 = ch1 - T.SCOPE.slow_prev1;
+        T.SCOPE.slow_prev1=prev;
+    }
+    if(testbit(CH2ctrl,derivative)) {
+        uint8_t prev=ch2;
+        ch2 = ch2 - T.SCOPE.slow_prev2;
+        T.SCOPE.slow_prev2=prev;
+    }
+    // Offset
+    ch1 = saddwsat(ch1,T.SCOPE.CH1.offset);
+    ch2 = saddwsat(ch2,T.SCOPE.CH2.offset);
     // Invert
     if(testbit(CH1ctrl,chinvert)) ch1 = 255-ch1;
     if(testbit(CH2ctrl,chinvert)) ch2 = 255-ch2;
@@ -3076,17 +3089,17 @@ ISR(TCE1_OVF_vect) {
         if(testbit(CH2ctrl,submult)) ch2=addwsat(ch2,-(int8_t)sch1);   // CH2-CH1
         else ch2=mul;                                                  // CH1*CH2
     }
-    slow_sum1+=ch1;
-    slow_sum2+=ch2;
+    T.SCOPE.slow_sum1+=ch1;
+    T.SCOPE.slow_sum2+=ch2;
 
-    slow_count++;
+    T.SCOPE.slow_count++;
     setbit(Misc,slowacq);
-    if(slow_count>=T.SCOPE.slowval) {
-        slow_count=0;
+    if(T.SCOPE.slow_count>=T.SCOPE.slowval) {
+        T.SCOPE.slow_count=0;
         // Average
-        if(testbit(CH1ctrl,chaverage)) ch1=slow_sum1/T.SCOPE.slowval;
-        if(testbit(CH2ctrl,chaverage)) ch2=slow_sum2/T.SCOPE.slowval;
-        slow_sum1=0; slow_sum2=0;
+        if(testbit(CH1ctrl,chaverage)) ch1=T.SCOPE.slow_sum1/T.SCOPE.slowval;
+        if(testbit(CH2ctrl,chaverage)) ch2=T.SCOPE.slow_sum2/T.SCOPE.slowval;
+        T.SCOPE.slow_sum1=0; T.SCOPE.slow_sum2=0;
         if(testbit(Display,elastic)) {
             ch1=average(T.SCOPE.DC.CH1data[Index],ch1);
             ch2=average(T.SCOPE.DC.CH2data[Index],ch2);
@@ -3097,7 +3110,7 @@ ISR(TCE1_OVF_vect) {
     }
     if(testbit(MFFT, scopemode) && !testbit(Mcursors,roll)) {  // Draw data if in scope mode
         // Draw Channel 1
-        if(slow_count==0 || !testbit(CH1ctrl,chaverage)) {
+        if(T.SCOPE.slow_count==0 || !testbit(CH1ctrl,chaverage)) {
             uint8_t oldch1;
             // Apply position
             ch1=addwsat(ch1,M.CH1pos);
@@ -3117,7 +3130,7 @@ ISR(TCE1_OVF_vect) {
             }
         }
         // Draw Channel 2
-        if(slow_count==0 || !testbit(CH2ctrl,chaverage)) {
+        if(T.SCOPE.slow_count==0 || !testbit(CH2ctrl,chaverage)) {
             uint8_t oldch2;
             // Apply position
             ch2=addwsat(ch2,M.CH2pos);
@@ -3165,7 +3178,7 @@ ISR(TCE1_OVF_vect) {
         }
     }
     else if(testbit(MFFT, fftmode) && testbit(Display,showset)) set_pixel(Index>>1, 63);   // FFT progress
-    if(slow_count==0) {
+    if(T.SCOPE.slow_count==0) {
         Index++;
         if(Index==0) {
             setbit(Misc,sacquired);
