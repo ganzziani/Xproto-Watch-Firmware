@@ -259,7 +259,10 @@ typedef union {
         uint8_t slow_prev2;
         uint8_t old_s, old_g1, old_g2;      // sampling, gains before entering meter mode
         uint8_t shortcuti;                  // shortcut index
-        ACHANNEL CH1,CH2;                   // Analog Channel 1, Channel 2
+        struct {
+            ACHANNEL CH1;                   // Analog Channel 1
+            ACHANNEL CH2;                   // Analog Channel 2
+        };            
         SCOPE_DATA DC;                      // Data samples
     } SCOPE;
     struct {

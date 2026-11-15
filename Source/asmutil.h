@@ -1,7 +1,7 @@
 #ifndef _ASMUTIL_H
 #define _ASMUTIL_H
 
- void    toggle_pixel(uint8_t x, uint8_t y);
+void    toggle_pixel(uint8_t x, uint8_t y);
 void    set_pixel_buffer(uint8_t x, uint8_t y, uint8_t *p);
 void    set_pixel(uint8_t x, uint8_t y);
 void    vertical_dots(uint8_t x);            // Dots at (x,16), (x,32), ... (x,112)
